@@ -1,3 +1,45 @@
+# openxlsx2 0.3.1
+
+## New features
+
+* Functions adding data to a workbook now bring an `applyCellStyle` argument. If this is `TRUE` `openxlsx2` will apply a numeric style, if `FALSE` we will simply add the numeric value without additional styling and use the previous cell style. [365](https://github.com/JanMarvin/openxlsx2/pull/365)
+
+* Reading from file or workbook with `showFormula` now returns all formulas found in the workbook. Previously only those with type `e` or `str` were returned. Now we will be able to see formulas like hyperlinks too. [352](https://github.com/JanMarvin/openxlsx2/issues/352)
+
+## Internal changes
+
+* Moved data validation list from x14 to data validation. This enables data validation lists without x14 extension [openxlsx 386](https://github.com/ycphs/openxlsx/issues/386). [347](https://github.com/JanMarvin/openxlsx2/pull/347)
+
+* Removed `build_cell_merges()` and replaced it with a plain R solution. [390](https://github.com/JanMarvin/openxlsx2/pull/390)
+
+## Fixes
+
+* Improvements to setting column widths. Previously values set by `set_col_widths()` were a little off. This has now been improved. There are still corner cases where the column width set with `openxlsx2` does not match those shown in spreadsheet software. Notable differences can be seen with floating point values (e.g., `10L` works while `10.1` is slightly off) and with column width on Mac. [350](https://github.com/JanMarvin/openxlsx2/pull/350)
+
+* Improve `rowNames` when writing data to worksheet. Previously the name for the rownames column defaulted to `1`. This has been changed. Now with data it defaults to an empty cell and with a data table it defaults to `_rowNames_`. [375](https://github.com/JanMarvin/openxlsx2/pull/375)
+
+* Fix the workbook xml relationship file to not include a reference to shared strings per default. This solves [360](https://github.com/JanMarvin/openxlsx2/issues/360) for plain data files written from `openxlsx2`. [363](https://github.com/JanMarvin/openxlsx2/pull/363)
+
+* Adding cell styles has been streamlined to increase consistency. This includes all style functions like `wb_add_font()` and covers all cases of hyperlinks. [365](https://github.com/JanMarvin/openxlsx2/pull/365)
+
+* Fix cloning pivot charts. [361](https://github.com/JanMarvin/openxlsx2/issues/361)
+
+* Fix loading and writing files with slicers. Loading would add a few empty slicer xml files to `Content_Types` and `workbook.xml.rels`. [361](https://github.com/JanMarvin/openxlsx2/issues/361)
+
+* Align the logic for writing data to empty worksheets and updating/writing to worksheets with data. This removes `update_cell_loop()` and changes how `update_cell()` behaves. Not only does this remove duplicated code, it also brings great speed improvements (issue [356](https://github.com/JanMarvin/openxlsx2/issues/356)). [356](https://github.com/JanMarvin/openxlsx2/issues/356)
+
+* It is now possible to use special characters in formulas without coding. Previously `&` had to be encoded like `&amp;` [251](https://github.com/JanMarvin/openxlsx2/issues/251)
+
+## Breaking changes
+
+* Previously deprecated `names.wbWorkbook()` and `names<-.wbWorkbook()` have been removed. [367](https://github.com/JanMarvin/openxlsx2/pull/367)
+
+* Conditional style defaults for `create_dxfs_style()` have changed to be more permissive. Previously we shipped a default font, default font size and font color. This has been changed to better reflect a behavior the user expects. [343](https://github.com/JanMarvin/openxlsx2/issues/343)
+
+
+***************************************************************************
+
+
 # openxlsx2 0.3
 
 ## New features

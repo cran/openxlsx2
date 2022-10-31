@@ -10,7 +10,7 @@ test_that("Loading readTest.xlsx Sheet 1", {
   expect_equal(expected_shared_strings(), sst)
 })
 
-test_that("Loading multiple pivot tables: loadPivotTables.xlsx works",{
+test_that("Loading multiple pivot tables: loadPivotTables.xlsx works", {
   ## loadPivotTables.xlsx is a file with 3 pivot tables and 2 of them have the same reference data (pivotCacheDefinition)
   fl <- system.file("extdata", "loadPivotTables.xlsx", package = "openxlsx2")
   wb <- wb_load(fl)
@@ -189,7 +189,7 @@ test_that("additional wb tests", {
   exp <- data.frame(Var1 = c("TRUE", "TRUE", "TRUE", "FALSE"),
                     Var3 = c(1.00, NaN, 1.34, NA))
   got <- wb_to_df(wb1, cols = c(1, 4),
-                  types = c("Var1" = 0, "Var3" = 1))[seq_len(4),]
+                  types = c("Var1" = 0, "Var3" = 1))[seq_len(4), ]
   expect_equal(exp, got, ignore_attr = TRUE)
   expect_equal(names(exp), names(got))
 })
@@ -197,12 +197,12 @@ test_that("additional wb tests", {
 test_that("test headerFooter", {
 
   # Plain text headers and footers
-  header = c('ODD HEAD LEFT', 'ODD HEAD CENTER', 'ODD HEAD RIGHT')
-  footer = c('ODD FOOT RIGHT', 'ODD FOOT CENTER', 'ODD FOOT RIGHT')
-  evenHeader = c('EVEN HEAD LEFT', 'EVEN HEAD CENTER', 'EVEN HEAD RIGHT')
-  evenFooter = c('EVEN FOOT RIGHT', 'EVEN FOOT CENTER', 'EVEN FOOT RIGHT')
-  firstHeader = c('TOP', 'OF FIRST', 'PAGE')
-  firstFooter = c('BOTTOM', 'OF FIRST', 'PAGE')
+  header <- c('ODD HEAD LEFT', 'ODD HEAD CENTER', 'ODD HEAD RIGHT')
+  footer <- c('ODD FOOT RIGHT', 'ODD FOOT CENTER', 'ODD FOOT RIGHT')
+  evenHeader <- c('EVEN HEAD LEFT', 'EVEN HEAD CENTER', 'EVEN HEAD RIGHT')
+  evenFooter <- c('EVEN FOOT RIGHT', 'EVEN FOOT CENTER', 'EVEN FOOT RIGHT')
+  firstHeader <- c('TOP', 'OF FIRST', 'PAGE')
+  firstFooter <- c('BOTTOM', 'OF FIRST', 'PAGE')
 
   # Add Sheet 1
   wb <- wb_workbook()
@@ -297,5 +297,26 @@ test_that("Sheet not found", {
     read_xlsx(temp, "Tes"),
     paste0("No such sheet in the workbook. Workbook contains:\nTest\nTest \nTest & Test")
   )
+
+})
+
+test_that("loading slicers works", {
+
+  wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+
+  exp <- c(
+    "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>",
+    "<Relationship Id=\"rId4\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\"/>",
+    "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>",
+    "<Relationship Id=\"rId0\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>",
+    "<Relationship Id=\"rId0\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet2.xml\"/>",
+    "<Relationship Id=\"rId0\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet3.xml\"/>",
+    "<Relationship Id=\"rId0\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet4.xml\"/>",
+    "<Relationship Id=\"rId20001\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition\" Target=\"pivotCache/pivotCacheDefinition1.xml\"/>",
+    "<Relationship Id=\"rId20002\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition\" Target=\"pivotCache/pivotCacheDefinition2.xml\"/>",
+    "<Relationship Id=\"rId100001\" Type=\"http://schemas.microsoft.com/office/2007/relationships/slicerCache\" Target=\"slicerCaches/slicerCache1.xml\"/>"
+  )
+  got <- wb$workbook.xml.rels
+  expect_equal(exp, got)
 
 })

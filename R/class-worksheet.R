@@ -199,7 +199,7 @@ wbWorksheet <- R6::R6Class(
       self$sheetPr               <- tabColour
       self$dimension             <- '<dimension ref="A1"/>'
       self$sheetViews            <- sprintf('<sheetViews><sheetView workbookViewId="0" zoomScale="%s" showGridLines="%s" showRowColHeaders="%s" tabSelected="%s"/></sheetViews>', as.integer(zoom), as.integer(gridLines), as.integer(rowColHeaders), as.integer(tabSelected))
-      self$sheetFormatPr         <- '<sheetFormatPr defaultRowHeight="15.0"/>'
+      self$sheetFormatPr         <- '<sheetFormatPr baseColWidth="8.43" defaultRowHeight="16" x14ac:dyDescent="0.2"/>'
       self$cols_attr             <- character()
       self$autoFilter            <- character()
       self$mergeCells            <- character()
@@ -383,7 +383,7 @@ wbWorksheet <- R6::R6Class(
 
       # avoid error and return empty data frame
       if (length(self$cols_attr) == 0)
-        return (empty_cols_attr())
+        return(empty_cols_attr())
 
       col_df <- col_to_df(read_xml(self$cols_attr))
       col_df$min <- as.numeric(col_df$min)
@@ -402,7 +402,7 @@ wbWorksheet <- R6::R6Class(
 
       out <- NULL
       for (i in seq_len(nrow(col_df))) {
-        z <- col_df[i,]
+        z <- col_df[i, ]
         for (j in seq(z$min, z$max)) {
           z$key <- j
           out <- rbind(out, z)
@@ -443,11 +443,11 @@ wbWorksheet <- R6::R6Class(
 
       # merge with string variable, drop empty string and clean up
       col_df <- merge(out, col_df, by = "string", all.x = TRUE)
-      col_df <- col_df[col_df$string != "",]
+      col_df <- col_df[col_df$string != "", ]
       col_df$string <- NULL
 
       # order and return
-      col_df <- col_df[order(col_df$min),]
+      col_df <- col_df[order(col_df$min), ]
       col_df$min <- as.character(col_df$min)
       col_df$max <- as.character(col_df$max)
 
@@ -468,7 +468,7 @@ wbWorksheet <- R6::R6Class(
 
       cc <- self$sheet_data$cc
 
-      if (NROW(cc) == 0) return (invisible(self))
+      if (NROW(cc) == 0) return(invisible(self))
 
       if (numbers)
         cc[cc$c_t %in% c("n", ""),
@@ -558,7 +558,7 @@ wbWorksheet <- R6::R6Class(
       # different ext types have different uri ids. We support dataValidations
       # and sparklineGroups.
       uri <- ""
-      if (l_name == "x14:dataValidations") uri <- "{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF}"
+      # if (l_name == "x14:dataValidations") uri <- "{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF}"
       if (l_name == "x14:sparklineGroups") uri <- "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}"
 
       is_needed_uri <- grepl(pattern = uri, extLst, fixed = TRUE)
@@ -682,43 +682,6 @@ wbWorksheet <- R6::R6Class(
 
       self$append("dataValidations", xml_add_child(header, form))
       invisible(self)
-    },
-
-    # data validations list goes to extLst not to worksheet
-    data_validation_list = function(
-      value,
-      allowBlank,
-      showInputMsg,
-      showErrorMsg,
-      errorStyle,
-      errorTitle,
-      error,
-      promptTitle,
-      prompt,
-      sqref
-    ) {
-
-      data_val <- xml_node_create(
-        "x14:dataValidation",
-        xml_attributes = c(
-          type = "list",
-          allowBlank = allowBlank,
-          showInputMessage = showInputMsg,
-          showErrorMessage = showErrorMsg,
-          errorStyle = errorStyle,
-          errorTitle = errorTitle,
-          error = error,
-          promptTitle = promptTitle,
-          prompt = prompt
-        )
-      )
-
-      formula <- sprintf("<x14:formula1><xm:f>%s</xm:f></x14:formula1>", value)
-      sqref <- sprintf("<xm:sqref>%s</xm:sqref>", sqref)
-      xmlData <- xml_add_child(data_val, c(formula, sqref))
-      private$do_append_x14(xmlData, "x14:dataValidation", "x14:dataValidations")
-
-      invisible(self)
     }
   )
 )
@@ -751,7 +714,7 @@ empty_cols_attr <- function(n = 0, beg, end) {
   if (n > 0) {
     z$min <- n_seq
     z$max <- n_seq
-    z$width <- "8.43" # default width in ms365
+    z$width <- "8.43"
   }
 
   z

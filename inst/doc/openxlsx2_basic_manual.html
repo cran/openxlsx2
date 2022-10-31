@@ -448,17 +448,17 @@ underlying functions to see what is going on in the sheet. Using
 <code>showFormula</code> this is possible</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># return the underlying Excel formula instead of their values</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">wb_to_df</span>(xlsxFile, <span class="at">showFormula =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 NA   Var3 Var4       Var5         Var6 Var7</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2   TRUE    1 NA   1.00    a 2015-02-07 3209324 This  1/0</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3   TRUE   NA NA     NA    b 2015-02-06         &lt;NA&gt; &lt;NA&gt;</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4   TRUE    2 NA   1.34    c 2015-02-05         &lt;NA&gt; &lt;NA&gt;</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5  FALSE    2 NA     NA &lt;NA&gt;       &lt;NA&gt;         &lt;NA&gt; &lt;NA&gt;</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    3 NA   1.56    e       &lt;NA&gt;         &lt;NA&gt; &lt;NA&gt;</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    1 NA   1.70    f 2015-02-02         &lt;NA&gt; &lt;NA&gt;</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 8     NA   NA NA     NA &lt;NA&gt; 2015-02-01         &lt;NA&gt; &lt;NA&gt;</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 9  FALSE    2 NA  23.00    h 2015-01-31         &lt;NA&gt; &lt;NA&gt;</span></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    3 NA  67.30    i 2015-01-30         &lt;NA&gt; &lt;NA&gt;</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 11    NA    1 NA 123.00 &lt;NA&gt; 2015-01-29         &lt;NA&gt; &lt;NA&gt;</span></span></code></pre></div>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 NA  Var3  Var4       Var5                Var6  Var7</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 2   TRUE    1 NA     1     a 2015-02-07 &quot;3209324&quot; &amp; &quot; This&quot;   1/0</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 3   TRUE   NA NA #NUM!     b 2015-02-06                &lt;NA&gt;  &lt;NA&gt;</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 4   TRUE    2 NA  1.34     c 2015-02-05                &lt;NA&gt; #NUM!</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 5  FALSE    2 NA  &lt;NA&gt; #NUM!       &lt;NA&gt;                &lt;NA&gt;  &lt;NA&gt;</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    3 NA  1.56     e       &lt;NA&gt;                &lt;NA&gt;  &lt;NA&gt;</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    1 NA   1.7     f 2015-02-02                &lt;NA&gt;  &lt;NA&gt;</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 8     NA   NA NA  &lt;NA&gt;  &lt;NA&gt; 2015-02-01                &lt;NA&gt;  &lt;NA&gt;</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 9  FALSE    2 NA    23     h 2015-01-31                &lt;NA&gt;  &lt;NA&gt;</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    3 NA  67.3     i 2015-01-30                &lt;NA&gt;  &lt;NA&gt;</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; 11    NA    1 NA   123  &lt;NA&gt; 2015-01-29                &lt;NA&gt;  &lt;NA&gt;</span></span></code></pre></div>
 </div>
 <div id="dims---read-specific-dimension" class="section level3">
 <h3>dims - read specific dimension</h3>

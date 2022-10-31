@@ -2,45 +2,22 @@
 #'
 #' Minimal invasive update of cell(s) inside of imported workbooks.
 #'
-#' @param x value you want to insert
+#' @param x cc dataframe of the updated cells
 #' @param wb the workbook you want to update
 #' @param sheet the sheet you want to update
 #' @param cell the cell you want to update in Excel connotation e.g. "A1"
-#' @param data_class optional data class object
 #' @param colNames if TRUE colNames are passed down
 #' @param removeCellStyle keep the cell style?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
 #'
-#' @examples
-#'    xlsxFile <- system.file("extdata", "update_test.xlsx", package = "openxlsx2")
-#'    wb <- wb_load(xlsxFile)
-#'
-#'    # update Cells D4:D6 with 1:3
-#'    wb <- update_cell(x = c(1:3), wb = wb, sheet = "Sheet1", cell = "D4:D6")
-#'
-#'    # update Cells B3:D3 (names())
-#'    wb <- update_cell(x = c("x", "y", "z"), wb = wb, sheet = "Sheet1", cell = "B3:D3")
-#'
-#'    # update D4 again (single value this time)
-#'    wb <- update_cell(x = 7, wb = wb, sheet = "Sheet1", cell = "D4")
-#'
-#'    # add new column on the left of the existing workbook
-#'    wb <- update_cell(x = 7, wb = wb, sheet = "Sheet1", cell = "A4")
-#'
-#'    # add new row on the end of the existing workbook
-#'    wb <- update_cell(x = 7, wb = wb, sheet = "Sheet1", cell = "A9")
-#'    wb_to_df(wb)
-#'
 #' @keywords internal
 #' @noRd
-update_cell <- function(x, wb, sheet, cell, data_class,
-                        colNames = FALSE, removeCellStyle = FALSE,
-                        na.strings) {
+update_cell <- function(x, wb, sheet, cell, colNames = FALSE,
+                        removeCellStyle = FALSE, na.strings) {
 
   sheet_id <- wb$validate_sheet(sheet)
 
   dims <- dims_to_dataframe(cell, fill = TRUE)
-  cols <- colnames(dims)
   rows <- rownames(dims)
 
   cells_needed <- unname(unlist(dims))
@@ -69,7 +46,7 @@ update_cell <- function(x, wb, sheet, cell, data_class,
     row_attr <- rbind(row_attr, row_attr_missing)
 
     # order
-    row_attr <- row_attr[order(as.numeric(row_attr$r)),]
+    row_attr <- row_attr[order(as.numeric(row_attr$r)), ]
 
     wb$worksheets[[sheet_id]]$sheet_data$row_attr <- row_attr
     # provide output
@@ -85,8 +62,8 @@ update_cell <- function(x, wb, sheet, cell, data_class,
     # create missing cells
     cc_missing <- create_char_dataframe(names(cc), length(missing_cells))
     cc_missing$r     <- missing_cells
-    cc_missing$row_r <- gsub("[[:upper:]]","", cc_missing$r)
-    cc_missing$c_r   <- gsub("[[:digit:]]","", cc_missing$r)
+    cc_missing$row_r <- gsub("[[:upper:]]", "", cc_missing$r)
+    cc_missing$c_r   <- gsub("[[:digit:]]", "", cc_missing$r)
 
     # assign to cc
     cc <- rbind(cc, cc_missing)
@@ -105,25 +82,21 @@ update_cell <- function(x, wb, sheet, cell, data_class,
     wb$worksheets[[sheet_id]]$dimension <- paste0("<dimension ref=\"", min_cell, ":", max_cell, "\"/>")
   }
 
-  no_na_strings <- FALSE
   if (missing(na.strings)) {
     na.strings <- NULL
-    no_na_strings <- TRUE
   }
 
-  update_cell_loop(
-    cc,
-    x,
-    data_class,
-    rows,
-    cols,
-    colNames,
-    removeCellStyle,
-    cell,
-    no_na_strings,
-    na.strings,
-    wb$styles_mgr$get_xf_id("hyperlinkstyle")
-  )
+  if (removeCellStyle) {
+    cell_style <- "c_s"
+  } else {
+    cell_style <- NULL
+  }
+
+  replacement <- c("r", cell_style, "c_t", "c_cm", "c_ph", "c_vm", "v",
+                   "f", "f_t", "f_ref", "f_ca", "f_si", "is")
+
+  sel <- match(x$r, cc$r)
+  cc[sel, replacement] <- x[replacement]
 
   # avoid missings in cc
   if (any(is.na(cc)))
@@ -158,8 +131,10 @@ nmfmt_df <- function(x) {
 #' @param rowNames include rownames?
 #' @param startRow row to place it
 #' @param startCol col to place it
+#' @param applyCellStyle apply styles when writing on the sheet
 #' @param removeCellStyle keep the cell style?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
+#' @param data_table logical. if `TRUE` and `rowNames = TRUE`, do not write the cell containing  `"_rowNames_"`
 #' @details
 #' The string `"_openxlsx_NA"` is reserved for `openxlsx2`. If the data frame
 #' contains this string, the output will be broken.
@@ -181,34 +156,26 @@ nmfmt_df <- function(x) {
 #' write_data2(wb, "sheet4", as.data.frame(Titanic), startRow = 2, startCol = 2)
 #'
 #' @export
-write_data2 <-function(wb, sheet, data, name = NULL,
-                       colNames = TRUE, rowNames = FALSE,
-                       startRow = 1, startCol = 1,
-                       removeCellStyle = FALSE,
-                       na.strings) {
+write_data2 <- function(
+    wb,
+    sheet,
+    data,
+    name = NULL,
+    colNames = TRUE,
+    rowNames = FALSE,
+    startRow = 1,
+    startCol = 1,
+    applyCellStyle = TRUE,
+    removeCellStyle = FALSE,
+    na.strings,
+    data_table = FALSE
+  ) {
 
   if (missing(na.strings)) na.strings <- substitute()
 
   is_data_frame <- FALSE
   #### prepare the correct data formats for openxml
   dc <- openxlsx2_type(data)
-
-  # if hyperlinks are found, Excel sets something like the following font
-  # blue with underline
-  if (any(dc == openxlsx2_celltype[["hyperlink"]])) {
-    if (!length(wb$styles_mgr$get_font_id("hyperlinkfont"))) {
-      hyperlinkfont <- create_font(
-        color = wb_colour(hex = "FF0000FF"),
-        name = wb_get_base_font(wb)$name$val,
-        u = "single")
-
-      wb$styles_mgr$add(hyperlinkfont, "hyperlinkfont")
-
-      hyperlink_xf <- create_cell_style(fontId = wb$styles_mgr$get_font_id("hyperlinkfont"))
-      wb$styles_mgr$add(hyperlink_xf, "hyperlinkstyle")
-    }
-  }
-
 
   # convert factor to character
   if (any(dc == openxlsx2_celltype[["factor"]])) {
@@ -233,15 +200,15 @@ write_data2 <-function(wb, sheet, data, name = NULL,
     sel <- !dc %in% c(4, 5, 10)
     data[sel] <- lapply(data[sel], as.character)
 
+    # add rownames
+    if (rowNames) {
+      data <- cbind("_rowNames_" = rownames(data), data)
+      dc <- c(c("_rowNames_" = openxlsx2_celltype[["character"]]), dc)
+    }
+
     # add colnames
     if (colNames)
       data <- rbind(colnames(data), data)
-
-    # add rownames
-    if (rowNames) {
-      data <- cbind(rownames(data), data)
-      dc <- c(c("_rowNames_" = openxlsx2_celltype[["character"]]), dc)
-    }
   }
 
 
@@ -255,8 +222,8 @@ write_data2 <-function(wb, sheet, data, name = NULL,
   data_nrow <- NROW(data)
   data_ncol <- NCOL(data)
 
-  endRow <- (startRow -1) + data_nrow
-  endCol <- (startCol -1) + data_ncol
+  endRow <- (startRow - 1) + data_nrow
+  endCol <- (startCol - 1) + data_ncol
 
   dims <- paste0(
     int2col(startCol), startRow,
@@ -293,218 +260,264 @@ write_data2 <-function(wb, sheet, data, name = NULL,
   }
 
   # from here on only wb$worksheets is required
+
+  # rtyp character vector per row
+  # list(c("A1, ..., "k1"), ...,  c("An", ..., "kn"))
+  rtyp <- dims_to_dataframe(dims, fill = TRUE)
+
+  rows_attr <- vector("list", data_nrow)
+
+  # create <rows ...>
+  want_rows <- startRow:endRow
+  rows_attr <- empty_row_attr(n = length(want_rows))
+  rows_attr$r <- rownames(rtyp)
+
+  # original cc data frame
+  cc <- empty_sheet_data_cc(n = nrow(data) * ncol(data))
+
+
+  sel <- which(dc == openxlsx2_celltype[["logical"]])
+  for (i in sel) {
+    if (colNames) {
+      data[-1, i] <- as.integer(as.logical(data[-1, i]))
+    } else {
+      data[, i] <- as.integer(as.logical(data[, i]))
+    }
+  }
+
+  sel <- which(dc == openxlsx2_celltype[["character"]]) # character
+  if (length(sel)) {
+    data[sel][is.na(data[sel])] <- "_openxlsx_NA"
+  }
+
+  wide_to_long(
+    data,
+    dc,
+    cc,
+    ColNames = colNames,
+    start_col = startCol,
+    start_row = startRow,
+    ref = dims
+  )
+
+  # if any v is missing, set typ to 'e'. v is only filled for non character
+  # values, but contains a string. To avoid issues, set it to the missing
+  # value expression
+
+  ## replace NA, NaN, and Inf
+  is_na <- which(cc$is == "<is><t>_openxlsx_NA</t></is>" | cc$v == "NA")
+  if (length(is_na)) {
+    if (missing(na.strings)) {
+      cc[is_na, "v"]   <- "#N/A"
+      cc[is_na, "c_t"] <- "e"
+      cc[is_na, "is"]  <- ""
+    } else {
+      cc[is_na, "v"]  <- ""
+      if (is.null(na.strings)) {
+        # do nothing
+      } else {
+        cc[is_na, "c_t"] <- "inlineStr"
+        cc[is_na, "is"] <- txt_to_is(as.character(na.strings),
+                                     no_escapes = TRUE, raw = TRUE)
+      }
+    }
+  }
+
+  is_nan <- which(cc$v == "NaN")
+  if (length(is_nan)) {
+    cc[is_nan, "v"]   <- "#VALUE!"
+    cc[is_nan, "c_t"] <- "e"
+  }
+
+  is_inf <- which(cc$v == "-Inf" | cc$v == "Inf")
+  if (length(is_inf)) {
+    cc[is_inf, "v"]   <- "#NUM!"
+    cc[is_inf, "c_t"] <- "e"
+  }
+
+  # if rownames = TRUE and data_table = FALSE, remove "_rownames_"
+  if (!data_table && rowNames && colNames) {
+    cc <- cc[cc$r != rtyp[1, 1], ]
+  }
+
   if (is.null(wb$worksheets[[sheetno]]$sheet_data$cc)) {
 
     wb$worksheets[[sheetno]]$dimension <- paste0("<dimension ref=\"", dims, "\"/>")
 
-    # rtyp character vector per row
-    # list(c("A1, ..., "k1"), ...,  c("An", ..., "kn"))
-    rtyp <- dims_to_dataframe(dims, fill = TRUE)
-
-    rows_attr <- vector("list", data_nrow)
-
-    # create <rows ...>
-    want_rows <- startRow:endRow
-    rows_attr <- empty_row_attr(n = length(want_rows))
-    rows_attr$r <- rownames(rtyp)
-
     wb$worksheets[[sheetno]]$sheet_data$row_attr <- rows_attr
 
-    # original cc data frame
-    cc <- empty_sheet_data_cc(n = nrow(data) * ncol(data))
+    wb$worksheets[[sheetno]]$sheet_data$cc <- cc
+
+  } else {
+    # update cell(s)
+    # message("update_cell()")
+
+    wb <- update_cell(
+      x = cc,
+      wb =  wb,
+      sheet = sheetno,
+      cell = dims,
+      colNames = colNames,
+      removeCellStyle = removeCellStyle,
+      na.strings = na.strings
+    )
+  }
+
+  ### Begin styles
+
+  if (applyCellStyle) {
 
     ## create a cell style format for specific types at the end of the existing
     # styles. gets the reference an passes it on.
-    short_date_fmt <- long_date_fmt <- accounting_fmt <- percentage_fmt <-
-      comma_fmt <- scientific_fmt <- NULL
+    get_data_class_dims <- function(data_class) {
+      sel <- dc == openxlsx2_celltype[[data_class]]
+      sel_cols <- names(rtyp[sel == TRUE])
+      sel_rows <- rownames(rtyp)
 
-    hash_id          <- round(as.numeric(Sys.time()), digits = 3)
-    numeric_fmtid    <- paste0("numeric_fmt", hash_id)
-    short_date_fmtid <- paste0("short_date_fmt", hash_id)
-    long_date_fmtid  <- paste0("long_date_fmt", hash_id)
-    accounting_fmtid <- paste0("accounting_fmt", hash_id)
-    percentage_fmtid <- paste0("percentage_fmt", hash_id)
-    scientific_fmtid <- paste0("scientific_fmt", hash_id)
-    comma_fmtid      <- paste0("comma_fmt", hash_id)
+      # ignore first row if colNames
+      if (colNames) sel_rows <- sel_rows[-1]
+
+      paste(
+        unname(
+          unlist(
+            rtyp[rownames(rtyp) %in% sel_rows, sel_cols, drop = FALSE]
+          )
+        ),
+        collapse = ";"
+      )
+    }
+
+    # if hyperlinks are found, Excel sets something like the following font
+    # blue with underline
+    if (any(dc == openxlsx2_celltype[["hyperlink"]])) {
+
+      dim_sel <- get_data_class_dims("hyperlink")
+      # message("hyperlink: ", dim_sel)
+
+      wb$add_font(
+          sheet = sheetno,
+          dim = dim_sel,
+          color = wb_colour(hex = "FF0000FF"),
+          name = wb_get_base_font(wb)$name$val,
+          u = "single"
+      )
+    }
 
     # options("openxlsx2.numFmt" = NULL)
     if (any(dc == openxlsx2_celltype[["numeric"]])) { # numeric or integer
       if (!is.null(unlist(options("openxlsx2.numFmt")))) {
-        cust_numFmt <- create_numfmt(
-          numFmtId = wb$styles_mgr$next_numfmt_id(),
-          formatCode = unlist(options("openxlsx2.numFmt")))
-        wb$styles_mgr$add(cust_numFmt, numeric_fmtid)
-        numfmt_num <- wb$styles_mgr$get_numfmt_id(numeric_fmtid)
-        numeric_fmt <- write_xf(nmfmt_df(numfmt_num))
-        wb$styles_mgr$add(numeric_fmt, numeric_fmtid)
+
+        numfmt_numeric <- unlist(options("openxlsx2.numFmt"))
+
+        dim_sel <- get_data_class_dims("numeric")
+        # message("numeric: ", dim_sel)
+
+        wb$add_numfmt(
+          sheet = sheetno,
+          dim = dim_sel,
+          numfmt = numfmt_numeric
+        )
       }
     }
     if (any(dc == openxlsx2_celltype[["short_date"]])) { # Date
       if (is.null(unlist(options("openxlsx2.dateFormat")))) {
         numfmt_dt <- 14
       } else {
-        cust_dateFormat <- create_numfmt(
-          numFmtId = wb$styles_mgr$next_numfmt_id(),
-          formatCode = unlist(options("openxlsx2.dateFormat")))
-        wb$styles_mgr$add(cust_dateFormat, short_date_fmtid)
-        numfmt_dt <- wb$styles_mgr$get_numfmt_id(short_date_fmtid)
+        numfmt_dt <- unlist(options("openxlsx2.dateFormat"))
       }
-      short_date_fmt <- write_xf(nmfmt_df(numfmt_dt))
-      wb$styles_mgr$add(short_date_fmt, short_date_fmtid)
+
+      dim_sel <- get_data_class_dims("short_date")
+      # message("short_date: ", dim_sel)
+
+      wb$add_numfmt(
+        sheet = sheetno,
+        dim = dim_sel,
+        numfmt = numfmt_dt
+      )
     }
     if (any(dc == openxlsx2_celltype[["long_date"]])) {
       if (is.null(unlist(options("openxlsx2.datetimeFormat")))) {
         numfmt_posix <- 22
       } else {
-        cust_datetimeFormat <- create_numfmt(
-          numFmtId = wb$styles_mgr$next_numfmt_id(),
-          formatCode = unlist(options("openxlsx2.datetimeFormat")))
-        wb$styles_mgr$add(cust_datetimeFormat, long_date_fmtid)
-        numfmt_posix <- wb$styles_mgr$get_numfmt_id(long_date_fmtid)
+        numfmt_posix <- unlist(options("openxlsx2.datetimeFormat"))
       }
-      long_date_fmt  <- write_xf(nmfmt_df(numfmt_posix))
-      wb$styles_mgr$add(long_date_fmt, long_date_fmtid)
+
+      dim_sel <- get_data_class_dims("long_date")
+      # message("long_date: ", dim_sel)
+
+      wb$add_numfmt(
+        sheet = sheetno,
+        dim = dim_sel,
+        numfmt = numfmt_posix
+      )
     }
     if (any(dc == openxlsx2_celltype[["accounting"]])) { # accounting
       if (is.null(unlist(options("openxlsx2.accountingFormat")))) {
         numfmt_accounting <- 4
       } else {
-        cust_accountingFormat <- create_numfmt(
-          numFmtId = wb$styles_mgr$next_numfmt_id(),
-          formatCode = unlist(options("openxlsx2.accountingFormat")))
-        wb$styles_mgr$add(cust_accountingFormat, accounting_fmtid)
-        numfmt_accounting <- wb$styles_mgr$get_numfmt_id(accounting_fmtid)
+        numfmt_accounting <- unlist(options("openxlsx2.accountingFormat"))
       }
-      accounting_fmt <- write_xf(nmfmt_df(numfmt_accounting))
-      wb$styles_mgr$add(accounting_fmt, accounting_fmtid)
+
+      dim_sel <- get_data_class_dims("accounting")
+      # message("accounting: ", dim_sel)
+
+      wb$add_numfmt(
+        dim = dim_sel,
+        numfmt = numfmt_accounting
+      )
     }
     if (any(dc == openxlsx2_celltype[["percentage"]])) { # percentage
       if (is.null(unlist(options("openxlsx2.percentageFormat")))) {
         numfmt_percentage <- 10
       } else {
-        cust_percentageFormat <- create_numfmt(
-          numFmtId = wb$styles_mgr$next_numfmt_id(),
-          formatCode = unlist(options("openxlsx2.percentageFormat")))
-        wb$styles_mgr$add(cust_percentageFormat, percentage_fmtid)
-        numfmt_percentage <- wb$styles_mgr$get_numfmt_id(percentage_fmtid)
+        numfmt_percentage <- unlist(options("openxlsx2.percentageFormat"))
       }
-      percentage_fmt <- write_xf(nmfmt_df(numfmt_percentage))
-      wb$styles_mgr$add(percentage_fmt, percentage_fmtid)
+
+      dim_sel <- get_data_class_dims("percentage")
+      # message("percentage: ", dim_sel)
+
+      wb$add_numfmt(
+        sheet = sheetno,
+        dim = dim_sel,
+        numfmt = numfmt_percentage
+      )
     }
     if (any(dc == openxlsx2_celltype[["scientific"]])) {
       if (is.null(unlist(options("openxlsx2.scientificFormat")))) {
         numfmt_scientific <- 48
       } else {
-        cust_scientificFormat <- create_numfmt(
-          numFmtId = wb$styles_mgr$next_numfmt_id(),
-          formatCode = unlist(options("openxlsx2.scientificFormat")))
-        wb$styles_mgr$add(cust_scientificFormat, scientific_fmtid)
-        numfmt_scientific <- wb$styles_mgr$get_numfmt_id(scientific_fmtid)
+        numfmt_scientific <- unlist(options("openxlsx2.scientificFormat"))
       }
-      scientific_fmt <- write_xf(nmfmt_df(numfmt_scientific))
-      wb$styles_mgr$add(scientific_fmt, scientific_fmtid)
+
+      dim_sel <- get_data_class_dims("scientific")
+      # message("scientific: ", dim_sel)
+
+      wb$add_numfmt(
+        sheet = sheetno,
+        dim = dim_sel,
+        numfmt = numfmt_scientific
+      )
     }
     if (any(dc == openxlsx2_celltype[["comma"]])) {
       if (is.null(unlist(options("openxlsx2.comma")))) {
         numfmt_comma <- 3
       } else {
-        cust_scientificFormat <- create_numfmt(
-          numFmtId = wb$styles_mgr$next_numfmt_id(),
-          formatCode = unlist(options("openxlsx2.commaFormat")))
-        wb$styles_mgr$add(cust_scientificFormat, comma_fmtid)
-        numfmt_comma <- wb$styles_mgr$get_numfmt_id(comma_fmtid)
+        numfmt_comma <- unlist(options("openxlsx2.commaFormat"))
       }
-      comma_fmt <- write_xf(nmfmt_df(numfmt_comma))
-      wb$styles_mgr$add(comma_fmt, comma_fmtid)
+
+      dim_sel <- get_data_class_dims("comma")
+      # message("comma: ", dim_sel)
+
+      wb$add_numfmt(
+        sheet = sheetno,
+        dim = dim_sel,
+        numfmt = numfmt_comma
+      )
     }
-
-    sel <- which(dc == openxlsx2_celltype[["logical"]])
-    for (i in sel) {
-      if (colNames) {
-        data[-1, i] <- as.integer(as.logical(data[-1, i]))
-      } else {
-        data[,i] <- as.integer(as.logical(data[,i]))
-      }
-    }
-
-    sel <- which(dc == openxlsx2_celltype[["character"]]) # character
-    if (length(sel)) {
-      data[sel][is.na(data[sel])] <- "_openxlsx_NA"
-    }
-
-    wide_to_long(
-      data,
-      dc,
-      cc,
-      ColNames = colNames,
-      start_col = startCol,
-      start_row = startRow,
-      ref = dims
-    )
-
-    # if any v is missing, set typ to 'e'. v is only filled for non character
-    # values, but contains a string. To avoid issues, set it to the missing
-    # value expression
-
-    ## replace NA, NaN, and Inf
-    is_na <- which(cc$is == "<is><t>_openxlsx_NA</t></is>" | cc$v == "NA")
-    if (length(is_na)) {
-      if (missing(na.strings)) {
-        cc[is_na, "v"]   <- "#N/A"
-        cc[is_na, "c_t"] <- "e"
-        cc[is_na, "is"]  <- ""
-      } else {
-        cc[is_na, "v"]  <- ""
-        if (is.null(na.strings)) {
-          # do nothing
-        } else {
-          cc[is_na, "c_t"] <- "inlineStr"
-          cc[is_na, "is"] <- txt_to_is(as.character(na.strings),
-                                        no_escapes = TRUE, raw = TRUE)
-        }
-      }
-    }
-
-    is_nan <- which(cc$v == "NaN")
-    if (length(is_nan)) {
-      cc[is_nan, "v"]   <- "#VALUE!"
-      cc[is_nan, "c_t"] <- "e"
-    }
-
-    is_inf <- which(cc$v == "-Inf" | cc$v == "Inf")
-    if (length(is_inf)) {
-      cc[is_inf, "v"]   <- "#NUM!"
-      cc[is_inf, "c_t"] <- "e"
-    }
-
-    cc$c_s[cc$typ == "0"]  <- wb$styles_mgr$get_xf_id(short_date_fmtid)
-    cc$c_s[cc$typ == "1"]  <- wb$styles_mgr$get_xf_id(long_date_fmtid)
-    if (length(wb$styles_mgr$get_xf_id(numeric_fmtid)) == 1) {
-      cc$c_s[cc$typ == "2"]  <- wb$styles_mgr$get_xf_id(numeric_fmtid)
-    }
-    cc$c_s[cc$typ == "6"]  <- wb$styles_mgr$get_xf_id(accounting_fmtid)
-    cc$c_s[cc$typ == "7"]  <- wb$styles_mgr$get_xf_id(percentage_fmtid)
-    cc$c_s[cc$typ == "8"]  <- wb$styles_mgr$get_xf_id(scientific_fmtid)
-    cc$c_s[cc$typ == "9"]  <- wb$styles_mgr$get_xf_id(comma_fmtid)
-    cc$c_s[cc$typ == "10"] <- wb$styles_mgr$get_xf_id("hyperlinkstyle")
-
-    wb$worksheets[[sheetno]]$sheet_data$cc <- cc
-
-  } else {
-    # update cell(s)
-    wb <- update_cell(
-      x = data,
-      wb,
-      sheetno,
-      dims,
-      dc,
-      colNames,
-      removeCellStyle,
-      na.strings
-    )
   }
+  ### End styles
 
-  wb
+  return(wb)
 }
 
 
@@ -533,6 +546,7 @@ write_data2 <-function(wb, sheet, data, name = NULL,
 #' @param bandedCols logical. If TRUE, the columns are colour banded
 #' @param bandedCols logical. If TRUE, a data table is created
 #' @param name If not NULL, a named region is defined.
+#' @param applyCellStyle apply styles when writing on the sheet
 #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
 #' @noRd
@@ -556,6 +570,7 @@ write_data_table <- function(
     bandedRows = TRUE,
     bandedCols = FALSE,
     name = NULL,
+    applyCellStyle = TRUE,
     removeCellStyle = FALSE,
     data_table = FALSE,
     na.strings
@@ -623,14 +638,19 @@ write_data_table <- function(
     # hlinkNames <- names(x)
     if (is.null(dim(x))) {
       colNames <- FALSE
-      x[is_hyperlink] <- create_hyperlink(text = x[is_hyperlink])
+      if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
+        x[is_hyperlink] <- create_hyperlink(text = x[is_hyperlink])
+      }
       class(x[is_hyperlink]) <- c("character", "hyperlink")
     } else {
       # check should be in create_hyperlink and that apply should not be required either
-      if (!any(grepl("^(=|)HYPERLINK\\(", x[is_hyperlink], ignore.case = TRUE))) {
-        x[is_hyperlink] <- apply(x[is_hyperlink], 1, FUN=function(str) create_hyperlink(text = str))
+      if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
+        x[is_hyperlink] <- apply(
+          x[is_hyperlink], 1,
+          FUN = function(str) create_hyperlink(text = str)
+        )
       }
-      class(x[,is_hyperlink]) <- c("character", "hyperlink")
+      class(x[, is_hyperlink]) <- c("character", "hyperlink")
     }
   }
 
@@ -716,10 +736,11 @@ write_data_table <- function(
     rowNames = rowNames,
     startRow = startRow,
     startCol = startCol,
+    applyCellStyle = applyCellStyle,
     removeCellStyle = removeCellStyle,
-    na.strings = na.strings
+    na.strings = na.strings,
+    data_table = data_table
   )
-
 
   ### Beg: Only in datatable ---------------------------------------------------
 
@@ -729,7 +750,7 @@ write_data_table <- function(
 
     ## replace invalid XML characters
     col_names <- replace_legal_chars(colnames(x))
-    if (rowNames) col_names <- c("1", col_names)
+    if (rowNames) col_names <- c("_rowNames_", col_names)
 
     ## Table name validation
     if (is.null(tableName)) {
@@ -802,6 +823,7 @@ write_data_table <- function(
 #' @param withFilter If `TRUE`, add filters to the column name row. NOTE can only have one filter per worksheet.
 #' @param sep Only applies to list columns. The separator used to collapse list columns to a character vector e.g. sapply(x$list_column, paste, collapse = sep).
 #' @param name If not NULL, a named region is defined.
+#' @param applyCellStyle apply styles when writing on the sheet
 #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
 #' @seealso [write_datatable()]
@@ -878,6 +900,7 @@ write_data <- function(
     withFilter = FALSE,
     sep = ", ",
     name = NULL,
+    applyCellStyle = TRUE,
     removeCellStyle = FALSE,
     na.strings
 ) {
@@ -904,6 +927,7 @@ write_data <- function(
     bandedRows = FALSE,
     bandedCols = FALSE,
     name = name,
+    applyCellStyle = applyCellStyle,
     removeCellStyle = removeCellStyle,
     data_table = FALSE,
     na.strings = na.strings
@@ -934,6 +958,8 @@ write_data <- function(
 #' @param xy An alternative to specifying `startCol` and
 #' `startRow` individually.  A vector of the form
 #' `c(startCol, startRow)`.
+#' @param applyCellStyle apply styles when writing on the sheet
+#' @param removeCellStyle if writing into existing cells, should the cell style be removed?
 #' @seealso [write_data()]
 #' @export write_formula
 #' @rdname write_formula
@@ -987,7 +1013,7 @@ write_data <- function(
 #' write_formula(wb, "Sheet1", x = '=HYPERLINK("#Sheet2!B3", "Text to Display - Link to Sheet2")')
 #'
 #' ## 5. - Writing array formulas
-#' 
+#'
 #' set.seed(123)
 #' df <- data.frame(C = rnorm(10), D = rnorm(10))
 #'
@@ -1000,19 +1026,26 @@ write_data <- function(
 #'              x = "SUM(C2:C11*D2:D11)",
 #'              array = TRUE)
 #'
-write_formula <- function(wb,
+write_formula <- function(
+  wb,
   sheet,
   x,
   startCol = 1,
   startRow = 1,
   dims = rowcol_to_dims(startRow, startCol),
   array = FALSE,
-  xy = NULL) {
+  xy = NULL,
+  applyCellStyle = TRUE,
+  removeCellStyle = FALSE
+) {
   assert_class(x, "character")
+  # remove xml encoding and reapply it afterwards. until v0.3 encoding was not enforced
+  x <- replaceXMLEntities(x)
+  x <- vapply(x, function(val) xml_value(xml_node_create("fml", val, escapes = TRUE), "fml"), NA_character_)
   dfx <- data.frame("X" = x, stringsAsFactors = FALSE)
   class(dfx$X) <- c("character", if (array) "array_formula" else "formula")
 
-  if (any(grepl("^(=|)HYPERLINK\\(", x, ignore.case = TRUE))) {
+  if (any(grepl("=([\\s]*?)HYPERLINK\\(", x, perl = TRUE))) {
     class(dfx$X) <- c("character", "formula", "hyperlink")
   }
 
@@ -1026,7 +1059,9 @@ write_formula <- function(wb,
     array = array,
     xy = xy,
     colNames = FALSE,
-    rowNames = FALSE
+    rowNames = FALSE,
+    applyCellStyle = applyCellStyle,
+    removeCellStyle = removeCellStyle
   )
 }
 
@@ -1058,6 +1093,8 @@ write_formula <- function(wb,
 #' @param lastColumn logical. If TRUE, the last column is bold
 #' @param bandedRows logical. If TRUE, rows are colour banded
 #' @param bandedCols logical. If TRUE, the columns are colour banded
+#' @param applyCellStyle apply styles when writing on the sheet
+#' @param removeCellStyle if writing into existing cells, should the cell style be removed?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
 #' @details columns of x with class Date/POSIXt, currency, accounting,
 #' hyperlink, percentage are automatically styled as dates, currency, accounting,
@@ -1169,6 +1206,8 @@ write_datatable <- function(
     lastColumn = FALSE,
     bandedRows = TRUE,
     bandedCols = FALSE,
+    applyCellStyle = TRUE,
+    removeCellStyle = FALSE,
     na.strings
 ) {
 
@@ -1194,8 +1233,9 @@ write_datatable <- function(
     bandedRows = bandedRows,
     bandedCols = bandedCols,
     name = NULL,
-    removeCellStyle = FALSE,
     data_table = TRUE,
+    applyCellStyle = applyCellStyle,
+    removeCellStyle = removeCellStyle,
     na.strings = na.strings
   )
 }

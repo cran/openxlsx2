@@ -76,7 +76,7 @@ wb$add_conditional_formatting(
 wb$add_conditional_formatting(
   "Moving Col",
   cols = 1:2,
-  rows = 1:11, 
+  rows = 1:11,
   rule = "A$1>0",
   style = "posStyle"
 )
@@ -91,7 +91,7 @@ wb$add_data("Dependent on", LETTERS[1:11], startCol = 2)
 wb$add_conditional_formatting(
   "Dependent on",
   cols = 1:2,
-  rows = 1:11, 
+  rows = 1:11,
   rule = "$A$1 < 0",
   style = "negStyle"
 )
@@ -108,15 +108,15 @@ wb$add_data("Dependent on", data.frame(x = 1:10, y = runif(10)), startRow = 15)
 wb$add_conditional_formatting(
   "Dependent on",
   cols = 1,
-  rows = 16:25, 
-  rule = "B16<0.5", 
+  rows = 16:25,
+  rule = "B16<0.5",
   style = "negStyle"
 )
 wb$add_conditional_formatting(
   "Dependent on",
   cols = 1,
-  rows = 16:25, 
-  rule = "B16>=0.5", 
+  rows = 16:25,
+  rule = "B16>=0.5",
   style = "posStyle"
 )
 
@@ -156,10 +156,10 @@ knitr::include_graphics("img/cf_contains_no_text.jpg")
 fn <- function(x) paste(sample(LETTERS, 10), collapse = "-")
 wb$add_data("notcontainsText", sapply(1:10, fn))
 wb$add_conditional_formatting(
-  "notcontainsText", 
+  "notcontainsText",
   cols = 1,
-  rows = 1:10, 
-  type = "notContainsText", 
+  rows = 1:10,
+  type = "notContainsText",
   rule = "A"
 )
 
@@ -171,10 +171,10 @@ fn <- function(x) paste(sample(LETTERS, 10), collapse = "-")
 wb$add_worksheet("beginsWith")
 wb$add_data("beginsWith", sapply(1:100, fn))
 wb$add_conditional_formatting(
-  "beginsWith", 
+  "beginsWith",
   cols = 1,
-  rows = 1:100, 
-  type = "beginsWith", 
+  rows = 1:100,
+  type = "beginsWith",
   rule = "A"
 )
 
@@ -186,9 +186,9 @@ fn <- function(x) paste(sample(LETTERS, 10), collapse = "-")
 wb$add_worksheet("endsWith")
 wb$add_data("endsWith", sapply(1:100, fn))
 wb$add_conditional_formatting(
-  "endsWith", 
+  "endsWith",
   cols = 1,
-  rows = 1:100, 
+  rows = 1:100,
   type = "endsWith",
   rule = "A"
 )
@@ -204,7 +204,7 @@ wb$add_data("colorScale", df, colNames = FALSE) ## write data.frame
 ## -----------------------------------------------------------------------------
 wb$add_conditional_formatting(
   "colorScale",
-  cols = seq_along(df), 
+  cols = seq_along(df),
   rows = seq_len(nrow(df)),
   style = c("black", "white"),
   rule = c(0, 255),
@@ -298,11 +298,11 @@ knitr::include_graphics("img/cf_between.jpg")
 wb$add_worksheet("between")
 wb$add_data("between", -5:5)
 wb$add_conditional_formatting(
-  "between", 
+  "between",
   cols = 1,
   rows = 1:11,
-  type = "between", 
-  rule = c(-2,2)
+  type = "between",
+  rule = c(-2, 2)
 )
 wb$add_worksheet("topN")
 
@@ -314,7 +314,7 @@ wb$add_data("topN", data.frame(x = 1:10, y = rnorm(10)))
 
 ## -----------------------------------------------------------------------------
 wb$add_conditional_formatting(
-  "topN", 
+  "topN",
   cols = 1,
   rows = 2:11,
   style = "posStyle",
@@ -324,10 +324,10 @@ wb$add_conditional_formatting(
 
 ## -----------------------------------------------------------------------------
 wb$add_conditional_formatting(
-  "topN", 
+  "topN",
   cols = 2,
   rows = 2:11,
-  style = "posStyle", 
+  style = "posStyle",
   type = "topN",
   params = list(rank = 20, percent = TRUE)
 )
@@ -344,17 +344,17 @@ wb$add_conditional_formatting(
   "bottomN",
   cols = 1,
   rows = 2:11,
-  style = "negStyle", 
+  style = "negStyle",
   type = "bottomN",
   params = list(rank = 5)
 )
 
 ## -----------------------------------------------------------------------------
 wb$add_conditional_formatting(
-  "bottomN", 
+  "bottomN",
   cols = 2,
   rows = 2:11,
-  style = "negStyle", 
+  style = "negStyle",
   type = "bottomN",
   params = list(rank = 20, percent = TRUE)
 )
@@ -367,7 +367,7 @@ knitr::include_graphics("img/cf_logical_operators.jpg")
 wb$add_data("logical operators", 1:10)
 wb$add_conditional_formatting(
   "logical operators",
-  cols = 1, 
+  cols = 1,
   rows = 1:10,
   rule = "OR($A1=1,$A1=3,$A1=5,$A1=7)"
 )

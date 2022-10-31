@@ -639,7 +639,7 @@ wbWorkbook <- R6::R6Class(
                 chartid <- nrow(self$charts) + 1L
                 newname <- stri_join("chart", chartid, ".xml")
                 old_chart <- as.integer(gsub("\\D+", "", cf))
-                self$charts <- rbind(self$charts, self$charts[old_chart,])
+                self$charts <- rbind(self$charts, self$charts[old_chart, ])
 
                 # Read the chartfile and adjust all formulas to point to the new
                 # sheet name instead of the clone source
@@ -656,23 +656,23 @@ wbWorkbook <- R6::R6Class(
                 new_sheet_name <- guard_ws(new)
 
                 ## we need to replace "'oldname'" as well as "oldname"
-                if (grepl("'", old_sheet_name)) {
-                  chart <- gsub(
-                    stri_join("(?<=')", old_sheet_name, "(?='!)"),
-                    stri_join(new_sheet_name),
-                    chart,
-                    perl = TRUE
-                  )
-                } else {
-                  chart <- gsub(
-                    stri_join("(?<=[^A-Za-z0-9])", old_sheet_name, "(?=!)"),
-                    stri_join(new_sheet_name),
-                    chart,
-                    perl = TRUE
-                  )
-                }
+                chart <- gsub(
+                  old_sheet_name,
+                  new_sheet_name,
+                  chart,
+                  perl = TRUE
+                )
 
                 self$charts$chart[chartid] <- chart
+
+                # two charts can not point to the same rels
+                if (self$charts$rels[chartid] != "") {
+                  self$charts$rels[chartid] <- gsub(
+                    stri_join(old_chart, ".xml"),
+                    stri_join(chartid, ".xml"),
+                    self$charts$rels[chartid]
+                  )
+                }
 
                 rl <- gsub(stri_join("(?<=charts/)", cf), newname, rl, perl = TRUE)
               }
@@ -784,7 +784,7 @@ wbWorkbook <- R6::R6Class(
         self$worksheets_rels[[newSheetIndex]] <- relship_no(obj = self$worksheets_rels[[newSheetIndex]], x = "table")
 
         # make this the new sheets object
-        tbls <- self$tables[self$tables$tab_sheet == old,]
+        tbls <- self$tables[self$tables$tab_sheet == old, ]
         if (NROW(tbls)) {
 
           # newid and rid can be different. ids must be unique
@@ -925,6 +925,7 @@ wbWorkbook <- R6::R6Class(
     #' @param withFilter withFilter
     #' @param name name
     #' @param sep sep
+    #' @param applyCellStyle applyCellStyle
     #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
     #' @param na.strings na.strings
     #' @param return The `wbWorkbook` object
@@ -941,6 +942,7 @@ wbWorkbook <- R6::R6Class(
         withFilter      = FALSE,
         name            = NULL,
         sep             = ", ",
+        applyCellStyle  = TRUE,
         removeCellStyle = FALSE,
         na.strings
       ) {
@@ -961,6 +963,7 @@ wbWorkbook <- R6::R6Class(
         withFilter      = withFilter,
         name            = name,
         sep             = sep,
+        applyCellStyle  = applyCellStyle,
         removeCellStyle = removeCellStyle,
         na.strings      = na.strings
       )
@@ -984,6 +987,8 @@ wbWorkbook <- R6::R6Class(
     #' @param lastColumn lastColumn
     #' @param bandedRows bandedRows
     #' @param bandedCols bandedCols
+    #' @param applyCellStyle applyCellStyle
+    #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
     #' @param na.strings na.strings
     #' @returns The `wbWorkbook` object
     add_data_table = function(
@@ -1003,6 +1008,8 @@ wbWorkbook <- R6::R6Class(
         lastColumn  = FALSE,
         bandedRows  = TRUE,
         bandedCols  = FALSE,
+        applyCellStyle = TRUE,
+        removeCellStyle = FALSE,
         na.strings
     ) {
 
@@ -1026,6 +1033,8 @@ wbWorkbook <- R6::R6Class(
         lastColumn  = lastColumn,
         bandedRows  = bandedRows,
         bandedCols  = bandedCols,
+        applyCellStyle = applyCellStyle,
+        removeCellStyle = removeCellStyle,
         na.strings  = na.strings
       )
       invisible(self)
@@ -1039,6 +1048,8 @@ wbWorkbook <- R6::R6Class(
     #' @param dims dims
     #' @param array array
     #' @param xy xy
+    #' @param applyCellStyle applyCellStyle
+    #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
     #' @returns The `wbWorkbook` object
     add_formula = function(
         sheet    = current_sheet(),
@@ -1047,7 +1058,9 @@ wbWorkbook <- R6::R6Class(
         startRow = 1,
         dims     = rowcol_to_dims(startRow, startCol),
         array    = FALSE,
-        xy       = NULL
+        xy       = NULL,
+        applyCellStyle = TRUE,
+        removeCellStyle = FALSE
     ) {
       write_formula(
         wb       = self,
@@ -1057,7 +1070,9 @@ wbWorkbook <- R6::R6Class(
         startRow = startRow,
         dims     = dims,
         array    = array,
-        xy       = xy
+        xy       = xy,
+        applyCellStyle = applyCellStyle,
+        removeCellStyle = removeCellStyle
       )
       invisible(self)
     },
@@ -1344,7 +1359,7 @@ wbWorkbook <- R6::R6Class(
         for (i in seq_along(tab_ids)) {
 
           # select only active tabs. in future there should only be active tabs
-          tabs <- self$tables[self$tables$tab_act == 1,]
+          tabs <- self$tables[self$tables$tab_act == 1, ]
 
           if (NROW(tabs)) {
             write_file(
@@ -1621,7 +1636,7 @@ wbWorkbook <- R6::R6Class(
       workbookXML$sheets <- stri_join("<sheets>", pxml(workbookXML$sheets), "</sheets>")
 
       if (length(workbookXML$definedNames)) {
-        workbookXML$definedNames <- stri_join("<definedNames>", pxml(workbookXML$definedNames), "</definedNames>" )
+        workbookXML$definedNames <- stri_join("<definedNames>", pxml(workbookXML$definedNames), "</definedNames>")
       }
 
       # openxml 2.8.1 expects the following order of xml nodes. While we create this per default, it is not
@@ -1848,7 +1863,7 @@ wbWorkbook <- R6::R6Class(
       name   <- unlist(xml_attr(baseFont, "font", "name"))
 
       if (length(sz[[1]]) == 0) {
-        sz <- list("val" = "10")
+        sz <- list("val" = "11")
       } else {
         sz <- as.list(sz)
       }
@@ -1878,16 +1893,10 @@ wbWorkbook <- R6::R6Class(
     #' @param fontColour fontColour
     #' @param fontName fontName
     #' @return The `wbWorkbook` object
-    set_base_font = function(fontSize = 11, fontColour = "black", fontName = "Calibri") {
+    set_base_font = function(fontSize = 11, fontColour = wb_colour(theme = "1"), fontName = "Calibri") {
       if (fontSize < 0) stop("Invalid fontSize")
-      fontColour <- validateColour(fontColour)
-
-      self$styles_mgr$styles$fonts[[1]] <- sprintf(
-        '<font><sz val="%s"/><color rgb="%s"/><name val="%s"/></font>',
-        fontSize,
-        fontColour,
-        fontName
-      )
+      if (is.character(fontColour) && is.null(names(fontColour))) fontColour <- wb_colour(fontColour)
+      self$styles_mgr$styles$fonts[[1]] <- create_font(sz = as.character(fontSize), color = fontColour, name = fontName)
     },
 
     ### sheet names ----
@@ -1960,7 +1969,7 @@ wbWorkbook <- R6::R6Class(
           if (any(ind)) {
             nn <- sprintf("'%s'", new_name[i])
             nn <- stringi::stri_replace_all_fixed(self$workbook$definedName[ind], old, nn)
-            nn <- stringi::stri_replace_all(nn, "'+", "'" )
+            nn <- stringi::stri_replace_all(nn, "'+", "'")
             self$workbook$definedNames[ind] <- nn
           }
         }
@@ -2233,43 +2242,22 @@ wbWorkbook <- R6::R6Class(
 
       ## Remove duplicates
       ok <- !duplicated(cols)
-      widths <- widths[ok]
+      col_width <- widths[ok]
       hidden <- hidden[ok]
       cols <- cols[ok]
 
       col_df <- self$worksheets[[sheet]]$unfold_cols()
+      base_font <- wb_get_base_font(self)
 
       if (any(widths == "auto")) {
-
         df <- wb_to_df(self, sheet = sheet, cols = cols, colNames = FALSE)
         # TODO format(x) might not be the way it is formatted in the xlsx file.
         col_width <- vapply(df, function(x) max(nchar(format(x))), NA_real_)
-
-        # message() should be used instead if we really needed to show this
-        # print(col_width)
-
-        # https://docs.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.column
-
-        # TODO save this instead as internal package data for quicker loading
-        fw <- system.file("extdata", "fontwidth/FontWidth.csv", package = "openxlsx2")
-        font_width_tab <- read.csv(fw)
-
-        # TODO base font might not be the font used in this column
-        base_font <- wb_get_base_font(self)
-        font <- base_font$name$val
-        size <- as.integer(base_font$size$val)
-
-        sel <- font_width_tab$FontFamilyName == font & font_width_tab$FontSize == size
-        # maximum digit width of selected font
-        mdw <- font_width_tab$Width[sel]
-
-        # formula from openxml.spreadsheet.column documentation. The formula returns exactly the expected
-        # value, but the output in excel is still off. Therefore round to create even numbers. In my tests
-        # the results were close to the initial col_width sizes. Character width is still bad, numbers are
-        # way larger, therefore characters cells are to wide. Not sure if we need improve this.
-        widths <- trunc((col_width * mdw + 5) / mdw * 256) / 256
-        widths <- round(widths)
       }
+
+
+      # https://docs.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.column
+      widths <- calc_col_width(base_font = base_font, col_width = col_width)
 
       # create empty cols
       if (NROW(col_df) == 0)
@@ -2443,7 +2431,7 @@ wbWorkbook <- R6::R6Class(
         # wb_validate_sheet() makes sheet an integer
         # so we need to remove this before getting rid of the sheet names
         self$workbook$definedNames <- self$workbook$definedNames[
-          !get_named_regions_from_definedName(self)$sheets %in% self$sheet_names[sheet]
+          !get_nr_from_definedName(self)$sheets %in% self$sheet_names[sheet]
         ]
       }
 
@@ -2725,35 +2713,24 @@ wbWorkbook <- R6::R6Class(
       )
 
       if (type == "list") {
-        self$worksheets[[sheet]]$.__enclos_env__$private$data_validation_list(
-          value        = value,
-          allowBlank   = allowBlank,
-          showInputMsg = showInputMsg,
-          showErrorMsg = showErrorMsg,
-          errorStyle   = errorStyle,
-          errorTitle   = errorTitle,
-          error        = error,
-          promptTitle  = promptTitle,
-          prompt       = prompt,
-          sqref        = sqref
-        )
-      } else {
-        self$worksheets[[sheet]]$.__enclos_env__$private$data_validation(
-          type         = type,
-          operator     = operator,
-          value        = value,
-          allowBlank   = allowBlank,
-          showInputMsg = showInputMsg,
-          showErrorMsg = showErrorMsg,
-          errorStyle   = errorStyle,
-          errorTitle   = errorTitle,
-          error        = error,
-          promptTitle  = promptTitle,
-          prompt       = prompt,
-          origin       = origin,
-          sqref        = sqref
-        )
+        operator <- NULL
       }
+
+      self$worksheets[[sheet]]$.__enclos_env__$private$data_validation(
+        type         = type,
+        operator     = operator,
+        value        = value,
+        allowBlank   = allowBlank,
+        showInputMsg = showInputMsg,
+        showErrorMsg = showErrorMsg,
+        errorStyle   = errorStyle,
+        errorTitle   = errorTitle,
+        error        = error,
+        promptTitle  = promptTitle,
+        prompt       = prompt,
+        origin       = origin,
+        sqref        = sqref
+      )
 
       invisible(self)
     },
@@ -2773,25 +2750,17 @@ wbWorkbook <- R6::R6Class(
       rows <- range(as.integer(rows))
       cols <- range(as.integer(cols))
 
-      # sqref <- get_cell_refs(data.frame(x = rows, y = cols))
       sqref <- paste0(int2col(cols), rows)
+      sqref <- stri_join(sqref, collapse = ":", sep = " ")
 
-      # TODO If the cell merge specs were saved as a data.frame or matrix
-      # this would be quicker to check
-      current <- reg_match0(self$worksheets[[sheet]]$mergeCells, "[A-Z0-9]+:[A-Z0-9]+")
+      current <- rbindlist(xml_attr(xml = self$worksheets[[sheet]]$mergeCells, "mergeCell"))$ref
 
       # regmatch0 will return character(0) when x is NULL
       if (length(current)) {
-        comps <- lapply(
-          current,
-          function(rectCoords) {
-            unlist(strsplit(rectCoords, split = ":"))
-          }
-        )
 
-        current_cells <- build_cell_merges(comps = comps)
-        new_merge <- unlist(build_cell_merges(comps = list(sqref))) # used below in vapply()
-        intersects <- vapply(current_cells, function(x) any(x %in% new_merge), NA)
+        new_merge     <- unname(unlist(dims_to_dataframe(sqref, fill = TRUE)))
+        current_cells <- lapply(current, function(x) unname(unlist(dims_to_dataframe(x, fill = TRUE))))
+        intersects    <- vapply(current_cells, function(x) any(x %in% new_merge), NA)
 
         # Error if merge intersects
         if (any(intersects)) {
@@ -2806,7 +2775,7 @@ wbWorkbook <- R6::R6Class(
         # TODO does this have to be xml?  Can we just save the data.frame or
         # matrix and then check that?  This would also simplify removing the
         # merge specifications
-      private$append_sheet_field(sheet, "mergeCells", sprintf('<mergeCell ref="%s"/>', stri_join(sqref, collapse = ":", sep = " " )))
+      private$append_sheet_field(sheet, "mergeCells", sprintf('<mergeCell ref="%s"/>', sqref))
       invisible(self)
     },
 
@@ -2817,24 +2786,22 @@ wbWorkbook <- R6::R6Class(
     #' @return The `wbWorkbook` object, invisibly
     unmerge_cells = function(sheet = current_sheet(), rows = NULL, cols = NULL) {
       sheet <- private$get_sheet_index(sheet)
+
       rows <- range(as.integer(rows))
       cols <- range(as.integer(cols))
-      # sqref <- get_cell_refs(data.frame(x = rows, y = cols))
-      sqref <- paste0(int2col(cols), rows)
 
-      current <- regmatches(
-        self$worksheets[[sheet]]$mergeCells,
-        regexpr("[A-Z0-9]+:[A-Z0-9]+", self$worksheets[[sheet]]$mergeCells)
-      )
+      sqref <- paste0(int2col(cols), rows)
+      sqref <- stri_join(sqref, collapse = ":", sep = " ")
+
+      current <- rbindlist(xml_attr(xml = self$worksheets[[sheet]]$mergeCells, "mergeCell"))$ref
 
       if (!is.null(current)) {
-        comps <- lapply(current, function(x) unlist(strsplit(x, split = ":")))
-        current_cells <- build_cell_merges(comps = comps)
-        new <- unlist(build_cell_merges(comps = list(sqref))) # used right below
-        mergeIntersections <- vapply(current_cells, function(x) any(x %in% new), NA)
+        new_merge     <- unname(unlist(dims_to_dataframe(sqref, fill = TRUE)))
+        current_cells <- lapply(current, function(x) unname(unlist(dims_to_dataframe(x, fill = TRUE))))
+        intersects    <- vapply(current_cells, function(x) any(x %in% new_merge), NA)
 
         # Remove intersection
-        self$worksheets[[sheet]]$mergeCells <- self$worksheets[[sheet]]$mergeCells[!mergeIntersections]
+        self$worksheets[[sheet]]$mergeCells <- self$worksheets[[sheet]]$mergeCells[!intersects]
       }
 
       invisible(self)
@@ -3045,7 +3012,7 @@ wbWorkbook <- R6::R6Class(
       ## check valid rule
       dxfId <- NULL
       if (!is.null(style)) dxfId <- self$styles_mgr$get_dxf_id(style)
-      params <- validate_conditional_formatting_params(params)
+      params <- validate_cf_params(params)
       values <- NULL
 
       sel <- c("expression", "duplicatedValues", "containsText", "notContainsText", "beginsWith", "endsWith", "between", "topN", "bottomN")
@@ -3400,7 +3367,7 @@ wbWorkbook <- R6::R6Class(
       # If no drawing is found, initiate one. If one is found, append a child to the exisiting node.
       # Might look into updating attributes as well.
       if (all(self$drawings[[drawing_sheet]] == "")) {
-        xml_attr = c(
+        xml_attr <- c(
           "xmlns:xdr" = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
           "xmlns:a" = "http://schemas.openxmlformats.org/drawingml/2006/main",
           "xmlns:r" = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -4479,19 +4446,19 @@ wbWorkbook <- R6::R6Class(
         dim_full_single <- df[1, 1]
 
       if (ncol(df) == 1 && nrow(df) >= 2) {
-        dim_top_single <- df[1,1]
+        dim_top_single <- df[1, 1]
         dim_bottom_single <- df[nrow(df), 1]
         if (nrow(df) >= 3) {
-          mid <- df[,1]
+          mid <- df[, 1]
           dim_middle_single <- mid[!mid %in% c(dim_top_single, dim_bottom_single)]
         }
       }
 
       if (ncol(df) >= 2 && nrow(df) == 1) {
-        dim_left_single <- df[1,1]
+        dim_left_single <- df[1, 1]
         dim_right_single <- df[1, ncol(df)]
         if (ncol(df) >= 3) {
-          ctr <- df[1,]
+          ctr <- df[1, ]
           dim_center_single <- ctr[!ctr %in% c(dim_left_single, dim_right_single)]
         }
       }
@@ -4503,16 +4470,16 @@ wbWorkbook <- R6::R6Class(
         dim_bottom_right <- df[nrow(df), ncol(df)]
 
         if (nrow(df) >= 3) {
-          top_mid <- df[,1]
-          bottom_mid <- df[,ncol(df)]
+          top_mid <- df[, 1]
+          bottom_mid <- df[, ncol(df)]
 
           dim_middle_left <- top_mid[!top_mid %in% c(dim_top_left, dim_bottom_left)]
           dim_middle_right <- bottom_mid[!bottom_mid %in% c(dim_top_right, dim_bottom_right)]
         }
 
         if (ncol(df) >= 3) {
-          top_ctr <- df[1,]
-          bottom_ctr <- df[nrow(df),]
+          top_ctr <- df[1, ]
+          bottom_ctr <- df[nrow(df), ]
 
           dim_top_center <- top_ctr[!top_ctr %in% c(dim_top_left, dim_top_right)]
           dim_bottom_center <- bottom_ctr[!bottom_ctr %in% c(dim_bottom_left, dim_bottom_right)]
@@ -4736,19 +4703,6 @@ wbWorkbook <- R6::R6Class(
       sheet <- private$get_sheet_index(sheet)
       private$do_cell_init(sheet, dims)
 
-      new_fill <- create_fill(
-        gradientFill = gradient_fill,
-        patternType = pattern,
-        fgColor = color
-      )
-
-      # sample() will change the random seed
-      smp <- random_string()
-      snew_fill <- paste0(smp, "new_fill")
-      # sxf_new_fill <- paste0(smp, "xf_new_fill") # not used?
-
-      self$styles_mgr$add(new_fill, snew_fill)
-
       # dim in dataframe can contain various styles. go cell by cell.
       did <- dims_to_dataframe(dims, fill = TRUE)
       # select a few cols and rows to fill
@@ -4758,8 +4712,16 @@ wbWorkbook <- R6::R6Class(
       dims <- unname(unlist(did[rows, cols, drop = FALSE]))
 
       for (dim in dims) {
+
+        new_fill <- create_fill(
+          gradientFill = gradient_fill,
+          patternType = pattern,
+          fgColor = color
+        )
+        self$styles_mgr$add(new_fill, new_fill)
+
         xf_prev <- get_cell_styles(self, sheet, dim)
-        xf_new_fill <- set_fill(xf_prev, self$styles_mgr$get_fill_id(snew_fill))
+        xf_new_fill <- set_fill(xf_prev, self$styles_mgr$get_fill_id(new_fill))
         self$styles_mgr$add(xf_new_fill, xf_new_fill)
         s_id <- self$styles_mgr$get_xf_id(xf_new_fill)
         self$set_cell_style(sheet, dim, s_id)
@@ -4813,33 +4775,33 @@ wbWorkbook <- R6::R6Class(
       sheet <- private$get_sheet_index(sheet)
       private$do_cell_init(sheet, dims)
 
-      new_font <- create_font(
-        b = bold,
-        charset = charset,
-        color = color,
-        condense = condense,
-        extend = extend,
-        family = family,
-        i = italic,
-        name = name,
-        outline = outline,
-        scheme = scheme,
-        shadow = shadow,
-        strike = strike,
-        sz = size,
-        u = underline,
-        vertAlign = vertAlign
-      )
-
-      smp <- random_string()
-      snew_font <- paste0(smp, "new_font")
-      sxf_new_font <- paste0(smp, "xf_new_font")
-
-      self$styles_mgr$add(new_font, snew_font)
+      did <- dims_to_dataframe(dims, fill = TRUE)
+      dims <- unname(unlist(did))
 
       for (dim in dims) {
+
+        new_font <- create_font(
+          b = bold,
+          charset = charset,
+          color = color,
+          condense = condense,
+          extend = extend,
+          family = family,
+          i = italic,
+          name = name,
+          outline = outline,
+          scheme = scheme,
+          shadow = shadow,
+          strike = strike,
+          sz = size,
+          u = underline,
+          vertAlign = vertAlign
+        )
+        self$styles_mgr$add(new_font, new_font)
+
         xf_prev <- get_cell_styles(self, sheet, dim)
-        xf_new_font <- set_font(xf_prev, self$styles_mgr$get_font_id(snew_font))
+        xf_new_font <- set_font(xf_prev, self$styles_mgr$get_font_id(new_font))
+
         self$styles_mgr$add(xf_new_font, xf_new_font)
         s_id <- self$styles_mgr$get_xf_id(xf_new_font)
         self$set_cell_style(sheet, dim, s_id)
@@ -4864,22 +4826,20 @@ wbWorkbook <- R6::R6Class(
       sheet <- private$get_sheet_index(sheet)
       private$do_cell_init(sheet, dims)
 
+      did <- dims_to_dataframe(dims, fill = TRUE)
+      dims <- unname(unlist(did))
+
       if (inherits(numfmt, "character")) {
 
         new_numfmt <- create_numfmt(
           numFmtId = self$styles_mgr$next_numfmt_id(),
           formatCode = numfmt
         )
-
-        smp <- random_string()
-        snew_numfmt <- paste0(smp, "new_numfmt")
-        # sxf_new_numfmt <- paste0(smp, "xf_new_numfmt")
-
-        self$styles_mgr$add(new_numfmt, snew_numfmt)
+        self$styles_mgr$add(new_numfmt, new_numfmt)
 
         for (dim in dims) {
           xf_prev <- get_cell_styles(self, sheet, dim)
-          xf_new_numfmt <- set_numfmt(xf_prev, self$styles_mgr$get_numfmt_id(snew_numfmt))
+          xf_new_numfmt <- set_numfmt(xf_prev, self$styles_mgr$get_numfmt_id(new_numfmt))
           self$styles_mgr$add(xf_new_numfmt, xf_new_numfmt)
           s_id <- self$styles_mgr$get_xf_id(xf_new_numfmt)
           self$set_cell_style(sheet, dim, s_id)
@@ -4970,6 +4930,9 @@ wbWorkbook <- R6::R6Class(
       sheet <- private$get_sheet_index(sheet)
       private$do_cell_init(sheet, dims)
 
+      did <- dims_to_dataframe(dims, fill = TRUE)
+      dims <- unname(unlist(did))
+
       for (dim in dims) {
         xf_prev <- get_cell_styles(self, sheet, dim)
         xf_new_cellstyle <- set_cellstyle(
@@ -5036,7 +4999,7 @@ wbWorkbook <- R6::R6Class(
     #' @return The `wbWorksheetObject`, invisibly
     set_cell_style = function(sheet = current_sheet(), dims, style) {
 
-      if (length(dims) == 1 && grepl(":", dims))
+      if (length(dims) == 1 && grepl(":|;", dims))
         dims <- dims_to_dataframe(dims, fill = TRUE)
       sheet <- private$get_sheet_index(sheet)
 
@@ -5105,7 +5068,7 @@ wbWorkbook <- R6::R6Class(
         merged_rows[is.na(merged_rows)] <- ""
         merged_rows <- merged_rows[!duplicated(merged_rows["r"]), ]
         ordr <- ordered(order(as.integer(merged_rows$r)))
-        merged_rows <- merged_rows[ordr,]
+        merged_rows <- merged_rows[ordr, ]
 
         self$worksheets[[id_new]]$sheet_data$row_attr <- merged_rows
       }
@@ -5598,12 +5561,12 @@ wbWorkbook <- R6::R6Class(
             # still row_attr is what we want!
 
             rows_attr <- ws$sheet_data$row_attr
-            ws$sheet_data$row_attr <- rows_attr[order(as.numeric(rows_attr[, "r"])),]
+            ws$sheet_data$row_attr <- rows_attr[order(as.numeric(rows_attr[, "r"])), ]
 
             cc_rows <- ws$sheet_data$row_attr$r
             cc_out <- cc[cc$row_r %in% cc_rows, c("row_r", "c_r",  "r", "v", "c_t", "c_s", "c_cm", "c_ph", "c_vm", "f", "f_t", "f_ref", "f_ca", "f_si", "is")]
 
-            ws$sheet_data$cc_out <- cc_out[order(as.integer(cc_out[,"row_r"]), col2int(cc_out[, "c_r"])),]
+            ws$sheet_data$cc_out <- cc_out[order(as.integer(cc_out[, "row_r"]), col2int(cc_out[, "c_r"])), ]
           } else {
             ws$sheet_data$row_attr <- NULL
             ws$sheet_data$cc_out <- NULL
@@ -5643,7 +5606,7 @@ wbWorkbook <- R6::R6Class(
 
             ## Check if any tables were deleted - remove these from rels
             # TODO a relship manager should take care of this
-            tabs <- self$tables[self$tables$tab_act == 1,]
+            tabs <- self$tables[self$tables$tab_act == 1, ]
             if (NROW(tabs)) {
               table_inds <- grep("tables/table[0-9].xml", ws_rels)
 
@@ -5996,7 +5959,7 @@ wbWorkbook <- R6::R6Class(
     do_cell_init = function(sheet = current_sheet(), dims) {
 
       sheet <- private$get_sheet_index(sheet)
-      if (length(dims) == 1 && grepl(":", dims))
+      if (length(dims) == 1 && grepl(":|;", dims))
         dims <- dims_to_dataframe(dims, fill = TRUE)
 
       exp_cells <- unname(unlist(dims))
@@ -6004,12 +5967,18 @@ wbWorkbook <- R6::R6Class(
 
       # initialize cell
       if (!all(exp_cells %in% got_cells)) {
+
         init_cells <- NA
-        for (exp_cell in exp_cells[!exp_cells %in% got_cells])
-        # TODO use dims once PR#236 is merged
-        self$add_data(x = init_cells, na.strings = NULL, colNames = FALSE,
-                      startCol = col2int(exp_cell),
-                      startRow = as.numeric(gsub("\\D", "", exp_cell)))
+        missing_cells <- exp_cells[!exp_cells %in% got_cells]
+
+        for (exp_cell in missing_cells) {
+          self$add_data(
+            x = init_cells,
+            na.strings = NULL,
+            colNames = FALSE,
+            dims = exp_cell
+          )
+        }
       }
 
       invisible(self)
@@ -6055,7 +6024,7 @@ lcr <- function(var) {
 #' @param index Sheet name index
 #' @return The sheet index
 #' @export
-wb_get_sheet_name = function(wb, index = NULL) {
+wb_get_sheet_name <- function(wb, index = NULL) {
   index <- index %||% seq_along(wb$sheet_names)
 
   # index should be integer like

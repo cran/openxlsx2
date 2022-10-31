@@ -280,7 +280,7 @@ create_font <- function(
     b = "",
     charset = "",
     color = wb_colour(hex = "FF000000"),
-    condense ="",
+    condense = "",
     extend = "",
     family = "2",
     i = "",
@@ -323,7 +323,7 @@ create_font <- function(
     i <- xml_node_create("i", xml_attributes = c("val" = i))
   }
 
-  if(is.null(name)) name <- ""
+  if (is.null(name)) name <- ""
   if (name != "") {
     name <- xml_node_create("name", xml_attributes = c("val" = name))
   }
@@ -344,7 +344,7 @@ create_font <- function(
     strike <- xml_node_create("strike", xml_attributes = c("val" = strike))
   }
 
-  if(is.null(sz)) sz <- ""
+  if (is.null(sz)) sz <- ""
 
   if (sz != "") {
     sz <- xml_node_create("sz", xml_attributes = c("val" = sz))
@@ -766,14 +766,19 @@ styles_on_sheet <- function(wb, sheet) {
 #' @param cell cell
 #' @noRd
 get_cell_styles <- function(wb, sheet, cell) {
-  z <- wb$get_cell_style(sheet, cell)
-  id <- vapply(z, function(x) {
-    out <- which(wb$styles_mgr$get_xf()$id %in% x)
-    if (identical(out,integer())) out <- 1L
-    out
-  },
-  NA_integer_)
-  wb$styles_mgr$styles$cellXfs[id]
+  cellstyles <- wb$get_cell_style(sheet, cell)
+
+  out <- NULL
+  for (cellstyle in cellstyles) {
+    if (cellstyle == "")
+      tmp <- wb$styles_mgr$styles$cellXfs[1]
+    else
+      tmp <- wb$styles_mgr$styles$cellXfs[as.numeric(cellstyle) + 1]
+
+    out <- c(out, tmp)
+  }
+
+  out
 }
 
 
@@ -829,7 +834,8 @@ set_cell_style <- function(wb, sheet, cell, value) {
 
 #' @name create_dxfs_style
 #' @title Create a custom formatting style
-#' @description Create a new style to apply to worksheet cells
+#' @description Create a new style to apply to worksheet cells. Created styles have to be
+#' assigned to a workbook to use them
 #' @param font_name A name of a font. Note the font name is not validated. If fontName is NULL,
 #' the workbook base font is used. (Defaults to Calibri)
 #' @param font_color Colour of text in cell.  A valid hex colour beginning with "#"
@@ -847,34 +853,55 @@ set_cell_style <- function(wb, sheet, cell, value) {
 #' @param text_italic italic
 #' @param text_underline underline 1, true, single or double
 #' @return A dxfs style node
-#' @export
+#' @seealso [wb_add_style()]
 #' @examples
+#' # do not apply anthing
+#' style1 <- create_dxfs_style()
+#'
+#' # change font color and background color
+#' style2 <- create_dxfs_style(
+#'   font_color = wb_colour(hex = "FF9C0006"),
+#'   bgFill = wb_colour(hex = "FFFFC7CE")
+#' )
+#'
+#' # change font (type, size and color) and background
+#' # the old default in openxlsx and openxlsx2 <= 0.3
+#' style3 <- create_dxfs_style(
+#'   font_name = "Calibri",
+#'   font_size = 11,
+#'   font_color = wb_colour(hex = "FF9C0006"),
+#'   bgFill = wb_colour(hex = "FFFFC7CE")
+#' )
+#'
 #' ## See package vignettes for further examples
+#' @export
 create_dxfs_style <- function(
-    font_name      = "Calibri",
-    font_size      = "11",
-    font_color     = wb_colour(hex = "FF9C0006"),
+    font_name      = NULL,
+    font_size      = NULL,
+    font_color     = NULL,
     numFmt         = NULL,
     border         = NULL,
     border_color   = wb_colour(getOption("openxlsx2.borderColour", "black")),
     border_style   = getOption("openxlsx2.borderStyle", "thin"),
-    bgFill         = wb_colour(hex = "FFFFC7CE"),
+    bgFill         = NULL,
     text_bold      = NULL,
     text_strike    = NULL,
     text_italic    = NULL,
     text_underline = NULL # "true" or "double"
 ) {
 
-  if (is.null(font_color)) font_color = ""
-  if (is.null(text_bold)) text_bold = ""
-  if (is.null(text_strike)) text_strike = ""
-  if (is.null(text_italic)) text_italic = ""
-  if (is.null(text_underline)) text_underline = ""
+  if (is.null(font_color)) font_color <- ""
+  if (is.null(font_size)) font_size <- ""
+  if (is.null(text_bold)) text_bold <- ""
+  if (is.null(text_strike)) text_strike <- ""
+  if (is.null(text_italic)) text_italic <- ""
+  if (is.null(text_underline)) text_underline <- ""
 
   # found numFmtId=3 in MS365 xml not sure if this should be increased
   if (!is.null(numFmt)) numFmt <- create_numfmt(3, numFmt)
 
-  font <- create_font(color = font_color, name = font_name, sz = font_size,
+  font <- create_font(color = font_color, name = font_name,
+                      sz = as.character(font_size),
                       b = text_bold, i = text_italic, strike = text_strike,
                       u = text_underline,
                       family = "", scheme = "")

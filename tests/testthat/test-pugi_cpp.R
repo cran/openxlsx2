@@ -69,7 +69,7 @@ test_that("xml_value", {
 
 test_that("xml_attr", {
 
-  exp <- list(c(a="1"))
+  exp <- list(c(a = "1"))
 
   xml_str <- "<a a=\"1\"/>"
   xml <- read_xml(xml_str)
@@ -180,4 +180,14 @@ test_that("getXMLPtr1con", {
   got <- getXMLPtr1con(read_xml(xml))
   expect_equal(exp, got)
 
+})
+
+test_that("write_xmlPtr", {
+
+  xml <- read_xml("<a/>")
+  temp <- tempfile(fileext = ".xml")
+  expect_silent(write_xmlPtr(xml, temp))
+
+  skip_on_cran()
+  expect_error(write_xmlPtr(xml, paste0("/", random_string(), "/test.xml")), "could not save file")
 })
