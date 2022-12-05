@@ -50,6 +50,8 @@ wb_workbook <- function(
 #' @export
 #' @family workbook wrappers
 #'
+#' @returns the `wbWorkbook` object, invisibly
+#'
 #' @examples
 #' ## Create a new workbook and add a worksheet
 #' wb <- wb_workbook("Creator of workbook")
@@ -61,9 +63,8 @@ wb_workbook <- function(
 #' }
 wb_save <- function(wb, path = NULL, overwrite = TRUE) {
   assert_workbook(wb)
-  wb$clone()$save(path = path, overwrite = overwrite)$path
+  wb$clone()$save(path = path, overwrite = overwrite)
 }
-
 
 # add data ----------------------------------------------------------------
 
@@ -748,6 +749,36 @@ wb_add_plot <- function(
   )
 }
 
+#' add drawings to workbook
+#' @param wb a wbWorkbook
+#' @param sheet a sheet in the workbook
+#' @param xml the drawing xml as character or file
+#' @param dims the dimension where the drawing is added. Can be NULL
+#' @examples
+#' if (requireNamespace("rvg") && interactive()) {
+#'
+#' ## rvg example
+#' require(rvg)
+#' tmp <- tempfile(fileext = ".xml")
+#' dml_xlsx(file =  tmp)
+#' plot(1,1)
+#' dev.off()
+#'
+#' wb <- wb_workbook()$
+#'   add_worksheet()$
+#'   add_drawing(xml = tmp)$
+#'   add_drawing(xml = tmp, dims = NULL)
+#' }
+#‘ @export
+wb_add_drawing <- function(
+  wb,
+  sheet = current_sheet(),
+  xml,
+  dims = "A1:H8"
+) {
+  assert_workbook(wb)
+  wb$clone()$add_drawing(sheet = sheet, xml = xml, dims = dims)
+}
 
 #' @title Remove a worksheet from a workbook
 #' @description Remove a worksheet from a Workbook object
@@ -819,6 +850,59 @@ wb_get_base_font <- function(wb) {
   # TODO all of these class checks need to be cleaned up
   assert_workbook(wb)
   wb$get_base_font()
+}
+
+
+#' Set the workbook position, size and filter
+#'
+#' Get the base font used in the workbook.
+#' @param wb A [wbWorkbook] object
+#' @param activeTab activeTab
+#' @param autoFilterDateGrouping autoFilterDateGrouping
+#' @param firstSheet firstSheet
+#' @param minimized minimized
+#' @param showHorizontalScroll showHorizontalScroll
+#' @param showSheetTabs showSheetTabs
+#' @param showVerticalScroll showVerticalScroll
+#' @param tabRatio tabRatio
+#' @param visibility visibility
+#' @param windowHeight windowHeight
+#' @param windowWidth windowWidth
+#' @param xWindow xWindow
+#' @param yWindow yWindow
+#' @return The `wbWorkbook` object
+wb_set_bookview <- function(
+    wb,
+    activeTab              = NULL,
+    autoFilterDateGrouping = NULL,
+    firstSheet             = NULL,
+    minimized              = NULL,
+    showHorizontalScroll   = NULL,
+    showSheetTabs          = NULL,
+    showVerticalScroll     = NULL,
+    tabRatio               = NULL,
+    visibility             = NULL,
+    windowHeight           = NULL,
+    windowWidth            = NULL,
+    xWindow                = NULL,
+    yWindow                = NULL
+) {
+  assert_workbook(wb)
+  wb$clone()$set_bookview(
+    activeTab              = activeTab,
+    autoFilterDateGrouping = autoFilterDateGrouping,
+    firstSheet             = firstSheet,
+    minimized              = minimized,
+    showHorizontalScroll   = showHorizontalScroll,
+    showSheetTabs          = showSheetTabs,
+    showVerticalScroll     = showVerticalScroll,
+    tabRatio               = tabRatio,
+    visibility             = visibility,
+    windowHeight           = windowHeight,
+    windowWidth            = windowWidth,
+    xWindow                = xWindow,
+    yWindow                = yWindow
+  )
 }
 
 #' Set document headers and footers
@@ -1195,15 +1279,16 @@ wb_protect <- function(
 #' @param wb A workbook object
 #' @param sheet A name or index of a worksheet
 #' @param show A logical. If `FALSE`, grid lines are hidden.
+#' @param print A logical. If `FALSE`, grid lines are not printed.
 #' @export
 #' @examples
 #' wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
 #' wb$get_sheet_names() ## list worksheets in workbook
 #' wb$grid_lines(1, show = FALSE)
 #' wb$grid_lines("testing", show = FALSE)
-wb_grid_lines <- function(wb, sheet = current_sheet(), show = FALSE) {
+wb_grid_lines <- function(wb, sheet = current_sheet(), show = FALSE, print = show) {
   assert_workbook(wb)
-  wb$clone()$grid_lines(sheet = sheet, show = show)
+  wb$clone()$grid_lines(sheet = sheet, show = show, print = print)
 }
 
 # TODO hide gridlines?
@@ -1266,7 +1351,20 @@ wb_set_order <- function(wb, sheets) {
 #' @param cols Numeric vector specifying columns to include in region
 #' @param name Name for region. A character vector of length 1. Note region names musts be case-insensitive unique.
 #' @param overwrite Boolean. Overwrite if exists? Default to FALSE
-#' @param localSheetId localSheetId
+#' @param localSheet If `TRUE` the named region will be local for this sheet
+#' @param comment description text for named region
+#' @param customMenu customMenu (unknown xml feature)
+#' @param description description (unknown xml feature)
+#' @param is_function function (unknown xml feature)
+#' @param functionGroupId function group id (unknown xml feature)
+#' @param help help (unknown xml feature)
+#' @param hidden hidden if the named region should be hidden
+#' @param localName localName (unknown xml feature)
+#' @param publishToServer publish to server (unknown xml feature)
+#' @param statusBar status bar (unknown xml feature)
+#' @param vbProcedure wbProcedure (unknown xml feature)
+#' @param workbookParameter workbookParameter (unknown xml feature)
+#' @param xml xml (unknown xml feature)
 #' @details Region is given by: min(cols):max(cols) X min(rows):max(rows)
 #' @examples
 #' ## create named regions
@@ -1308,15 +1406,49 @@ NULL
 
 #' @rdname named_region
 #' @export
-wb_add_named_region <- function(wb, sheet = current_sheet(), cols, rows, name, localSheetId = NULL, overwrite = FALSE) {
+wb_add_named_region <- function(
+  wb,
+  sheet             = current_sheet(),
+  cols,
+  rows,
+  name,
+  localSheet        = FALSE,
+  overwrite         = FALSE,
+  comment           = NULL,
+  customMenu        = NULL,
+  description       = NULL,
+  is_function       = NULL,
+  functionGroupId   = NULL,
+  help              = NULL,
+  hidden            = NULL,
+  localName         = NULL,
+  publishToServer   = NULL,
+  statusBar         = NULL,
+  vbProcedure       = NULL,
+  workbookParameter = NULL,
+  xml               = NULL
+) {
   assert_workbook(wb)
   wb$clone()$add_named_region(
-    sheet        = sheet,
-    cols         = cols,
-    rows         = rows,
-    name         = name,
-    localSheetId = localSheetId,
-    overwrite    = overwrite
+    sheet             = sheet,
+    cols              = cols,
+    rows              = rows,
+    name              = name,
+    localSheet        = localSheet,
+    overwrite         = overwrite,
+    comment           = comment,
+    customMenu        = customMenu,
+    description       = description,
+    is_function       = is_function,
+    functionGroupId   = functionGroupId,
+    help              = help,
+    hidden            = hidden,
+    localName         = localName,
+    publishToServer   = publishToServer,
+    statusBar         = statusBar,
+    vbProcedure       = vbProcedure,
+    workbookParameter = workbookParameter,
+    xml               = xml
   )
 }
 
@@ -1869,6 +2001,25 @@ wb_add_image <- function(
     dpi       = dpi
   )
 }
+
+
+#' dummy function to add a chart to an existing workbook
+#' currently only a barplot is possible
+#' @param wb a workbook
+#' @param sheet the sheet on which the graph will appear
+#' @param xml chart xml
+#' @param dims the dimensions where the sheet will appear
+#' @export
+wb_add_chart_xml <- function(
+  wb,
+  sheet = current_sheet(),
+  xml,
+  dims = "A1:H8"
+) {
+  assert_workbook(wb)
+  wb$clone()$add_chart_xml(sheet, xml, dims)
+}
+
 
 #' clean sheet (remove all values)
 #'

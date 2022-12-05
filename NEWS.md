@@ -1,3 +1,59 @@
+# openxlsx2 (in development)
+
+## New features
+
+* Provide `rvg` support via `wb_add_drawing()`. This allows integrating `rvg` plots into xlsx files. [449](https://github.com/JanMarvin/openxlsx2/pull/449)
+
+* Improve print options. Defaults to printing grid lines, if the worksheet contains grid lines. [440](https://github.com/JanMarvin/openxlsx2/pull/440)
+
+* Support reading files with form control. [426](https://github.com/JanMarvin/openxlsx2/pull/426)
+
+* Handle input files with chart extensions. [443](https://github.com/JanMarvin/openxlsx2/pull/443)
+
+* Improve writing styles to workbook. Previously every cell was checked, this has been changed to check unique styles. [423](https://github.com/JanMarvin/openxlsx2/pull/423)
+
+* Implement reading custom file properties. [418](https://github.com/JanMarvin/openxlsx2/pull/418)
+
+* Improved `add_named_region()`. This function includes now various xml options. [386](https://github.com/JanMarvin/openxlsx2/pull/386)
+
+* Add ... as argument to `read_xlsx()` and `wb_read()`. [381](https://github.com/JanMarvin/openxlsx2/pull/381)
+
+* Allow reading files with xml namespace created by third party software. [405](https://github.com/JanMarvin/openxlsx2/pull/405)
+
+## Fixes
+
+* Update or remove calculation chain when overwriting formulas in a workbook. [438](https://github.com/JanMarvin/openxlsx2/pull/438)
+
+* Fix double xml escaping when saving. [435](https://github.com/JanMarvin/openxlsx2/pull/435)
+
+* Minor tweak for POSIXct dates and try to avoid the notorious 29Feb1900. [424](https://github.com/JanMarvin/openxlsx2/pull/424)
+
+* Implement reading `customXml` folder for input files with connection. [419](https://github.com/JanMarvin/openxlsx2/pull/419)
+
+* Fixed saving files with `<sheetPr/>` tag. Previously this was wrapped in a second `sheetPr` node. This issue occurs with xlsm files only. [417](https://github.com/JanMarvin/openxlsx2/pull/417)
+
+* Fixed a case where embedded files were assigned incorrectly in worksheet relationships. This caused corrupted output. [403](https://github.com/JanMarvin/openxlsx2/pull/403)
+
+## Breaking changes
+
+* Remove `merge_` functions for styles. [450](https://github.com/JanMarvin/openxlsx2/issues/450)
+
+* Previously if a loaded workbook contained formulas pointing to cells modified by `openxlsx2`, these formulas were not updated, once the workbook was opened in spreadsheet software. This is now enforced, unless the option `openxlsx2.disableFullCalcOnLoad` is set. In this case we would respect the original calculation properties of the  workbook.
+
+* `wb_save()` no longer returns the `path` that the object was saved to, but instead the `wbWorkbook` object, invisibly.  This is consistent with the behavior of others wrappers. [378](https://github.com/JanMarvin/openxlsx2/issues/378)
+
+* Remove never used `all.equal.wbWorkbook()`. The idea was nice, but it never developed into something useful.
+
+* Remove never used `wb_chart_sheet()` function. [399](https://github.com/JanMarvin/openxlsx2/pull/399)
+
+## Internal changes
+
+* Provide `set_sheetview()` in sheets. Can be used to provide a `wbWorkbook` function and wrapper in the future. [399](https://github.com/JanMarvin/openxlsx2/pull/399)
+
+
+***************************************************************************
+
+
 # openxlsx2 0.3.1
 
 ## New features
@@ -184,7 +240,7 @@
 
 * private `wbWorkbook` field `original_sheet_names` added to track the original names passed to sheets
 * private `$get_sheet()` removed in favor of more explicit
-* private `wbWorkbook` methods additions:  
+* private `wbWorkbook` methods additions:
   * `$get_sheet_id_max()`, `$get_sheet_index()` for getting ids
   * `$get_sheet_name()` for getting a sheet name
   * `$set_single_sheet_name()` for setting sheet names

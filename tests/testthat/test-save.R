@@ -1,11 +1,11 @@
 test_that("test return values for wb_save", {
   tempFile <- temp_xlsx()
   wb <- wb_add_worksheet(wb_workbook(), "name")
-  expect_identical(tempFile, wb_save(wb, tempFile))
+  expect_identical(tempFile, wb_save(wb, tempFile)$path)
   expect_error(wb_save(wb, tempFile), NA)
   expect_error(wb_save(wb, tempFile, overwrite = FALSE))
 
-  expect_identical(tempFile, wb_save(wb, tempFile))
+  expect_identical(tempFile, wb_save(wb, tempFile)$path)
   file.remove(tempFile)
 })
 
@@ -328,5 +328,26 @@ test_that("write & load file with chartsheet", {
   temp <- temp_xlsx()
   expect_silent(wb$save(temp))
   expect_silent(wb2 <- wb_load(temp))
+
+})
+
+test_that("escaping of inlinestrings works", {
+
+  temp <- temp_xlsx()
+  wb <- wb_workbook()$
+    add_worksheet("Test")$
+    add_data(dims = "A1", x = "A & B")$
+    save(temp)
+
+  exp <- "A & B"
+  got <- wb_to_df(wb, colNames = FALSE)$A
+  expect_equal(exp, got)
+
+  got <- wb_to_df(temp, colNames = FALSE)$A
+  expect_equal(exp, got)
+
+  wb2 <- wb_load(temp)
+  got <- wb_to_df(wb2, colNames = FALSE)$A
+  expect_equal(exp, got)
 
 })

@@ -30,8 +30,14 @@ wbWorkbook <- R6::R6Class(
     #' @field isChartSheet isChartSheet
     isChartSheet = logical(),
 
+    #' @field customXml customXml
+    customXml = NULL,
+
     #' @field connections connections
     connections = NULL,
+
+    #' @field ctrlProps ctrlProps
+    ctrlProps = NULL,
 
     #' @field Content_Types Content_Types
     Content_Types = genBaseContent_Type(),
@@ -41,6 +47,9 @@ wbWorkbook <- R6::R6Class(
 
     #' @field core core
     core = character(),
+
+    #' @field custom custom
+    custom = character(),
 
     #' @field drawings drawings
     drawings = NULL,
@@ -89,9 +98,6 @@ wbWorkbook <- R6::R6Class(
 
     #' @field queryTables queryTables
     queryTables = NULL,
-
-    #' @field rowHeights rowHeights
-    rowHeights = NULL,
 
     #' @field slicers slicers
     slicers = NULL,
@@ -224,7 +230,6 @@ wbWorkbook <- R6::R6Class(
       self$pivotDefinitionsRels <- NULL
 
       self$queryTables <- NULL
-      self$rowHeights <- list()
 
       self$slicers <- NULL
       self$slicerCaches <- NULL
@@ -404,6 +409,14 @@ wbWorkbook <- R6::R6Class(
         msg <- c(msg, "zoom must be numeric")
       }
 
+      # nocov start
+      if (zoom < 10) {
+        zoom <- 10
+      } else if (zoom > 400) {
+        zoom <- 400
+      }
+      #nocov end
+
       if (!is.null(oddHeader) & length(oddHeader) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("header"))
@@ -487,11 +500,7 @@ wbWorkbook <- R6::R6Class(
       ## append to worksheets list
       self$append("worksheets",
         wbWorksheet$new(
-          gridLines   = gridLines,
-          rowColHeaders = rowColHeaders,
-          tabSelected = newSheetIndex == 1,
           tabColour   = tabColour,
-          zoom        = zoom,
           oddHeader   = oddHeader,
           oddFooter   = oddFooter,
           evenHeader  = evenHeader,
@@ -501,8 +510,22 @@ wbWorkbook <- R6::R6Class(
           paperSize   = paperSize,
           orientation = orientation,
           hdpi        = hdpi,
-          vdpi        = vdpi
+          vdpi        = vdpi,
+          printGridLines = gridLines
         )
+      )
+
+      # NULL or TRUE/FALSE
+      rightToLeft <- getOption("openxlsx2.rightToLeft")
+
+      # set preselected set for sheetview
+      self$worksheets[[newSheetIndex]]$set_sheetview(
+        workbookViewId    = 0,
+        zoomScale         = zoom,
+        showGridLines     = gridLines,
+        showRowColHeaders = rowColHeaders,
+        tabSelected       = newSheetIndex == 1,
+        rightToLeft       = rightToLeft
       )
 
 
@@ -541,7 +564,6 @@ wbWorkbook <- R6::R6Class(
       self$isChartSheet[[newSheetIndex]]     <- FALSE
       self$comments[[newSheetIndex]]         <- list()
       self$threadComments[[newSheetIndex]]   <- list()
-      self$rowHeights[[newSheetIndex]]       <- list()
 
       self$append("sheetOrder", as.integer(newSheetIndex))
       private$set_single_sheet_name(newSheetIndex, sheet_name, sheet)
@@ -562,6 +584,13 @@ wbWorkbook <- R6::R6Class(
       newSheetIndex <- length(self$worksheets) + 1L
       private$set_current_sheet(newSheetIndex)
       sheetId <- private$get_sheet_id_max() # checks for length of worksheets
+
+      if (!all(self$charts$chartEx == "")) {
+        warning(
+          "The file you have loaded contains chart extensions. At the moment,",
+          " cloning worksheets can damage the output."
+        )
+      }
 
       # not the best but a quick fix
       new_raw <- new
@@ -645,7 +674,7 @@ wbWorkbook <- R6::R6Class(
                 # sheet name instead of the clone source
 
                 chart <- self$charts$chart[chartid]
-                self$charts$rels[chartid] <- gsub("?drawing[0-9].xml", paste0("drawing", chartid, ".xml"), self$charts$rels[chartid])
+                self$charts$rels[chartid] <- gsub("?drawing[0-9]+.xml", paste0("drawing", chartid, ".xml"), self$charts$rels[chartid])
 
                 guard_ws <- function(x) {
                   if (grepl(" ", x)) x <- shQuote(x, type = "sh")
@@ -741,7 +770,6 @@ wbWorkbook <- R6::R6Class(
       self$isChartSheet[[newSheetIndex]]   <- self$isChartSheet[[old]]
       self$comments[[newSheetIndex]]       <- self$comments[[old]]
       self$threadComments[[newSheetIndex]] <- self$threadComments[[old]]
-      self$rowHeights[[newSheetIndex]]     <- self$rowHeights[[old]]
 
       self$append("sheetOrder", as.integer(newSheetIndex))
       self$append("sheet_names", new)
@@ -861,11 +889,22 @@ wbWorkbook <- R6::R6Class(
 
       ## append to worksheets list
       self$append("worksheets",
-        wbChartSheet$new(
-          tabSelected = newSheetIndex == 1,
-          tabColour = tabColour,
-          zoom = zoom
-        )
+        wbChartSheet$new(tabColour = tabColour)
+      )
+
+
+      # nocov start
+      if (zoom < 10) {
+        zoom <- 10
+      } else if (zoom > 400) {
+        zoom <- 400
+      }
+      #nocov end
+
+      self$worksheets[[newSheetIndex]]$set_sheetview(
+        workbookViewId = 0,
+        zoomScale      = zoom,
+        tabSelected    = newSheetIndex == 1
       )
 
       self$append("sheet_names", sheet)
@@ -901,7 +940,6 @@ wbWorkbook <- R6::R6Class(
 
       self$worksheets_rels[[newSheetIndex]]  <- genBaseSheetRels(newSheetIndex)
       self$isChartSheet[[newSheetIndex]]     <- TRUE
-      self$rowHeights[[newSheetIndex]]       <- list()
       self$vml_rels[[newSheetIndex]]         <- list()
       self$vml[[newSheetIndex]]              <- list()
       self$append("sheetOrder", newSheetIndex)
@@ -1284,10 +1322,34 @@ wbWorkbook <- R6::R6Class(
 
       ## Write content
 
+      # if custom is present, we need 4 relationships, otherwise 3
+
+      Ids <- c("rId3", "rId2", "rId1")
+      Types <- c(
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+        "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+      )
+      Targets <- c("docProps/app.xml", "docProps/core.xml", "xl/workbook.xml")
+
+      if (length(self$custom)) {
+        Ids <- c(Ids, "rId4")
+        Types <- c(
+          Types,
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties"
+        )
+        Targets <- c(Targets, "docProps/custom.xml")
+      }
+
+      relship <- df_to_xml("Relationship",
+        data.frame(Id = Ids, Type = Types, Target = Targets, stringsAsFactors = FALSE)
+      )
+
+
       ## write .rels
       write_file(
         head = '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n',
-        body = '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>',
+        body = pxml(relship),
         tail = "</Relationships>",
         fl = file.path(relsDir, ".rels")
       )
@@ -1320,6 +1382,17 @@ wbWorkbook <- R6::R6Class(
         tail = "",
         fl = file.path(docPropsDir, "core.xml")
       )
+
+
+      ## write core.xml
+      if (length(self$custom)) {
+        write_file(
+          head = "",
+          body = pxml(self$custom),
+          tail = "",
+          fl = file.path(docPropsDir, "custom.xml")
+        )
+      }
 
       ## write workbook.xml.rels
       write_file(
@@ -1405,6 +1478,26 @@ wbWorkbook <- R6::R6Class(
       ## connections
       if (length(self$connections)) {
         write_file(body = self$connections, fl = file.path(xlDir, "connections.xml"))
+      }
+
+      ## connections
+      if (length(self$ctrlProps)) {
+        ctrlPropsDir <- dir_create(tmpDir, "xl", "ctrlProps")
+
+        for (i in seq_along(self$ctrlProps)) {
+          write_file(body = self$ctrlProps[i], fl = file.path(ctrlPropsDir, sprintf("ctrlProp%i.xml", i)))
+        }
+      }
+
+      if (length(self$customXml)) {
+        customXmlDir     <- dir_create(tmpDir, "customXml")
+        customXmlRelsDir <- dir_create(tmpDir, "customXml", "_rels")
+        for (fl in self$customXml[!grepl(".xml.rels$", self$customXml)]) {
+          file.copy(fl, customXmlDir, overwrite = TRUE)
+        }
+        for (fl in self$customXml[grepl(".xml.rels$", self$customXml)]) {
+          file.copy(fl, customXmlRelsDir, overwrite = TRUE)
+        }
       }
 
       ## externalLinks
@@ -1644,10 +1737,10 @@ wbWorkbook <- R6::R6Class(
       # workbook order, therefore we have to make sure that the expected order is written.
       # Othterwise spreadsheet software will complain.
       workbook_openxml281 <- c(
-        "fileVersion", "fileSharing", "workbookPr", "alternateContent", "absPath", "workbookProtection",
-        "bookViews", "sheets", "functionGroups", "externalReferences", "definedNames", "calcPr",
-        "oleSize", "customWorkbookViews", "pivotCaches", "smartTagPr", "smartTagTypes", "webPublishing",
-        "fileRecoveryPr", "webPublishObjects", "extLst"
+        "fileVersion", "fileSharing", "workbookPr", "alternateContent", "revisionPtr", "absPath",
+        "workbookProtection", "bookViews", "sheets", "functionGroups", "externalReferences",
+        "definedNames", "calcPr", "oleSize", "customWorkbookViews", "pivotCaches", "smartTagPr",
+        "smartTagTypes", "webPublishing", "fileRecoveryPr", "webPublishObjects", "extLst"
       )
 
       write_file(
@@ -1899,6 +1992,75 @@ wbWorkbook <- R6::R6Class(
       self$styles_mgr$styles$fonts[[1]] <- create_font(sz = as.character(fontSize), color = fontColour, name = fontName)
     },
 
+    ### book views ----
+
+    #' @description
+    #' Set the book views
+    #' @param activeTab activeTab
+    #' @param autoFilterDateGrouping autoFilterDateGrouping
+    #' @param firstSheet firstSheet
+    #' @param minimized minimized
+    #' @param showHorizontalScroll showHorizontalScroll
+    #' @param showSheetTabs showSheetTabs
+    #' @param showVerticalScroll showVerticalScroll
+    #' @param tabRatio tabRatio
+    #' @param visibility visibility
+    #' @param windowHeight windowHeight
+    #' @param windowWidth windowWidth
+    #' @param xWindow xWindow
+    #' @param yWindow yWindow
+    #' @return The `wbWorkbook` object
+    set_bookview = function(
+      activeTab              = NULL,
+      autoFilterDateGrouping = NULL,
+      firstSheet             = NULL,
+      minimized              = NULL,
+      showHorizontalScroll   = NULL,
+      showSheetTabs          = NULL,
+      showVerticalScroll     = NULL,
+      tabRatio               = NULL,
+      visibility             = NULL,
+      windowHeight           = NULL,
+      windowWidth            = NULL,
+      xWindow                = NULL,
+      yWindow                = NULL
+    ) {
+
+      wbv <- self$workbook$bookViews
+
+      if (is.null(wbv)) {
+        wbv <- xml_node_create("workbookView")
+      } else {
+        wbv <- xml_node(wbv, "bookViews", "workbookView")
+      }
+
+      wbv <- xml_attr_mod(
+        wbv,
+        xml_attributes = c(
+          activeTab              = as_xml_attr(activeTab),
+          autoFilterDateGrouping = as_xml_attr(autoFilterDateGrouping),
+          firstSheet             = as_xml_attr(firstSheet),
+          minimized              = as_xml_attr(minimized),
+          showHorizontalScroll   = as_xml_attr(showHorizontalScroll),
+          showSheetTabs          = as_xml_attr(showSheetTabs),
+          showVerticalScroll     = as_xml_attr(showVerticalScroll),
+          tabRatio               = as_xml_attr(tabRatio),
+          visibility             = as_xml_attr(visibility),
+          windowHeight           = as_xml_attr(windowHeight),
+          windowWidth            = as_xml_attr(windowWidth),
+          xWindow                = as_xml_attr(xWindow),
+          yWindow                = as_xml_attr(yWindow)
+        )
+      )
+
+      self$workbook$bookViews <- xml_node_create(
+        "bookViews",
+        xml_children = wbv
+      )
+
+      invisible(self)
+    },
+
     ### sheet names ----
 
     #' @description Get sheet names
@@ -2001,9 +2163,10 @@ wbWorkbook <- R6::R6Class(
       sheet <- private$get_sheet_index(sheet)
 
       # TODO move to wbWorksheet method
-      # TODO consider reworking rowHeights
-      # self$worksheets[[sheet]]$set_row_heights(rows = rows, heights = heights)
-      # invisible(self)
+
+      # create all A columns so that row_attr is available
+      dims <- rowcol_to_dims(rows, 1)
+      private$do_cell_init(sheet, dims)
 
       if (length(rows) > length(heights)) {
         heights <- rep(heights, length.out = length(rows))
@@ -2013,28 +2176,14 @@ wbWorkbook <- R6::R6Class(
         stop("Greater number of height values than rows.")
       }
 
-      ## Remove duplicates
-      ok <- !duplicated(rows)
-      heights <- heights[ok]
-      rows <- rows[ok]
+      row_attr <- self$worksheets[[sheet]]$sheet_data$row_attr
 
-      heights <- as.character(as.numeric(heights))
-      names(heights) <- rows
+      sel <- match(rows, row_attr$r)
+      row_attr[sel, "ht"] <- as.character(as.numeric(heights))
+      row_attr[sel, "customHeight"] <- "1"
 
-      ## remove any conflicting heights
-      flag <- names(self$rowHeights[[sheet]]) %in% rows
-      if (any(flag)) {
-        self$rowHeights[[sheet]] <- self$rowHeights[[sheet]][!flag]
-      }
+      self$worksheets[[sheet]]$sheet_data$row_attr <- row_attr
 
-      nms <- c(names(self$rowHeights[[sheet]]), rows)
-      allRowHeights <- unlist(c(self$rowHeights[[sheet]], heights))
-      names(allRowHeights) <- nms
-
-      allRowHeights <-
-        allRowHeights[order(as.integer(names(allRowHeights)))]
-
-      self$rowHeights[[sheet]] <- allRowHeights
       invisible(self)
     },
 
@@ -2045,12 +2194,19 @@ wbWorkbook <- R6::R6Class(
     #' @return The `wbWorkbook` object, invisibly
     remove_row_heights = function(sheet = current_sheet(), rows) {
       sheet <- private$get_sheet_index(sheet)
-      customRows <- as.integer(names(self$rowHeights[[sheet]]))
-      removeInds <- which(customRows %in% rows)
 
-      if (length(removeInds)) {
-        self$rowHeights[[sheet]] <- self$rowHeights[[sheet]][-removeInds]
+      row_attr <- self$worksheets[[sheet]]$sheet_data$row_attr
+
+      if (is.null(row_attr)) {
+        warning("There are no initialized rows on this sheet")
+        return(invisible(self))
       }
+
+      sel <- match(rows, row_attr$r)
+      row_attr[sel, "ht"] <- ""
+      row_attr[sel, "customHeight"] <- ""
+
+      self$worksheets[[sheet]]$sheet_data$row_attr <- row_attr
 
       invisible(self)
     },
@@ -3468,6 +3624,211 @@ wbWorkbook <- R6::R6Class(
       )
     },
 
+    #' @description Add xml drawing
+    #' @param sheet sheet
+    #' @param dims dims
+    #' @param xml xml
+    #' @returns The `wbWorkbook` object
+    add_drawing = function(
+      sheet = current_sheet(),
+      xml,
+      dims = "A1:H8"
+    ) {
+      sheet <- private$get_sheet_index(sheet)
+
+      xml <- read_xml(xml, pointer = FALSE)
+
+      if (!(xml_node_name(xml) == "xdr:wsDr")) {
+        error("xml needs to be a drawing.")
+      }
+
+      grpSp <- xml_node(xml, "xdr:wsDr", "xdr:absoluteAnchor", "xdr:grpSp")
+      ext   <- xml_node(xml, "xdr:wsDr", "xdr:absoluteAnchor", "xdr:ext")
+
+      # include rvg graphic from specific position to one or two cell anchor
+      if (!is.null(dims) && xml_node_name(xml, "xdr:wsDr") == "xdr:absoluteAnchor") {
+
+        twocell <- grepl(":", dims)
+
+        if (twocell) {
+
+          xdr_typ <- "xdr:twoCellAnchor"
+          ext <- NULL
+
+          dims_list <- strsplit(dims, ":")[[1]]
+          cols <- col2int(dims_list)
+          rows <- as.numeric(gsub("\\D+", "", dims_list))
+
+          anchor <- paste0(
+            "<xdr:from>",
+            "<xdr:col>%s</xdr:col><xdr:colOff>0</xdr:colOff>",
+            "<xdr:row>%s</xdr:row><xdr:rowOff>0</xdr:rowOff>",
+            "</xdr:from>",
+            "<xdr:to>",
+            "<xdr:col>%s</xdr:col><xdr:colOff>0</xdr:colOff>",
+            "<xdr:row>%s</xdr:row><xdr:rowOff>0</xdr:rowOff>",
+            "</xdr:to>"
+          )
+          anchor <- sprintf(anchor, cols[1] - 1L, rows[1] - 1L, cols[2], rows[2])
+
+        } else {
+
+          xdr_typ <- "xdr:oneCellAnchor"
+
+          cols <- col2int(dims)
+          rows <- as.numeric(gsub("\\D+", "", dims))
+
+          anchor <- paste0(
+            "<xdr:from>",
+            "<xdr:col>%s</xdr:col><xdr:colOff>0</xdr:colOff>",
+            "<xdr:row>%s</xdr:row><xdr:rowOff>0</xdr:rowOff>",
+            "</xdr:from>"
+          )
+          anchor <- sprintf(anchor, cols[1] - 1L, rows[1] - 1L)
+
+        }
+
+        xdr_typ_xml <- xml_node_create(
+          xdr_typ,
+          xml_children = c(
+            anchor,
+            ext,
+            grpSp,
+            "<xdr:clientData/>"
+          )
+        )
+
+        xml <- xml_node_create(
+          "xdr:wsDr",
+          xml_attributes = c(
+            "xmlns:a"   = "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "xmlns:r"   = "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "xmlns:pic" = "http://schemas.openxmlformats.org/drawingml/2006/picture",
+            "xmlns:xdr" = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+          ),
+          xml_children = xdr_typ_xml
+        )
+      }
+
+      # check if sheet already contains drawing. if yes, try to integrate
+      # our drawing into this else we only use our drawing.
+      drawings <- self$drawings[[sheet]]
+      if (drawings == "") {
+        drawings <- xml
+      } else {
+        drawing_type <- xml_node_name(xml, "xdr:wsDr")
+        xml_drawing <- xml_node(xml, "xdr:wsDr", drawing_type)
+        drawings <- xml_add_child(drawings, xml_drawing)
+      }
+      self$drawings[[sheet]] <- drawings
+
+      # get the correct next free relship id
+      if (length(self$worksheets_rels[[sheet]]) == 0) {
+        next_relship <- 1
+        has_no_drawing <- TRUE
+      } else {
+        relship <- rbindlist(xml_attr(self$worksheets_rels[[sheet]], "Relationship"))
+        relship$typ <- basename(relship$Type)
+        next_relship <- as.integer(gsub("\\D+", "", relship$Id)) + 1L
+        has_no_drawing <- !any(relship$typ == "drawing")
+      }
+
+      # if a drawing exisits, we already added ourself to it. Otherwise we
+      # create a new drawing.
+      if (has_no_drawing) {
+        no_drawing <- length(self$drawings)
+        self$worksheets_rels[[sheet]] <- sprintf("<Relationship Id=\"rId%s\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing%s.xml\"/>", next_relship, no_drawing)
+        self$worksheets[[sheet]]$drawing <- sprintf("<drawing r:id=\"rId%s\"/>", next_relship)
+      }
+
+      invisible(self)
+    },
+
+    #' @description Add xml drawing
+    #' @description Add xml chart
+    #' @param sheet sheet
+    #' @param dims dims
+    #' @param xml xml
+    #' @returns The `wbWorkbook` object
+    add_chart_xml = function(
+      sheet = current_sheet(),
+      xml,
+      dims = "A1:H8"
+    ) {
+
+      dims_list <- strsplit(dims, ":")[[1]]
+      cols <- col2int(dims_list)
+      rows <- as.numeric(gsub("\\D+", "", dims_list))
+
+      sheet <- private$get_sheet_index(sheet)
+
+      next_chart <- NROW(self$charts) + 1
+
+      chart <- data.frame(
+        chart = xml,
+        colors = colors1_xml,
+        style = styleplot_xml,
+        rels = chart1_rels_xml(next_chart),
+        chartEx = "",
+        relsEx = ""
+      )
+
+      self$charts <- rbind(self$charts, chart)
+
+      len_drawing <- length(xml_node_name(self$drawings[[sheet]], "xdr:wsDr")) + 1L
+
+      from <- c(cols[1] - 1L, rows[1] - 1L)
+      to   <- c(cols[2], rows[2])
+
+      # create drawing. add it to self$drawings, the worksheet and rels
+      self$add_drawing(
+        sheet = sheet,
+        xml = drawings(len_drawing, from, to),
+        dims = dims
+      )
+
+      self$drawings_rels[[sheet]] <- drawings_rels(self$drawings_rels[[sheet]], next_chart)
+
+      invisible(self)
+    },
+
+    #' @description Add mschart chart to the workbook
+    #' @param sheet the sheet on which the graph will appear
+    #' @param dims the dimensions where the sheet will appear
+    #' @param graph mschart graph
+    #' @returns The `wbWorkbook` object
+    add_mschart = function(
+      sheet = current_sheet(),
+      dims = "B2:H8",
+      graph
+    ) {
+
+      requireNamespace("mschart")
+      assert_class(graph, "ms_chart")
+
+      sheetname <- private$get_sheet_name(sheet)
+
+      # format.ms_chart is exported in mschart >= 0.4
+      out_xml <- read_xml(
+        format(
+          graph,
+          sheetname = sheetname,
+          id_x = "64451212",
+          id_y = "64453248"
+        ),
+        pointer = FALSE
+      )
+
+      # write the chart data to the workbook
+      if (inherits(graph$data_series, "wb_data")) {
+        self$
+          add_chart_xml(sheet = sheet, xml = out_xml, dims = dims)
+      } else {
+        self$
+          add_data(x = graph$data_series)$
+          add_chart_xml(sheet = sheet, xml = out_xml, dims = dims)
+      }
+    },
 
     #' @description
     #' Prints the `wbWorkbook` object
@@ -4017,24 +4378,23 @@ wbWorkbook <- R6::R6Class(
     #' @description grid lines
     #' @param sheet sheet
     #' @param show show
+    #' @param print print
     #' @returns The `wbWorkbook` object
-    grid_lines = function(sheet = current_sheet(), show = FALSE) {
+    grid_lines = function(sheet = current_sheet(), show = FALSE, print = show) {
       sheet <- private$get_sheet_index(sheet)
 
-      if (!is.logical(show)) {
-        stop("show must be a logical")
-      }
+      assert_class(show, "logical")
+      assert_class(print, "logical")
 
+      ## show
       sv <- self$worksheets[[sheet]]$sheetViews
-      show <- as.integer(show)
-      ## If attribute exists gsub
-      if (grepl("showGridLines", sv)) {
-        sv <- gsub('showGridLines=".?[^"]', sprintf('showGridLines="%s', show), sv, perl = TRUE)
-      } else {
-        sv <- gsub("<sheetView ", sprintf('<sheetView showGridLines="%s" ', show), sv)
-      }
-
+      sv <- xml_attr_mod(sv, c(showGridLines = as_xml_attr(show)))
       self$worksheets[[sheet]]$sheetViews <- sv
+
+      ## print
+      if (print)
+        self$worksheets[[sheet]]$set_print_options(gridLines = print, gridLinesSet = print)
+
       invisible(self)
     },
 
@@ -4045,16 +4405,42 @@ wbWorkbook <- R6::R6Class(
     #' @param cols cols
     #' @param rows rows
     #' @param name name
-    #' @param localSheetId localSheetId
+    #' @param localSheet localSheet
     #' @param overwrite overwrite
+    #' @param comment comment
+    #' @param customMenu customMenu
+    #' @param description description
+    #' @param is_function function
+    #' @param functionGroupId function group id
+    #' @param help help
+    #' @param hidden hidden
+    #' @param localName localName
+    #' @param publishToServer publish to server
+    #' @param statusBar status bar
+    #' @param vbProcedure wbProcedure
+    #' @param workbookParameter workbookParameter
+    #' @param xml xml
     #' @returns The `wbWorkbook` object
     add_named_region = function(
       sheet = current_sheet(),
       cols,
       rows,
       name,
-      localSheetId = NULL,
-      overwrite = FALSE
+      localSheet        = FALSE,
+      overwrite         = FALSE,
+      comment           = NULL,
+      customMenu        = NULL,
+      description       = NULL,
+      is_function       = NULL,
+      functionGroupId   = NULL,
+      help              = NULL,
+      hidden            = NULL,
+      localName         = NULL,
+      publishToServer   = NULL,
+      statusBar         = NULL,
+      vbProcedure       = NULL,
+      workbookParameter = NULL,
+      xml               = NULL
     ) {
       sheet <- private$get_sheet_index(sheet)
 
@@ -4066,16 +4452,25 @@ wbWorkbook <- R6::R6Class(
         stop("cols argument must be a numeric/integer vector")
       }
 
+      localSheetId <- ""
+      if (localSheet) localSheetId <- as.character(sheet)
+
       ## check name doesn't already exist
       ## named region
 
-      # TODO use reg_match0?
-      ex_names <- regmatches(self$workbook$definedNames, regexpr('(?<=name=")[^"]+', self$workbook$definedNames, perl = TRUE))
-      ex_names <- tolower(replaceXMLEntities(ex_names))
+      definedNames <- rbindlist(xml_attr(self$workbook$definedNames, level1 = "definedName"))
+      sel1 <- tolower(definedNames$name) == tolower(name)
+      sel2 <- definedNames$localSheetId == localSheetId
+      if (!is.null(definedNames$localSheetId)) {
+        sel <- sel1 & sel2
+      } else {
+         sel <- sel1
+      }
+      match_dn <- which(sel)
 
-      if (tolower(name) %in% ex_names) {
+      if (any(match_dn)) {
         if (overwrite)
-          self$workbook$definedNames <- self$workbook$definedNames[!ex_names %in% tolower(name)]
+          self$workbook$definedNames <- self$workbook$definedNames[-match_dn]
         else
           stop(sprintf("Named region with name '%s' already exists! Use overwrite  = TRUE if you want to replace it", name))
       } else if (grepl("^[A-Z]{1,3}[0-9]+$", name)) {
@@ -4094,12 +4489,27 @@ wbWorkbook <- R6::R6Class(
       ref1 <- paste0("$", int2col(startCol), "$", startRow)
       ref2 <- paste0("$", int2col(endCol), "$", endRow)
 
+      if (localSheetId == "") localSheetId <- NULL
+
       private$create_named_region(
-        ref1         = ref1,
-        ref2         = ref2,
-        name         = name,
-        sheet        = self$sheet_names[sheet],
-        localSheetId = localSheetId
+        ref1               = ref1,
+        ref2               = ref2,
+        name               = name,
+        sheet              = self$sheet_names[sheet],
+        localSheetId       = localSheetId,
+        comment            = comment,
+        customMenu         = customMenu,
+        description        = description,
+        is_function        = is_function,
+        functionGroupId    = functionGroupId,
+        help               = help,
+        hidden             = hidden,
+        localName          = localName,
+        publishToServer    = publishToServer,
+        statusBar          = statusBar,
+        vbProcedure        = vbProcedure,
+        workbookParameter  = workbookParameter,
+        xml                = xml
       )
 
       invisible(self)
@@ -4711,7 +5121,12 @@ wbWorkbook <- R6::R6Class(
 
       dims <- unname(unlist(did[rows, cols, drop = FALSE]))
 
-      for (dim in dims) {
+      cc <- self$worksheets[[sheet]]$sheet_data$cc
+      cc <- cc[cc$r %in% dims, ]
+      styles <- unique(cc[["c_s"]])
+
+      for (style in styles) {
+        dim <- cc[cc$c_s == style, "r"]
 
         new_fill <- create_fill(
           gradientFill = gradient_fill,
@@ -4720,7 +5135,7 @@ wbWorkbook <- R6::R6Class(
         )
         self$styles_mgr$add(new_fill, new_fill)
 
-        xf_prev <- get_cell_styles(self, sheet, dim)
+        xf_prev <- get_cell_styles(self, sheet, dim[[1]])
         xf_new_fill <- set_fill(xf_prev, self$styles_mgr$get_fill_id(new_fill))
         self$styles_mgr$add(xf_new_fill, xf_new_fill)
         s_id <- self$styles_mgr$get_xf_id(xf_new_fill)
@@ -4778,7 +5193,12 @@ wbWorkbook <- R6::R6Class(
       did <- dims_to_dataframe(dims, fill = TRUE)
       dims <- unname(unlist(did))
 
-      for (dim in dims) {
+      cc <- self$worksheets[[sheet]]$sheet_data$cc
+      cc <- cc[cc$r %in% dims, ]
+      styles <- unique(cc[["c_s"]])
+
+      for (style in styles) {
+        dim <- cc[cc$c_s == style, "r"]
 
         new_font <- create_font(
           b = bold,
@@ -4799,7 +5219,7 @@ wbWorkbook <- R6::R6Class(
         )
         self$styles_mgr$add(new_font, new_font)
 
-        xf_prev <- get_cell_styles(self, sheet, dim)
+        xf_prev <- get_cell_styles(self, sheet, dim[[1]])
         xf_new_font <- set_font(xf_prev, self$styles_mgr$get_font_id(new_font))
 
         self$styles_mgr$add(xf_new_font, xf_new_font)
@@ -4829,16 +5249,22 @@ wbWorkbook <- R6::R6Class(
       did <- dims_to_dataframe(dims, fill = TRUE)
       dims <- unname(unlist(did))
 
+      cc <- self$worksheets[[sheet]]$sheet_data$cc
+      cc <- cc[cc$r %in% dims, ]
+      styles <- unique(cc[["c_s"]])
+
       if (inherits(numfmt, "character")) {
 
-        new_numfmt <- create_numfmt(
-          numFmtId = self$styles_mgr$next_numfmt_id(),
-          formatCode = numfmt
-        )
-        self$styles_mgr$add(new_numfmt, new_numfmt)
+        for (style in styles) {
+          dim <- cc[cc$c_s == style, "r"]
 
-        for (dim in dims) {
-          xf_prev <- get_cell_styles(self, sheet, dim)
+          new_numfmt <- create_numfmt(
+            numFmtId = self$styles_mgr$next_numfmt_id(),
+            formatCode = numfmt
+          )
+          self$styles_mgr$add(new_numfmt, new_numfmt)
+
+          xf_prev <- get_cell_styles(self, sheet, dim[[1]])
           xf_new_numfmt <- set_numfmt(xf_prev, self$styles_mgr$get_numfmt_id(new_numfmt))
           self$styles_mgr$add(xf_new_numfmt, xf_new_numfmt)
           s_id <- self$styles_mgr$get_xf_id(xf_new_numfmt)
@@ -4846,9 +5272,9 @@ wbWorkbook <- R6::R6Class(
         }
 
       } else { # format is numeric
-
-        for (dim in dims) {
-          xf_prev <- get_cell_styles(self, sheet, dim)
+        for (style in styles) {
+          dim <- cc[cc$c_s == style, "r"]
+          xf_prev <- get_cell_styles(self, sheet, dim[[1]])
           xf_new_numfmt <- set_numfmt(xf_prev, numfmt)
           self$styles_mgr$add(xf_new_numfmt, xf_new_numfmt)
           s_id <- self$styles_mgr$get_xf_id(xf_new_numfmt)
@@ -4933,8 +5359,13 @@ wbWorkbook <- R6::R6Class(
       did <- dims_to_dataframe(dims, fill = TRUE)
       dims <- unname(unlist(did))
 
-      for (dim in dims) {
-        xf_prev <- get_cell_styles(self, sheet, dim)
+      cc <- self$worksheets[[sheet]]$sheet_data$cc
+      cc <- cc[cc$r %in% dims, ]
+      styles <- unique(cc[["c_s"]])
+
+      for (style in styles) {
+        dim <- cc[cc$c_s == style, "r"]
+        xf_prev <- get_cell_styles(self, sheet, dim[[1]])
         xf_new_cellstyle <- set_cellstyle(
           xf_node           = xf_prev,
           applyAlignment    = applyAlignment,
@@ -5432,7 +5863,7 @@ wbWorkbook <- R6::R6Class(
 
         if (!file.exists(xlchartsDir)) {
           dir.create(xlchartsDir, recursive = TRUE)
-          if (any(self$rels != ""))
+          if (any(self$charts$rels != "") || any(self$charts$relsEx != ""))
             dir.create(xlchartsRelsDir, recursive = TRUE)
         }
 
@@ -5444,6 +5875,15 @@ wbWorkbook <- R6::R6Class(
             write_file(
               body = self$charts$chart[crt],
               fl = file.path(xlchartsDir, stri_join("chart", crt, ".xml"))
+            )
+          }
+
+          if (self$charts$chartEx[crt] != "") {
+            ct <- c(ct, sprintf('<Override PartName="/xl/charts/chartEx%s.xml" ContentType="application/vnd.ms-office.chartex+xml"/>', crt))
+
+            write_file(
+              body = self$charts$chartEx[crt],
+              fl = file.path(xlchartsDir, stri_join("chartEx", crt, ".xml"))
             )
           }
 
@@ -5469,6 +5909,13 @@ wbWorkbook <- R6::R6Class(
             write_file(
               body = self$charts$rels[crt],
               fl = file.path(xlchartsRelsDir, stri_join("chart", crt, ".xml.rels"))
+            )
+          }
+
+          if (self$charts$relsEx[crt] != "") {
+            write_file(
+              body = self$charts$relsEx[crt],
+              fl = file.path(xlchartsRelsDir, stri_join("chartEx", crt, ".xml.rels"))
             )
           }
         }
@@ -5608,7 +6055,7 @@ wbWorkbook <- R6::R6Class(
             # TODO a relship manager should take care of this
             tabs <- self$tables[self$tables$tab_act == 1, ]
             if (NROW(tabs)) {
-              table_inds <- grep("tables/table[0-9].xml", ws_rels)
+              table_inds <- grep("tables/table[0-9]+.xml", ws_rels)
 
               relship <- rbindlist(xml_attr(ws_rels, "Relationship"))
               if (ncol(relship) && nrow(relship)) {
@@ -5637,28 +6084,69 @@ wbWorkbook <- R6::R6Class(
     },
 
     # old add_named_region()
-    create_named_region = function(ref1, ref2, name, sheet = current_sheet(), localSheetId = NULL) {
+    create_named_region = function(
+      ref1,
+      ref2,
+      name,
+      sheet = current_sheet(),
+      localSheetId      = NULL,
+      comment           = NULL,
+      customMenu        = NULL,
+      description       = NULL,
+      is_function       = NULL,
+      functionGroupId   = NULL,
+      help              = NULL,
+      hidden            = NULL,
+      localName         = NULL,
+      publishToServer   = NULL,
+      statusBar         = NULL,
+      vbProcedure       = NULL,
+      workbookParameter = NULL,
+      xml               = NULL
+    ) {
       name <- replace_legal_chars(name)
-      value <- if (is.null(localSheetId)) {
-        sprintf(
-          '<definedName name="%s">\'%s\'!%s:%s</definedName>',
-          name,
-          sheet,
-          ref1,
-          ref2
-        )
-      } else {
-        sprintf(
-          '<definedName name="%s" localSheetId="%s">\'%s\'!%s:%s</definedName>',
-          name,
-          localSheetId,
-          sheet,
-          ref1,
-          ref2
-        )
-      }
 
-      private$append_workbook_field("definedNames", value)
+      # special names
+
+      ## print
+      # _xlnm .Print_Area
+      # _xlnm .Print_Titles
+
+      ## filters
+      # _xlnm .Criteria
+      # _xlnm ._FilterDatabase
+      # _xlnm .Extract
+
+      ## misc
+      # _xlnm .Consolidate_Area
+      # _xlnm .Database
+      # _xlnm .Sheet_Title
+
+      named_region <- c(
+        comment          = comment,
+        customMenu        = customMenu,
+        description       = description,
+        `function`        = is_function,
+        functionGroupId   = functionGroupId,
+        help              = help,
+        hidden            = hidden,
+        localName         = localName,
+        localSheetId      = localSheetId,
+        name              = name,
+        publishToServer   = publishToServer,
+        statusBar         = statusBar,
+        vbProcedure       = vbProcedure,
+        workbookParameter = workbookParameter,
+        xml               = xml
+      )
+
+      xml <- xml_node_create(
+        "definedName",
+        xml_children = sprintf("\'%s\'!%s:%s", sheet, ref1, ref2),
+        xml_attributes = named_region
+      )
+
+      private$append_workbook_field("definedNames", xml)
     },
 
     get_sheet_id = function(type = c("rId", "sheetId"), i = NULL) {
@@ -5809,15 +6297,17 @@ wbWorkbook <- R6::R6Class(
       stylesInd        <- grep("styles\\.xml",                               self$workbook.xml.rels)
       themeInd         <- grep("theme/theme[0-9]+.xml",                      self$workbook.xml.rels)
       connectionsInd   <- grep("connections.xml",                            self$workbook.xml.rels)
+      customXMLInd     <- grep("customXml/item[0-9]+.xml",                   self$workbook.xml.rels)
       extRefInds       <- grep("externalLinks/externalLink[0-9]+.xml",       self$workbook.xml.rels)
       sharedStringsInd <- grep("sharedStrings.xml",                          self$workbook.xml.rels)
       tableInds        <- grep("table[0-9]+.xml",                            self$workbook.xml.rels)
       personInds       <- grep("person.xml",                                 self$workbook.xml.rels)
+      calcChainInd     <- grep("calcChain.xml",                              self$workbook.xml.rels)
 
 
       ## Reordering of workbook.xml.rels
       ## don't want to re-assign rIds for pivot tables or slicer caches
-      pivotNode        <- grep("pivotCache/pivotCacheDefinition[0-9].xml",  self$workbook.xml.rels, value = TRUE)
+      pivotNode        <- grep("pivotCache/pivotCacheDefinition[0-9]+.xml", self$workbook.xml.rels, value = TRUE)
       slicerNode       <- grep("slicerCache[0-9]+.xml",                     self$workbook.xml.rels, value = TRUE)
 
       ## Reorder children of workbook.xml.rels
@@ -5827,10 +6317,12 @@ wbWorkbook <- R6::R6Class(
           extRefInds,
           themeInd,
           connectionsInd,
+          customXMLInd,
           stylesInd,
           sharedStringsInd,
           tableInds,
-          personInds
+          personInds,
+          calcChainInd
         )]
 
       ## Re assign rIds to children of workbook.xml.rels
@@ -5888,54 +6380,20 @@ wbWorkbook <- R6::R6Class(
       visible_sheet_index <- which(!hidden)[1] # first visible
 
       if (is.null(self$workbook$bookViews))
-        self$workbook$bookViews <-
-        sprintf(
-          '<bookViews><workbookView xWindow="0" yWindow="0" windowWidth="13125" windowHeight="6105" firstSheet="%s" activeTab="%s"/></bookViews>',
-          visible_sheet_index - 1L,
-          visible_sheet_index - 1L
+        self$set_bookview(
+          xWindow      = 0,
+          yWindow      = 0,
+          windowWidth  = 13125,
+          windowHeight = 13125,
+          firstSheet   = visible_sheet_index - 1L,
+          activeTab    = visible_sheet_index - 1L
         )
 
-      self$worksheets[[visible_sheet_index]]$sheetViews <-
-        sub(
-          '( tabSelected="0")|( tabSelected="false")',
-          ' tabSelected="1"',
-          self$worksheets[[visible_sheet_index]]$sheetViews,
-          ignore.case = TRUE
-        )
+      # Failsafe: hidden sheet can not be selected.
+      self$worksheets[[visible_sheet_index]]$set_sheetview(tabSelected = TRUE)
       if (nSheets > 1) {
         for (i in setdiff(seq_len(nSheets), visible_sheet_index)) {
-          self$worksheets[[i]]$sheetViews <-
-            sub(
-              ' tabSelected="(1|true|false|0)"',
-              ' tabSelected="0"',
-              self$worksheets[[i]]$sheetViews,
-              ignore.case = TRUE
-            )
-        }
-      }
-
-
-      if (length(self$workbook$definedNames)) {
-        # TODO consider self$get_sheet_names() which orders the sheet names?
-        sheets <- self$sheet_names[self$sheetOrder]
-
-        belongTo <- get_named_regions(self)
-        belongTo <- belongTo$sheets[belongTo$value != "table"]
-
-        ## sheets is in re-ordered order (order it will be displayed)
-        newId <- match(belongTo, sheets) - 1L
-        oldId <- as.integer(reg_match0(self$workbook$definedNames, '(?<= localSheetId=")[0-9]+'))
-
-        for (i in seq_along(self$workbook$definedNames)) {
-          if (!is.na(newId[i])) {
-            self$workbook$definedNames[[i]] <-
-              gsub(
-                sprintf('localSheetId=\"%s\"', oldId[i]),
-                sprintf('localSheetId=\"%s\"', newId[i]),
-                self$workbook$definedNames[[i]],
-                fixed = TRUE
-              )
-          }
+          self$worksheets[[i]]$set_sheetview(tabSelected = FALSE)
         }
       }
 

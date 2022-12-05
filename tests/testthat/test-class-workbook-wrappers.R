@@ -72,10 +72,9 @@ test_that("wb_set_row_heights() is a wrapper", {
 # wb_remove_row_heights() -----------------------------------------------------
 
 test_that("wb_remove_row_heights() is a wrapper", {
-  wb <- wbWorkbook$new()$add_worksheet("sheet")
-  wb$add_worksheet("a")
+  wb <- wbWorkbook$new()$add_worksheet("a")
   wb$set_row_heights("a", 1:3, 20)
-  params <- list(sheet = "sheet", rows = 2)
+  params <- list(sheet = "a", rows = 2)
   expect_wrapper("remove_row_heights", wb = wb, params = params)
 })
 
@@ -127,6 +126,13 @@ test_that("wb_set_base_font() is a wrapper", {
   expect_wrapper("set_base_font", params = params)
 })
 
+# wb_set_bookview() -----------------------------------------------------------
+
+test_that("wb_set_bookview() is a wrapper", {
+  params <- list(activeTab = "1")
+  expect_wrapper("set_bookview", params = params)
+})
+
 # wb_set_header_footer() ------------------------------------------------------
 
 test_that("wb_set_header_footer() is a wrapper", {
@@ -173,6 +179,18 @@ test_that("wb_add_plot() is a wrapper", {
       fixed = TRUE
     )
   }
+})
+
+test_that("wb_add_drawing is a wrapper", {
+
+  fl <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+  wb <- wb_load(file = fl)
+
+  xml <- wb$drawings[[2]]
+
+  wb <- wb_workbook()$add_worksheet()
+
+  expect_wrapper("add_drawing", wb = wb, params = list(xml = xml))
 })
 
 # wb_get_tables(), wb_remove_tables() -------------------------------------
@@ -499,6 +517,47 @@ test_that("wb_set_cell_style() is a wrapper", {
     "set_cell_style",
     wb = wb,
     params = list(dims = "A1", style = numfmt)
+  )
+
+})
+
+
+# wb_add_chart_xml() ------------------------------------------------------
+
+test_that("wb_add_chart_xml() is a wrapper", {
+
+  wb <- wb_workbook()$add_worksheet()
+
+  expect_wrapper(
+    "add_chart_xml",
+    wb = wb,
+    params = list(dims = "F4:L20", xml = "<a/>")
+  )
+})
+
+
+# wb_add_mschart() --------------------------------------------------------
+
+test_that("wb_add_mschart() is a wrapper", {
+
+  skip_if_not_installed("mschart")
+
+  require(mschart)
+
+  ### Scatter
+  scatter <- ms_scatterchart(data = iris, x = "Sepal.Length",
+                             y = "Sepal.Width", group = "Species")
+  scatter <- chart_settings(scatter, scatterstyle = "marker")
+
+  wb <- wb_workbook()$add_worksheet()
+
+  # get style from b1 to assign it to a1
+  numfmt <- wb$get_cell_style(dims = "B1")
+
+  expect_wrapper(
+    "add_mschart",
+    wb = wb,
+    params = list(dims = "F4:L20", graph = scatter)
   )
 
 })

@@ -71,7 +71,7 @@ test_that("Read and save file with inlineStr", {
 
   tmp_xlsx <- temp_xlsx()
   # Check that wb can be saved without error and reimported
-  expect_identical(tmp_xlsx, wb_save(wb, path = tmp_xlsx))
+  expect_identical(tmp_xlsx, wb_save(wb, path = tmp_xlsx)$path)
   wb_df_re <- wb_read(wb_load(tmp_xlsx))
   attr(wb_df_re, "tt") <- NULL
   attr(wb_df_re, "types") <- NULL
@@ -312,11 +312,34 @@ test_that("loading slicers works", {
     "<Relationship Id=\"rId0\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet2.xml\"/>",
     "<Relationship Id=\"rId0\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet3.xml\"/>",
     "<Relationship Id=\"rId0\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet4.xml\"/>",
+    "<Relationship Id=\"rId8\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain\" Target=\"calcChain.xml\"/>",
     "<Relationship Id=\"rId20001\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition\" Target=\"pivotCache/pivotCacheDefinition1.xml\"/>",
     "<Relationship Id=\"rId20002\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition\" Target=\"pivotCache/pivotCacheDefinition2.xml\"/>",
     "<Relationship Id=\"rId100001\" Type=\"http://schemas.microsoft.com/office/2007/relationships/slicerCache\" Target=\"slicerCaches/slicerCache1.xml\"/>"
   )
   got <- wb$workbook.xml.rels
+  expect_equal(exp, got)
+
+  exp <- "<calcPr calcId=\"152511\" fullCalcOnLoad=\"1\"/>"
+  got <- wb$workbook$calcPr
+  expect_equal(exp, got)
+
+  options("openxlsx2.disableFullCalcOnLoad" = TRUE)
+  wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+
+  exp <- "<calcPr calcId=\"152511\"/>"
+  got <- wb$workbook$calcPr
+  expect_equal(exp, got)
+
+})
+
+test_that("vml target is updated on load", {
+
+  fl <- system.file("extdata", "mtcars_chart.xlsx", package = "openxlsx2")
+  wb <- wb_load(fl)
+
+  exp <- "<Relationship Id=\"rId2\" Target=\"../drawings/vmlDrawing4.vml\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing\"/>"
+  got <- wb$worksheets_rels[[4]][2]
   expect_equal(exp, got)
 
 })

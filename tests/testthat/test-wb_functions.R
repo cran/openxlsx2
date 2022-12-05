@@ -147,7 +147,7 @@ test_that("select_active_sheet", {
 
   # change the selected sheet to IrisSample
   exp <- structure(
-     list(tabSelected = c("true", "false", "false", "false"),
+     list(tabSelected = c("1", "0", "0", "0"),
           workbookViewId = c("0", "0", "0", "0"),
           names = c("IrisSample", "testing", "mtcars", "mtCars Pivot")),
      row.names = c(NA, 4L), class = "data.frame")
@@ -181,5 +181,45 @@ test_that("dims_to_dataframe", {
   exp <- list(c("A", "B"), "1")
   got <- dims_to_rowcol("A1;B1")
   expect_equal(exp, got)
+
+})
+
+test_that("dataframe_to_dims", {
+
+  # dims_to_dataframe will always create a square
+  df <- dims_to_dataframe("A1:D5;F1:F6;D8", fill = TRUE)
+  dims <- dataframe_to_dims(df)
+  df2 <- dims_to_dataframe(dims, fill = TRUE)
+  expect_equal(df, df2)
+
+})
+
+test_that("handle 29Feb1900", {
+
+  dates <- c("1900-02-28", "1900-03-01")
+  as_date <- as.Date(dates)
+  as_posix <- as.POSIXct(dates)
+
+  exp <- c(59, 61)
+  got <- conv_to_excel_date(as_date)
+  expect_equal(exp, got)
+
+  got <- conv_to_excel_date(as_posix)
+  expect_equal(exp, got)
+
+  expect_warning(
+    conv_to_excel_date("x"),
+    "could not convert x to Excel date. x is of class: character"
+  )
+
+  wb <- wb_workbook()$
+    add_worksheet()$add_data(x = as_date)$
+    add_worksheet()$add_data(x = as_posix)
+
+  got <- wb_to_df(wb, sheet = 1, colNames = FALSE)$A
+  expect_equal(as_date, got)
+
+  got <- wb_to_df(wb, sheet = 2, colNames = FALSE)$A
+  expect_equal(as_posix, got)
 
 })

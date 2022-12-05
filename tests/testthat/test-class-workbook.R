@@ -373,3 +373,165 @@ test_that("clone worksheet", {
   # wb$open()
 
 })
+
+test_that("set and remove row heights work", {
+
+  ## add row heights
+  wb <- wb_workbook()$
+    add_worksheet()$
+    set_row_heights(
+      rows = c(1, 4, 22, 2, 19),
+      heights = c(24, 28, 32, 42, 33)
+    )
+
+  exp <- structure(
+    list(
+      customHeight = c("1", "1", "1", "1", "1"),
+      ht = c("24", "42", "28", "33", "32"),
+      r = c("1", "2", "4", "19", "22")
+    ),
+    row.names = c(1L, 2L, 4L, 19L, 22L),
+    class = "data.frame"
+  )
+  got <- wb$worksheets[[1]]$sheet_data$row_attr[c(1, 2, 4, 19, 22), c("customHeight", "ht", "r")]
+  expect_equal(exp, got)
+
+  ## remove row heights
+  wb$remove_row_heights(rows = 1:21)
+  exp <- structure(
+    list(
+      customHeight = c("", "", "", "", "1"),
+      ht = c("", "", "", "", "32"),
+      r = c("1", "2", "4", "19", "22")
+    ),
+    row.names = c(1L, 2L, 4L, 19L, 22L),
+    class = "data.frame"
+  )
+  got <- wb$worksheets[[1]]$sheet_data$row_attr[c(1, 2, 4, 19, 22), c("customHeight", "ht", "r")]
+  expect_equal(exp, got)
+
+  expect_warning(
+    wb$add_worksheet()$remove_row_heights(rows = 1:3),
+    "There are no initialized rows on this sheet"
+  )
+
+})
+
+test_that("add_drawing works", {
+
+  skip_if_not_installed("rvg")
+  skip_if_not_installed("ggplot2")
+
+  require(rvg)
+  require(ggplot2)
+
+  tmp <- tempfile(fileext = "drawing.xml")
+
+  ## rvg example
+  dml_xlsx(file =  tmp, fonts = list(sans = "Bradley Hand"))
+  print(
+    ggplot(data = iris,
+           mapping = aes(x = Sepal.Length, y = Petal.Width)) +
+      geom_point() + labs(title = "With font Bradley Hand") +
+      theme_minimal(base_family = "sans", base_size = 18)
+  )
+  dev.off()
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_drawing(xml = tmp)$
+    add_drawing(xml = tmp, dims = "A1:H10")$
+    add_drawing(xml = tmp, dims = "L1")$
+    add_drawing(xml = tmp, dims = NULL)$
+    add_drawing(xml = tmp, dims = "L19")
+
+  expect_equal(1L, length(wb$drawings))
+
+})
+
+test_that("add_drawing works", {
+
+  skip_if_not_installed("mschart")
+
+  require(mschart)
+
+  # write data starting at B2
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = mtcars, dims = "B2")$
+    add_data(x = data.frame(name = rownames(mtcars)), dims = "A2")
+
+  # create wb_data object this will tell this mschart from this PR to create a file corresponding to openxlsx2
+  dat <- wb_data(wb, 1, dims = "A2:G6")
+
+  exp <- structure(
+    list(
+      name = c("Mazda RX4", "Mazda RX4 Wag", "Datsun 710", "Hornet 4 Drive"),
+      mpg = c(21, 21, 22.8, 21.4),
+      cyl = c(6, 6, 4, 6),
+      disp = c(160, 160, 108, 258),
+      hp = c(110, 110, 93, 110),
+      drat = c(3.9, 3.9, 3.85, 3.08),
+      wt = c(2.62, 2.875, 2.32, 3.215)
+    ),
+    row.names = 3:6,
+    class = c("data.frame", "wb_data"),
+    tt = structure(
+      list(
+        name = c("s", "s", "s", "s"),
+        mpg = c("n", "n", "n", "n"),
+        cyl = c("n", "n", "n", "n"),
+        disp = c("n", "n", "n", "n"),
+        hp = c("n", "n", "n", "n"),
+        drat = c("n", "n", "n", "n"),
+        wt = c("n", "n", "n", "n")
+      ),
+      row.names = 3:6,
+      class = "data.frame"),
+    types = c(A = 0, B = 1, C = 1, D = 1, E = 1, F = 1, G = 1),
+    dims = structure(
+      list(
+        A = c("A2", "A3", "A4", "A5", "A6"),
+        B = c("B2", "B3", "B4", "B5", "B6"),
+        C = c("C2", "C3", "C4", "C5", "C6"),
+        D = c("D2", "D3", "D4", "D5", "D6"),
+        E = c("E2", "E3", "E4", "E5", "E6"),
+        F = c("F2", "F3", "F4", "F5", "F6"),
+        G = c("G2", "G3", "G4", "G5", "G6")
+      ),
+      row.names = 2:6,
+      class = "data.frame"),
+    sheet = "Sheet 1")
+
+  expect_equal(exp, dat)
+
+  # call ms_scatterplot
+  scatter_plot <- ms_scatterchart(
+    data = dat,
+    x = "mpg",
+    y = c("disp", "hp"),
+    labels = c("disp", "hp")
+  )
+
+  # add the scatterplots to the data
+  wb <- wb %>%
+    wb_add_mschart(dims = "F4:L20", graph = scatter_plot)
+
+  expect_equal(1L, NROW(wb$charts))
+
+  chart_01 <- ms_linechart(
+    data = us_indus_prod,
+    x = "date", y = "value",
+    group = "type"
+  )
+
+  wb$add_worksheet()
+  wb$add_mschart(dims = "F4:L20", graph = chart_01)
+
+  exp <- list(
+    "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart\" Target=\"../charts/chart1.xml\"/>",
+    "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart\" Target=\"../charts/chart2.xml\"/>"
+  )
+  got <- wb$drawings_rels
+  expect_equal(exp, got)
+
+})

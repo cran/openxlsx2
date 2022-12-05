@@ -30,6 +30,12 @@ The \code{wbWorkbook} object
 
 The \code{wbWorkbook} object
 
+The \code{wbWorkbook} object
+
+The \code{wbWorkbook} object
+
+The \code{wbWorkbook} object
+
 The sheet tables.  \code{character()} if empty
 
 The \code{wbWorkbook} object
@@ -144,13 +150,19 @@ create_border
 
 \item{\code{isChartSheet}}{isChartSheet}
 
+\item{\code{customXml}}{customXml}
+
 \item{\code{connections}}{connections}
+
+\item{\code{ctrlProps}}{ctrlProps}
 
 \item{\code{Content_Types}}{Content_Types}
 
 \item{\code{app}}{app}
 
 \item{\code{core}}{core}
+
+\item{\code{custom}}{custom}
 
 \item{\code{drawings}}{drawings}
 
@@ -181,8 +193,6 @@ create_border
 \item{\code{pivotDefinitionsRels}}{pivotDefinitionsRels}
 
 \item{\code{queryTables}}{queryTables}
-
-\item{\code{rowHeights}}{rowHeights}
 
 \item{\code{slicers}}{slicers}
 
@@ -256,6 +266,7 @@ is created, not when the Excel files are saved.}
 \item \href{#method-wbWorkbook-buildTable}{\code{wbWorkbook$buildTable()}}
 \item \href{#method-wbWorkbook-get_base_font}{\code{wbWorkbook$get_base_font()}}
 \item \href{#method-wbWorkbook-set_base_font}{\code{wbWorkbook$set_base_font()}}
+\item \href{#method-wbWorkbook-set_bookview}{\code{wbWorkbook$set_bookview()}}
 \item \href{#method-wbWorkbook-get_sheet_names}{\code{wbWorkbook$get_sheet_names()}}
 \item \href{#method-wbWorkbook-set_sheet_names}{\code{wbWorkbook$set_sheet_names()}}
 \item \href{#method-wbWorkbook-setSheetName}{\code{wbWorkbook$setSheetName()}}
@@ -278,6 +289,9 @@ is created, not when the Excel files are saved.}
 \item \href{#method-wbWorkbook-add_conditional_formatting}{\code{wbWorkbook$add_conditional_formatting()}}
 \item \href{#method-wbWorkbook-add_image}{\code{wbWorkbook$add_image()}}
 \item \href{#method-wbWorkbook-add_plot}{\code{wbWorkbook$add_plot()}}
+\item \href{#method-wbWorkbook-add_drawing}{\code{wbWorkbook$add_drawing()}}
+\item \href{#method-wbWorkbook-add_chart_xml}{\code{wbWorkbook$add_chart_xml()}}
+\item \href{#method-wbWorkbook-add_mschart}{\code{wbWorkbook$add_mschart()}}
 \item \href{#method-wbWorkbook-print}{\code{wbWorkbook$print()}}
 \item \href{#method-wbWorkbook-protect}{\code{wbWorkbook$protect()}}
 \item \href{#method-wbWorkbook-protect_worksheet}{\code{wbWorkbook$protect_worksheet()}}
@@ -836,7 +850,7 @@ A list of of the font
 Get the base font
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$set_base_font(
-  fontSize = 12,
+  fontSize = 11,
   fontColour = wb_colour(theme = "1"),
   fontName = "Calibri"
 )}\if{html}{\out{</div>}}
@@ -850,6 +864,64 @@ Get the base font
 \item{\code{fontColour}}{fontColour}
 
 \item{\code{fontName}}{fontName}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorkbook} object
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-set_bookview"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-set_bookview}{}}}
+\subsection{Method \code{set_bookview()}}{
+Set the book views
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$set_bookview(
+  activeTab = NULL,
+  autoFilterDateGrouping = NULL,
+  firstSheet = NULL,
+  minimized = NULL,
+  showHorizontalScroll = NULL,
+  showSheetTabs = NULL,
+  showVerticalScroll = NULL,
+  tabRatio = NULL,
+  visibility = NULL,
+  windowHeight = NULL,
+  windowWidth = NULL,
+  xWindow = NULL,
+  yWindow = NULL
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{activeTab}}{activeTab}
+
+\item{\code{autoFilterDateGrouping}}{autoFilterDateGrouping}
+
+\item{\code{firstSheet}}{firstSheet}
+
+\item{\code{minimized}}{minimized}
+
+\item{\code{showHorizontalScroll}}{showHorizontalScroll}
+
+\item{\code{showSheetTabs}}{showSheetTabs}
+
+\item{\code{showVerticalScroll}}{showVerticalScroll}
+
+\item{\code{tabRatio}}{tabRatio}
+
+\item{\code{visibility}}{visibility}
+
+\item{\code{windowHeight}}{windowHeight}
+
+\item{\code{windowWidth}}{windowWidth}
+
+\item{\code{xWindow}}{xWindow}
+
+\item{\code{yWindow}}{yWindow}
 }
 \if{html}{\out{</div>}}
 }
@@ -1494,6 +1566,72 @@ Add plot. A wrapper for add_image()
 }
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-add_drawing"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-add_drawing}{}}}
+\subsection{Method \code{add_drawing()}}{
+Add xml drawing
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_drawing(sheet = current_sheet(), xml, dims = "A1:H8")}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{sheet}
+
+\item{\code{xml}}{xml}
+
+\item{\code{dims}}{dims}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-add_chart_xml"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-add_chart_xml}{}}}
+\subsection{Method \code{add_chart_xml()}}{
+Add xml drawing
+
+
+Add xml chart
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_chart_xml(sheet = current_sheet(), xml, dims = "A1:H8")}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{sheet}
+
+\item{\code{xml}}{xml}
+
+\item{\code{dims}}{dims}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-add_mschart"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-add_mschart}{}}}
+\subsection{Method \code{add_mschart()}}{
+Add mschart chart to the workbook
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_mschart(sheet = current_sheet(), dims = "B2:H8", graph)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{the sheet on which the graph will appear}
+
+\item{\code{dims}}{the dimensions where the sheet will appear}
+
+\item{\code{graph}}{mschart graph}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-wbWorkbook-print"></a>}}
 \if{latex}{\out{\hypertarget{method-wbWorkbook-print}{}}}
 \subsection{Method \code{print()}}{
@@ -1843,7 +1981,7 @@ remove filters
 \subsection{Method \code{grid_lines()}}{
 grid lines
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$grid_lines(sheet = current_sheet(), show = FALSE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$grid_lines(sheet = current_sheet(), show = FALSE, print = show)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1852,6 +1990,8 @@ grid lines
 \item{\code{sheet}}{sheet}
 
 \item{\code{show}}{show}
+
+\item{\code{print}}{print}
 }
 \if{html}{\out{</div>}}
 }
@@ -1867,8 +2007,21 @@ add a named region
   cols,
   rows,
   name,
-  localSheetId = NULL,
-  overwrite = FALSE
+  localSheet = FALSE,
+  overwrite = FALSE,
+  comment = NULL,
+  customMenu = NULL,
+  description = NULL,
+  is_function = NULL,
+  functionGroupId = NULL,
+  help = NULL,
+  hidden = NULL,
+  localName = NULL,
+  publishToServer = NULL,
+  statusBar = NULL,
+  vbProcedure = NULL,
+  workbookParameter = NULL,
+  xml = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -1883,9 +2036,35 @@ add a named region
 
 \item{\code{name}}{name}
 
-\item{\code{localSheetId}}{localSheetId}
+\item{\code{localSheet}}{localSheet}
 
 \item{\code{overwrite}}{overwrite}
+
+\item{\code{comment}}{comment}
+
+\item{\code{customMenu}}{customMenu}
+
+\item{\code{description}}{description}
+
+\item{\code{is_function}}{function}
+
+\item{\code{functionGroupId}}{function group id}
+
+\item{\code{help}}{help}
+
+\item{\code{hidden}}{hidden}
+
+\item{\code{localName}}{localName}
+
+\item{\code{publishToServer}}{publish to server}
+
+\item{\code{statusBar}}{status bar}
+
+\item{\code{vbProcedure}}{wbProcedure}
+
+\item{\code{workbookParameter}}{workbookParameter}
+
+\item{\code{xml}}{xml}
 }
 \if{html}{\out{</div>}}
 }

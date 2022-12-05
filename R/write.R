@@ -192,6 +192,12 @@ write_data2 <- function(
   # TODO need to tell excel that we have a date, apply some kind of numFmt
   data <- convertToExcelDate(df = data, date1904 = hconvert_date1904)
 
+  # backward compatible
+  if (!inherits(data, "data.frame") || inherits(data, "matrix")) {
+    data <- as.data.frame(data)
+    colNames <- FALSE
+  }
+
   if (inherits(data, "data.frame") || inherits(data, "matrix")) {
     is_data_frame <- TRUE
 
@@ -314,6 +320,8 @@ write_data2 <- function(
     } else {
       cc[is_na, "v"]  <- ""
       if (is.null(na.strings)) {
+        cc[is_na, "c_t"] <- ""
+        cc[is_na, "is"]  <- ""
         # do nothing
       } else {
         cc[is_na, "c_t"] <- "inlineStr"
@@ -377,14 +385,7 @@ write_data2 <- function(
       # ignore first row if colNames
       if (colNames) sel_rows <- sel_rows[-1]
 
-      paste(
-        unname(
-          unlist(
-            rtyp[rownames(rtyp) %in% sel_rows, sel_cols, drop = FALSE]
-          )
-        ),
-        collapse = ";"
-      )
+      dataframe_to_dims(rtyp[rownames(rtyp) %in% sel_rows, sel_cols, drop = FALSE])
     }
 
     # if hyperlinks are found, Excel sets something like the following font
@@ -516,6 +517,33 @@ write_data2 <- function(
     }
   }
   ### End styles
+
+  ### Update calcChain
+  if (length(wb$calcChain)) {
+
+    # if we overwrite a formula cell in the calculation chain, we have to update it
+    # At the moment we simply remove it from the calculation chain, in the future
+    # we might want to keep it if we write a formula.
+    xml <- wb$calcChain
+    calcChainR <- rbindlist(xml_attr(xml, "calcChain", "c"))
+    # according to the documentation there can be cases, without the sheetno reference
+    sel <- calcChainR$r %in% rtyp & calcChainR$i == sheetno
+    rmCalcChain <- as.integer(rownames(calcChainR[sel, , drop = FALSE]))
+    if (length(rmCalcChain)) {
+      xml <- xml_rm_child(xml, xml_child = "c", which = rmCalcChain)
+      # xml can not be empty, otherwise excel will complain. If xml is empty, remove all
+      # calcChain references from the workbook
+      if (length(xml_node_name(xml, "calcChain")) == 0) {
+        wb$Content_Types <- wb$Content_Types[-grep("/xl/calcChain", wb$Content_Types)]
+        wb$workbook.xml.rels <- wb$workbook.xml.rels[-grep("calcChain.xml", wb$workbook.xml.rels)]
+        wb$worksheets[[sheetno]]$sheetCalcPr <- character()
+        xml <- character()
+      }
+      wb$calcChain <- xml
+    }
+
+  }
+  ### End update calcChain
 
   return(wb)
 }
@@ -663,7 +691,7 @@ write_data_table <- function(
     colNames <- FALSE
   }
 
-  if (is.vector(x) || is.factor(x) || inherits(x, "Date")) {
+  if (is.vector(x) || is.factor(x) || inherits(x, "Date") || inherits(x, "POSIXt")) {
     colNames <- FALSE
   } ## this will go to coerce.default and rowNames will be ignored
 

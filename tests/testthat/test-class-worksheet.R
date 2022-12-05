@@ -57,3 +57,54 @@ test_that("old and new data validations", {
   )
 
 })
+
+test_that("set_sheetview", {
+
+  wb <- wb_workbook()$add_worksheet()
+
+  exp <- "<sheetViews><sheetView showGridLines=\"1\" showRowColHeaders=\"1\" tabSelected=\"1\" workbookViewId=\"0\" zoomScale=\"100\"/></sheetViews>"
+  got <- wb$worksheets[[1]]$sheetViews
+  expect_equal(exp, got)
+
+  exp <- "<sheetViews><sheetView rightToLeft=\"1\" showGridLines=\"1\" showRowColHeaders=\"1\" tabSelected=\"1\" workbookViewId=\"0\" zoomScale=\"100\"/></sheetViews>"
+
+  options("openxlsx2.rightToLeft" = TRUE)
+  wb <- wb_workbook()$add_worksheet()
+
+  got <- wb$worksheets[[1]]$sheetViews
+  expect_equal(exp, got)
+
+  options("openxlsx2.rightToLeft" = "1")
+  wb <- wb_workbook()$add_worksheet()
+
+  got <- wb$worksheets[[1]]$sheetViews
+
+  expect_equal(exp, got)
+
+})
+
+test_that("print options work", {
+
+  temp <- temp_xlsx()
+
+  wb <- wb_workbook() %>%
+    wb_add_worksheet(gridLines = FALSE) %>%
+    wb_add_data(x = iris) %>%
+    wb_add_worksheet(gridLines = TRUE) %>%
+    wb_add_data(x = mtcars)
+
+  exp <- character()
+  got <- wb$worksheets[[1]]$printOptions
+  expect_equal(exp, got)
+
+  exp <- "<printOptions gridLines=\"1\" gridLinesSet=\"1\"/>"
+  got <- wb$worksheets[[2]]$printOptions
+  expect_equal(exp, got)
+
+  wb$save(temp)
+  wb <- wb_load(temp)
+
+  got <- wb$worksheets[[2]]$printOptions
+  expect_equal(exp, got)
+
+})

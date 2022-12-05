@@ -10,7 +10,7 @@ test_that("read_xlsx from different sources", {
   xlsxFile <- system.file("extdata", "readTest.xlsx", package = "openxlsx2")
   df_file <- read_xlsx(xlsxFile)
 
-  expect_true(all.equal(df_url, df_file), label = "Read from URL")
+  expect_equal(df_url, df_file, label = "Read from URL")
 
 
   ## Non-existing URL
@@ -189,5 +189,116 @@ test_that("reading charts", {
   expect_false(any(grepl("drawing21.xml", unlist(wb$worksheets_rels))))
   expect_equal("", wb$drawings[[21]])
   expect_equal("", wb$drawings_rels[[21]])
+
+})
+
+test_that("load file with xml namespace", {
+
+  skip_if_offline()
+
+  fl <- "https://github.com/ycphs/openxlsx/files/8480120/2022-04-12-11-42-36-DP_Melanges1.xlsx"
+
+  expect_warning(
+    wb <- wb_load(fl),
+    "has been removed from the xml files, for example"
+  )
+  expect_null(getOption("openxlsx2.namespace_xml"))
+
+})
+
+test_that("reading file with macro and custom xml", {
+
+  skip_if_offline()
+
+  temp <- temp_xlsx()
+
+  wb <- wb_load("https://github.com/JanMarvin/openxlsx-data/raw/main/gh_issue_416.xlsm")
+  wb$save(temp)
+  wb <- wb_load(temp)
+
+  exp <- "<sheetPr codeName=\"Sheet1\"/>"
+  got <- wb$worksheets[[1]]$sheetPr
+  expect_equal(exp, got)
+
+  exp <- "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/custom-properties\" xmlns:vt=\"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes\"><property fmtid=\"{D5CDD505-2E9C-101B-9397-08002B2CF9AE}\" pid=\"2\" name=\"Source\"><vt:lpwstr>openxlsx2</vt:lpwstr></property></Properties>"
+  got <- wb$custom
+  expect_equal(exp, got)
+})
+
+test_that("load file with connection", {
+
+  skip_if_offline()
+
+  temp <- temp_xlsx()
+
+  wb <- wb_load("https://github.com/JanMarvin/openxlsx-data/raw/main/connection.xlsx")
+
+  expect_true(!is.null(wb$customXml))
+  expect_equal(3, length(wb$customXml))
+
+  wb$save(temp)
+
+  wb <- wb_load(temp)
+  expect_equal(3, length(wb$customXml))
+
+  expect_true(grepl("customXml/_rels/item1.xml.rels", wb$customXml[1]))
+  expect_true(grepl("customXml/item1.xml", wb$customXml[2]))
+  expect_true(grepl("customXml/itemProps1.xml", wb$customXml[3]))
+
+})
+
+test_that("calcChain is updated", {
+
+  skip_if_offline()
+
+  fl <- "https://github.com/JanMarvin/openxlsx-data/raw/main/overwrite_formula.xlsx"
+
+  wb <- wb_load(fl)$
+    add_data(dims = "A1", x = "Formula overwritten")
+
+  exp <- character()
+  got <- wb$calcChain
+  expect_equal(exp, got)
+
+})
+
+test_that("read workbook with chart extension", {
+
+  skip_if_offline()
+
+  fl <- "https://github.com/JanMarvin/openxlsx-data/raw/main/charts.xlsx"
+
+  wb <- wb_load(fl)
+
+  expect_warning(
+    wb$clone_worksheet(),
+    "The file you have loaded contains chart extensions. At the moment, cloning worksheets can damage the output."
+  )
+
+})
+
+test_that("reading of formControl works", {
+
+  skip_if_offline()
+
+  temp <- temp_xlsx()
+
+  wb <- wb_load("https://github.com/JanMarvin/openxlsx-data/raw/main/form_control.xlsx")
+
+  exp <- c(
+    "<formControlPr xmlns=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" objectType=\"CheckBox\" checked=\"Checked\" lockText=\"1\" noThreeD=\"1\"/>",
+    "<formControlPr xmlns=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" objectType=\"Radio\" checked=\"Checked\" firstButton=\"1\" lockText=\"1\" noThreeD=\"1\"/>",
+    "<formControlPr xmlns=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" objectType=\"Radio\" lockText=\"1\" noThreeD=\"1\"/>",
+    "<formControlPr xmlns=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" objectType=\"CheckBox\" lockText=\"1\" noThreeD=\"1\"/>",
+    "<formControlPr xmlns=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" objectType=\"Drop\" dropStyle=\"combo\" dx=\"15\" noThreeD=\"1\" sel=\"0\" val=\"0\"/>"
+  )
+  got <- wb$ctrlProps
+  expect_equal(exp, got)
+
+  wb$save(temp)
+  wb <- wb_load(temp)
+
+  got <- wb$ctrlProps
+  expect_equal(exp, got)
 
 })

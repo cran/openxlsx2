@@ -356,13 +356,17 @@ your experience. Open an issue on github or write us a mail.</p>
 <div id="importing-data" class="section level2">
 <h2>Importing data</h2>
 <p>Coming from <code>openxlsx</code> you might know about
-<code>read_xlsx()</code>, <code>wb_read()</code> and
-<code>wb_load</code> multiple functions that do may different things,
-but mostly the same. In <code>openxlsx2</code> we tried our best to
-reduce the complexity under the hood and for the user as well. For this
-example we will use example data provided by the package. You can locate
-it in our “inst/extdata” folder. The files are included with the package
-source and you can open them in any calculation software as well.</p>
+<code>read.xlsx()</code> (two functions, one for files and one for
+workbooks) and <code>readWorkbook()</code>. Functions that do different
+things, but mostly the same. In <code>openxlsx2</code> we tried our best
+to reduce the complexity under the hood and for the user as well. In
+<code>openxlsx2</code> they are replaced with <code>read_xlsx()</code>,
+<code>wb_read()</code> and they share the same underlying function
+<code>wb_to_df()</code>.</p>
+<p>For this example we will use example data provided by the package.
+You can locate it in our “inst/extdata” folder. The files are included
+with the package source and you can open them in any calculation
+software as well.</p>
 <div id="basic-import" class="section level3">
 <h3>Basic import</h3>
 <p>We begin with the <code>readTest.xlsx</code> file by telling R where
@@ -386,9 +390,9 @@ our function to read the workbook into R</p>
 <p>The output is created as a data frame and contains data types date,
 logical, numeric and character. The function to import the file to R,
 <code>wb_to_df()</code> provides similar options as the
-<code>openxlsx</code> functions <code>read_xlsx()</code> and
-<code>wb_read()</code> and a few new functions we will go through the
-options. As you might have noticed, we return the column of the xlsx
+<code>openxlsx</code> functions <code>read.xlsx()</code> and
+<code>readWorkbook()</code> and a few new functions we will go through
+the options. As you might have noticed, we return the column of the xlsx
 file as the row name of the data frame returned. Per default the first
 sheet in the workbook is imported. If you want to switch this, either
 provide the <code>sheet</code> parameter with the correct index or

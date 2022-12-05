@@ -47,6 +47,38 @@ dims_to_dataframe <- function(dims, fill = FALSE) {
   )
 }
 
+#' create dimensions from dataframe
+#' @param df dataframe with spreadsheet columns and rows
+#' @examples {
+#'   df <- dims_to_dataframe("A1:D5;F1:F6;D8", fill = TRUE)
+#'   dataframe_to_dims(df)
+#' }
+#' @export
+dataframe_to_dims <- function(df) {
+
+  # get continuous sequences of columns and rows in df
+  v <- as.integer(rownames(df))
+  rows <- split(v, cumsum(diff(c(-Inf, v)) != 1))
+
+  v <- col2int(colnames(df))
+  cols <- split(colnames(df), cumsum(diff(c(-Inf, v)) != 1))
+
+  # combine columns and rows to construct dims
+  out <- NULL
+  for (col in seq_along(cols)) {
+    for (row in seq_along(rows)) {
+      tmp <- paste0(
+        cols[[col]][[1]], rows[[row]][[1]],
+        ":",
+        rev(cols[[col]])[[1]],  rev(rows[[row]])[[1]]
+        )
+      out <- c(out, tmp)
+    }
+  }
+
+  paste0(out, collapse = ";")
+}
+
 # # similar to all, simply check if most of the values match the condition
 # # in guess_col_type not all bools may be "b" some are "s" (missings)
 # most <- function(x) {
@@ -342,9 +374,9 @@ wb_to_df <- function(
   }
 
   # the sheet has no data
-  if (is.null(wb$worksheets[[sheet]]$sheet_data$cc)) {
+  if (is.null(wb$worksheets[[sheet]]$sheet_data$cc) ||
+      nrow(wb$worksheets[[sheet]]$sheet_data$cc) == 0) {
     # TODO do we need more checks or do we need to initialize a new cc object?
-    # TODO would this also apply of nrow(cc) == 0?
     message("sheet found, but contains no data")
     return(NULL)
   }
@@ -467,16 +499,16 @@ wb_to_df <- function(
   cc$val <- NA_character_
   cc$typ <- NA_character_
 
-  cc_tab <- table(cc$c_t)
+  cc_tab <- unique(cc$c_t)
 
   # bool
-  if (isTRUE(cc_tab[c("b")] > 0)) {
+  if (any(cc_tab == c("b"))) {
     sel <- cc$c_t %in% c("b")
     cc$val[sel] <- as.logical(as.numeric(cc$v[sel]))
     cc$typ[sel] <- "b"
   }
   # text in v
-  if (isTRUE(any(cc_tab[c("str", "e")] > 0))) {
+  if (any(cc_tab %in% c("str", "e"))) {
     sel <- cc$c_t %in% c("str", "e")
     cc$val[sel] <- cc$v[sel]
     cc$typ[sel] <- "s"
@@ -487,13 +519,13 @@ wb_to_df <- function(
     cc$typ[sel] <- "s"
   }
   # text in t
-  if (isTRUE(cc_tab[c("inlineStr")] > 0)) {
+  if (any(cc_tab %in% c("inlineStr"))) {
     sel <- cc$c_t %in% c("inlineStr")
     cc$val[sel] <- is_to_txt(cc$is[sel])
     cc$typ[sel] <- "s"
   }
   # test is sst
-  if (isTRUE(cc_tab[c("s")] > 0)) {
+  if (any(cc_tab %in% c("s"))) {
     sel <- cc$c_t %in% c("s")
     cc$val[sel] <- sst[as.numeric(cc$v[sel]) + 1]
     cc$typ[sel] <- "s"
@@ -583,6 +615,11 @@ wb_to_df <- function(
 
       for (i in seq_along(mc)) {
         dms <- dims_to_dataframe(mc[i])
+
+        # Skip if merged cell is empty
+        if (all(is.na(z[rownames(z) %in% rownames(dms),
+                        colnames(z) %in% colnames(dms)])))
+          next
 
         z[rownames(z) %in% rownames(dms),
           colnames(z) %in% colnames(dms)] <- z[rownames(z) %in% rownames(dms[1, 1, drop = FALSE]),
@@ -742,6 +779,7 @@ wb_ws <- wb_get_worksheet
 #'   wb <- wb_set_active_sheet(wb, sheet = "IrisSample")
 #' @name select_active_sheet
 wb_get_active_sheet <- function(wb) {
+  assert_workbook(wb)
   at <- rbindlist(xml_attr(wb$workbook$bookViews, "bookViews", "workbookView"))["activeTab"]
   # return c index as R index
   as.numeric(at) + 1
@@ -751,25 +789,17 @@ wb_get_active_sheet <- function(wb) {
 #' @param sheet a sheet name of the workbook
 #' @export
 wb_set_active_sheet <- function(wb, sheet) {
-
-  sheet <- wb_validate_sheet(wb, sheet)
-  if (is.na(sheet)) stop("sheet not in workbook")
-  wbv <- xml_node(wb$workbook$bookViews, "bookViews", "workbookView")
-
-
   # active tab requires a c index
-  wb$workbook$bookViews <- xml_node_create(
-    "bookViews",
-    xml_children = xml_attr_mod(wbv,
-                                xml_attributes = c(activeTab = as.character(sheet - 1)))
-  )
-
-  wb
+  assert_workbook(wb)
+  sheet <- wb_validate_sheet(wb, sheet)
+  wb$clone()$set_bookview(activeTab = sheet - 1L)
 }
 
 #' @name select_active_sheet
 #' @export
 wb_get_selected <- function(wb) {
+
+  assert_workbook(wb)
 
   len <- length(wb$sheet_names)
   sv <- vector("list", length = len)
@@ -792,17 +822,82 @@ wb_set_selected <- function(wb, sheet) {
   sheet <- wb_validate_sheet(wb, sheet)
 
   for (i in seq_along(wb$sheet_names)) {
-
-    xml_attr <- c(tabSelected = ifelse(i == sheet, "true", "false"))
-    svs <- wb$worksheets[[i]]$sheetViews
-
-    # might lose other children if any. xml_replace_child?
-    sv <- xml_node(svs, "sheetViews", "sheetView")
-    sv <- xml_attr_mod(sv, xml_attr)
-    svs <- xml_node_create("sheetViews", xml_children = sv)
-
-    wb$worksheets[[i]]$sheetViews <- svs
+    xml_attr <- ifelse(i == sheet, TRUE, FALSE)
+    wb$worksheets[[i]]$set_sheetview(tabSelected = xml_attr)
   }
 
   wb
+}
+
+#' dummy function to add a chart to an existing workbook
+#' currently only a barplot is possible
+#' @param wb a workbook
+#' @param sheet the sheet on which the graph will appear
+#' @param dims the dimensions where the sheet will appear
+#' @param graph mschart graph
+#' @examples
+#' if (requireNamespace("mschart")) {
+#' require(mschart)
+#'
+#' ## Add mschart to worksheet (adds data and chart)
+#' scatter <- ms_scatterchart(data = iris, x = "Sepal.Length", y = "Sepal.Width", group = "Species")
+#' scatter <- chart_settings(scatter, scatterstyle = "marker")
+#'
+#' wb <- wb_workbook() %>%
+#'  wb_add_worksheet() %>%
+#'  wb_add_mschart(dims = "F4:L20", graph = scatter)
+#'
+#' ## Add mschart to worksheet and use available data
+#' wb <- wb_workbook() %>%
+#'   wb_add_worksheet() %>%
+#'   wb_add_data(x = mtcars, dims = "B2")
+#'
+#' # create wb_data object
+#' dat <- wb_data(wb, 1, dims = "B2:E6")
+#'
+#' # call ms_scatterplot
+#' data_plot <- ms_scatterchart(
+#'   data = dat,
+#'   x = "mpg",
+#'   y = c("disp", "hp"),
+#'   labels = c("disp", "hp")
+#' )
+#'
+#' # add the scatterplot to the data
+#' wb <- wb %>%
+#'   wb_add_mschart(dims = "F4:L20", graph = data_plot)
+#' }
+#' @seealso [wb_data()]
+#' @export
+wb_add_mschart <- function(
+  wb,
+  sheet = current_sheet(),
+  dims = "B2:H8",
+  graph
+) {
+  assert_workbook(wb)
+  wb$clone()$add_mschart(sheet, dims, graph)
+}
+
+#' provide wb_data object as mschart input
+#' @param wb a workbook
+#' @param sheet a sheet in the workbook either name or index
+#' @param dims the dimensions
+#' @examples
+#'  wb <- wb_workbook() %>%
+#'    wb_add_worksheet() %>%
+#'    wb_add_data(x = mtcars, dims = "B2")
+#'
+#'  wb_data(wb, 1, dims = "B2:E6")
+#' @export
+wb_data <- function(wb, sheet = current_sheet(), dims = "A1") {
+  assert_workbook(wb)
+  sheetname <- wb$.__enclos_env__$private$get_sheet_name(sheet)
+
+  z <- wb_to_df(wb, sheet, dims = dims)
+  attr(z, "dims")  <- dims_to_dataframe(dims, fill = TRUE)
+  attr(z, "sheet") <- sheetname
+
+  class(z) <- c("data.frame", "wb_data")
+  z
 }
