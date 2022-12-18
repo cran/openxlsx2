@@ -3,9 +3,15 @@
 #' @param file A path to an existing .xlsx or .xlsm file
 #' @param xlsxFile alias for file
 #' @param sheet optional sheet parameter. if this is applied, only the selected
-#'  sheet will be loaded.
+#' sheet will be loaded.
 #' @param data_only mode to import if only a data frame should be returned. This
-#'  strips the wbWorkbook to a bare minimum.
+#' strips the wbWorkbook to a bare minimum.
+#' @param calc_chain optionally you can keep the calculation chain intact. This
+#' is used by spreadsheet software to identify the order in which formulas are
+#' evaluated. Removing the calculation chain is considered harmless. The calc
+#' chain will be created upon the next time the worksheet is loaded in
+#' spreadsheet software. Keeping it, might only speed loading time in said
+#' software.
 #' @description  wb_load returns a workbook object conserving styles and
 #' formatting of the original .xlsx file.
 #' @details A warning is displayed if an xml namespace for main is found in the
@@ -24,7 +30,13 @@
 #' wb ## view object
 #' ## Add a worksheet
 #' wb$add_worksheet("A new worksheet")
-wb_load <- function(file, xlsxFile = NULL, sheet, data_only = FALSE) {
+wb_load <- function(
+  file,
+  xlsxFile = NULL,
+  sheet,
+  data_only = FALSE,
+  calc_chain = FALSE
+) {
 
   file <- xlsxFile %||% file
   file <- getFile(file)
@@ -277,20 +289,8 @@ wb_load <- function(file, xlsxFile = NULL, sheet, data_only = FALSE) {
     # TODO only loop over import_sheets
     for (i in seq_len(nrow(sheets))) {
       if (sheets$typ[i] == "chartsheet") {
-
         txt <- read_xml(sheets$target[i], pointer = FALSE)
-
-        zoom <- regmatches(txt, regexpr('(?<=zoomScale=")[0-9]+', txt, perl = TRUE))
-        if (length(zoom) == 0) {
-          zoom <- 100
-        }
-
-        tabColour <- xml_node(txt, "chartsheet", "sheetPr", "tabColor")
-        if (length(tabColour) == 0) {
-          tabColour <- NULL
-        }
-
-        wb$addChartSheet(sheet = sheets$name[i], tabColour = tabColour, zoom = as.numeric(zoom))
+        wb$add_chartsheet(sheet = sheets$name[i], visible = is_visible[i])
       } else if (sheets$typ[i] == "worksheet") {
         content_type <- read_xml(ContentTypesXML)
         override <- xml_attr(content_type, "Types", "Override")
@@ -319,7 +319,7 @@ wb_load <- function(file, xlsxFile = NULL, sheet, data_only = FALSE) {
     # no clue what calcPr does. If a calcChain is available, this prevents
     # formulas from getting reevaluated unless they are visited manually.
     calcPr <- xml_node(workbook_xml, "workbook", "calcPr")
-    if (!data_only && length(calcPr)) {
+    if (!data_only && calc_chain && length(calcPr)) {
       # we override the default unless explicitly requested
       if (!(getOption("openxlsx2.disableFullCalcOnLoad", default = FALSE))) {
         calcPr <- xml_attr_mod(calcPr, c(fullCalcOnLoad = "1"))
@@ -398,7 +398,7 @@ wb_load <- function(file, xlsxFile = NULL, sheet, data_only = FALSE) {
 
   }
 
-  if (!data_only && length(calcChainXML)) {
+  if (!data_only && calc_chain && length(calcChainXML)) {
     wb$calcChain <- read_xml(calcChainXML, pointer = FALSE)
     wb$append(
       "Content_Types",
@@ -409,7 +409,7 @@ wb_load <- function(file, xlsxFile = NULL, sheet, data_only = FALSE) {
     wb$append(
       "workbook.xml.rels",
       sprintf('<Relationship Id="rId%s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain" Target="calcChain.xml"/>',
-        length(wb$workbook.xml.rels) + 1
+        length(wb$workbook.xml.rels) + 1L
       )
     )
   }
@@ -724,7 +724,37 @@ wb_load <- function(file, xlsxFile = NULL, sheet, data_only = FALSE) {
         wb$worksheets[[i]]$webPublishItems <- xml_node(worksheet_xml, "worksheet", "webPublishItems")
 
         wb$worksheets[[i]]$sheetFormatPr <- xml_node(worksheet_xml, "worksheet", "sheetFormatPr")
-        wb$worksheets[[i]]$sheetViews    <- xml_node(worksheet_xml, "worksheet", "sheetViews")
+
+        # extract freezePane from sheetViews. This intends to match our freeze
+        # pane approach. Though I do not really like it. This blindly shovels
+        # everything into sheetViews and freezePane.
+        sheetViews    <- xml_node(worksheet_xml, "worksheet", "sheetViews")
+
+        if (length(sheetViews)) {
+
+          # extract only in single sheetView case
+          if (length(xml_node(sheetViews, "sheetViews", "sheetView")) == 1) {
+            xml_nams <- xml_node_name(sheetViews, "sheetViews", "sheetView")
+
+            freezePane <- paste0(
+              vapply(
+                xml_nams,
+                function(x) xml_node(sheetViews, "sheetViews", "sheetView", x),
+                NA_character_
+              ),
+              collapse = ""
+            )
+
+            for (xml_nam in xml_nams) {
+              sheetViews <- xml_rm_child(sheetViews, xml_child = xml_nam, level = "sheetView")
+            }
+
+            wb$worksheets[[i]]$freezePane <- freezePane
+          }
+
+        }
+        wb$worksheets[[i]]$sheetViews <- sheetViews
+
         wb$worksheets[[i]]$cols_attr     <- xml_node(worksheet_xml, "worksheet", "cols", "col")
 
         wb$worksheets[[i]]$dataValidations <- xml_node(worksheet_xml, "worksheet", "dataValidations", "dataValidation")

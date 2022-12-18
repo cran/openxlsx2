@@ -343,7 +343,37 @@ wb_unmerge_cells <- function(wb, sheet = current_sheet(), rows = NULL, cols = NU
 }
 
 
-# worksheets --------------------------------------------------------------
+# sheets ------------------------------------------------------------------
+
+#' Add a chartsheet to a workbook
+#'
+#' @param wb A Workbook object to attach the new worksheet
+#' @param sheet A name for the new worksheet
+#' @param tabColour Colour of the worksheet tab. A valid colour (belonging to
+#'   colours()) or a valid hex colour beginning with "#"
+#' @param zoom A numeric between 10 and 400. Worksheet zoom level as a
+#'   percentage.
+#' @param visible If FALSE, sheet is hidden else visible.
+#' @details After chartsheet creation a chart must be added to the sheet.
+#' Otherwise the chartsheet will break the workbook.
+#' @family workbook wrappers
+#' @seealso [wb_add_mschart()]
+#' @export
+wb_add_chartsheet <- function(
+  wb,
+  sheet       = next_sheet(),
+  tabColour   = NULL,
+  zoom        = 100,
+  visible     = c("true", "false", "hidden", "visible", "veryhidden")
+) {
+  assert_workbook(wb)
+  wb$clone()$add_chartsheet(
+    sheet       = sheet,
+    tabColour   = tabColour,
+    zoom        = zoom,
+    visible     = visible
+  )
+}
 
 #' Add a worksheet to a workbook
 #'
@@ -491,6 +521,7 @@ wb_clone_worksheet <- function(wb, old = current_sheet(), new = next_sheet()) {
   wb$clone()$clone_worksheet(old = old, new = new)
 }
 
+# worksheets --------------------------------------------------------------
 
 #' @name wb_freeze_pane
 #' @title Freeze a worksheet pane
@@ -544,6 +575,7 @@ wb_freeze_pane <- function(wb, sheet = current_sheet(), firstActiveRow = NULL, f
 #' @param sheet A name or index of a worksheet
 #' @param rows Indices of rows to set height
 #' @param heights Heights to set rows to specified in Excel column height units.
+#' @param hidden Option to hide rows.
 #'
 #' @export
 #' @family workbook wrappers
@@ -565,9 +597,9 @@ wb_freeze_pane <- function(wb, sheet = current_sheet(), firstActiveRow = NULL, f
 #'
 #' ## overwrite row 1 height
 #' wb <- wb_set_row_heights(wb, 1, rows = 1, heights = 40)
-wb_set_row_heights <- function(wb, sheet = current_sheet(), rows, heights) {
+wb_set_row_heights <- function(wb, sheet = current_sheet(), rows, heights = NULL, hidden = FALSE) {
   assert_workbook(wb)
-  wb$clone()$set_row_heights(sheet = sheet, rows, heights)
+  wb$clone()$set_row_heights(sheet = sheet, rows, heights, hidden)
 }
 
 
@@ -702,13 +734,11 @@ wb_remove_row_heights <- function(wb, sheet = current_sheet(), rows) {
 #'
 #' ## create plot objects
 #' require(ggplot2)
-#' p1 <- qplot(mpg,
-#'   data = mtcars, geom = "density",
-#'   fill = as.factor(gear), alpha = I(.5), main = "Distribution of Gas Mileage"
-#' )
-#' p2 <- qplot(age, circumference,
-#'   data = Orange, geom = c("point", "line"), colour = Tree
-#' )
+#' p1 <- ggplot(mtcars, aes(x = mpg, fill = as.factor(gear))) +
+#'   ggtitle("Distribution of Gas Mileage") +
+#'   geom_density(alpha = I(.5))
+#' p2 <- ggplot(Orange, aes(x = age, y = circumference, colour = Tree)) +
+#'   geom_point() + geom_line()
 #'
 #' ## Insert currently displayed plot to sheet 1, row 1, column 1
 #' print(p1) # plot needs to be showing
@@ -774,7 +804,7 @@ wb_add_drawing <- function(
   wb,
   sheet = current_sheet(),
   xml,
-  dims = "A1:H8"
+  dims = NULL
 ) {
   assert_workbook(wb)
   wb$clone()$add_drawing(sheet = sheet, xml = xml, dims = dims)
@@ -2014,7 +2044,7 @@ wb_add_chart_xml <- function(
   wb,
   sheet = current_sheet(),
   xml,
-  dims = "A1:H8"
+  dims = NULL
 ) {
   assert_workbook(wb)
   wb$clone()$add_chart_xml(sheet, xml, dims)
