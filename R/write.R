@@ -93,7 +93,7 @@ update_cell <- function(x, wb, sheet, cell, colNames = FALSE,
   }
 
   replacement <- c("r", cell_style, "c_t", "c_cm", "c_ph", "c_vm", "v",
-                   "f", "f_t", "f_ref", "f_ca", "f_si", "is")
+                   "f", "f_t", "f_ref", "f_ca", "f_si", "is", "typ")
 
   sel <- match(x$r, cc$r)
   cc[sel, replacement] <- x[replacement]
@@ -135,6 +135,7 @@ nmfmt_df <- function(x) {
 #' @param removeCellStyle keep the cell style?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
 #' @param data_table logical. if `TRUE` and `rowNames = TRUE`, do not write the cell containing  `"_rowNames_"`
+#' @param inline_strings write characters as inline strings
 #' @details
 #' The string `"_openxlsx_NA"` is reserved for `openxlsx2`. If the data frame
 #' contains this string, the output will be broken.
@@ -154,8 +155,8 @@ nmfmt_df <- function(x) {
 #'
 #' wb$add_worksheet("sheet4")
 #' write_data2(wb, "sheet4", as.data.frame(Titanic), startRow = 2, startCol = 2)
-#'
-#' @export
+#' @keywords internal
+#' @noRd
 write_data2 <- function(
     wb,
     sheet,
@@ -168,7 +169,8 @@ write_data2 <- function(
     applyCellStyle = TRUE,
     removeCellStyle = FALSE,
     na.strings,
-    data_table = FALSE
+    data_table = FALSE,
+    inline_strings = TRUE
   ) {
 
   if (missing(na.strings)) na.strings <- substitute()
@@ -296,6 +298,18 @@ write_data2 <- function(
     data[sel][is.na(data[sel])] <- "_openxlsx_NA"
   }
 
+  string_nums <- getOption("openxlsx2.string_nums", default = 0)
+
+  na_missing <- FALSE
+  na_null    <- FALSE
+  if (missing(na.strings)) {
+    na.strings <- ""
+    na_missing <- TRUE
+  } else if (is.null(na.strings)) {
+    na.strings <- ""
+    na_null    <- TRUE
+  }
+
   wide_to_long(
     data,
     dc,
@@ -303,45 +317,13 @@ write_data2 <- function(
     ColNames = colNames,
     start_col = startCol,
     start_row = startRow,
-    ref = dims
+    ref = dims,
+    string_nums = string_nums,
+    na_null = na_null,
+    na_missing = na_missing,
+    na_strings = na.strings,
+    inline_strings = inline_strings
   )
-
-  # if any v is missing, set typ to 'e'. v is only filled for non character
-  # values, but contains a string. To avoid issues, set it to the missing
-  # value expression
-
-  ## replace NA, NaN, and Inf
-  is_na <- which(cc$is == "<is><t>_openxlsx_NA</t></is>" | cc$v == "NA")
-  if (length(is_na)) {
-    if (missing(na.strings)) {
-      cc[is_na, "v"]   <- "#N/A"
-      cc[is_na, "c_t"] <- "e"
-      cc[is_na, "is"]  <- ""
-    } else {
-      cc[is_na, "v"]  <- ""
-      if (is.null(na.strings)) {
-        cc[is_na, "c_t"] <- ""
-        cc[is_na, "is"]  <- ""
-        # do nothing
-      } else {
-        cc[is_na, "c_t"] <- "inlineStr"
-        cc[is_na, "is"] <- txt_to_is(as.character(na.strings),
-                                     no_escapes = TRUE, raw = TRUE)
-      }
-    }
-  }
-
-  is_nan <- which(cc$v == "NaN")
-  if (length(is_nan)) {
-    cc[is_nan, "v"]   <- "#VALUE!"
-    cc[is_nan, "c_t"] <- "e"
-  }
-
-  is_inf <- which(cc$v == "-Inf" | cc$v == "Inf")
-  if (length(is_inf)) {
-    cc[is_inf, "v"]   <- "#NUM!"
-    cc[is_inf, "c_t"] <- "e"
-  }
 
   # if rownames = TRUE and data_table = FALSE, remove "_rownames_"
   if (!data_table && rowNames && colNames) {
@@ -398,10 +380,28 @@ write_data2 <- function(
       wb$add_font(
           sheet = sheetno,
           dim = dim_sel,
-          color = wb_colour(hex = "FF0000FF"),
+          color = wb_color(hex = "FF0000FF"),
           name = wb_get_base_font(wb)$name$val,
           u = "single"
       )
+    }
+
+    if (any(dc == openxlsx2_celltype[["character"]])) {
+      if (any(sel <- cc$typ == openxlsx2_celltype[["string_nums"]])) {
+
+        # # we cannot select every cell like this, because it is terribly slow.
+        # dim_sel <- paste0(cc$r[sel], collapse = ";")
+        dim_sel <- get_data_class_dims("character")
+        # message("character: ", dim_sel)
+
+        wb$add_cell_style(
+          sheet = sheetno,
+          dim = dim_sel,
+          applyNumberFormat = "1",
+          quotePrefix = "1",
+          numFmtId = "49"
+        )
+      }
     }
 
     # options("openxlsx2.numFmt" = NULL)
@@ -518,6 +518,35 @@ write_data2 <- function(
   }
   ### End styles
 
+  # update shared strings if we use shared strings
+  if (!inline_strings) {
+
+    cc <- wb$worksheets[[sheetno]]$sheet_data$cc
+
+    sel <- grepl("<si>", cc$v)
+    cc_sst <- stringi::stri_unique(cc[sel, "v"])
+
+    wb$sharedStrings <- stringi::stri_unique(c(wb$sharedStrings, cc_sst))
+
+    sel <- grepl("<si>", cc$v)
+    cc$v[sel] <- as.character(match(cc$v[sel], wb$sharedStrings) - 1L)
+
+    text        <- si_to_txt(wb$sharedStrings)
+    uniqueCount <- length(wb$sharedStrings)
+
+    attr(wb$sharedStrings, "uniqueCount") <- uniqueCount
+    attr(wb$sharedStrings, "text")        <- text
+
+    wb$worksheets[[sheetno]]$sheet_data$cc <- cc
+
+    if (!any(grepl("sharedStrings", wb$workbook.xml.rels))) {
+      wb$append(
+        "workbook.xml.rels",
+        "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>"
+      )
+    }
+  }
+
   ### Update calcChain
   if (length(wb$calcChain)) {
 
@@ -570,13 +599,14 @@ write_data2 <- function(
 #' @param sep Only applies to list columns. The separator used to collapse list columns to a character vector e.g. sapply(x$list_column, paste, collapse = sep).
 #' @param firstColumn logical. If TRUE, the first column is bold
 #' @param lastColumn logical. If TRUE, the last column is bold
-#' @param bandedRows logical. If TRUE, rows are colour banded
-#' @param bandedCols logical. If TRUE, the columns are colour banded
+#' @param bandedRows logical. If TRUE, rows are color banded
+#' @param bandedCols logical. If TRUE, the columns are color banded
 #' @param bandedCols logical. If TRUE, a data table is created
 #' @param name If not NULL, a named region is defined.
 #' @param applyCellStyle apply styles when writing on the sheet
 #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
+#' @param inline_strings optional write strings as inline strings
 #' @noRd
 write_data_table <- function(
     wb,
@@ -601,11 +631,9 @@ write_data_table <- function(
     applyCellStyle = TRUE,
     removeCellStyle = FALSE,
     data_table = FALSE,
-    na.strings
+    na.strings,
+    inline_strings = TRUE
 ) {
-
-  op <- openxlsx2_options()
-  on.exit(options(op), add = TRUE)
 
   ## Input validating
   assert_workbook(wb)
@@ -618,6 +646,12 @@ write_data_table <- function(
   assert_class(lastColumn, "logical")
   assert_class(bandedRows, "logical")
   assert_class(bandedCols, "logical")
+
+  # force with globalenv() options
+  x <- force(x)
+
+  op <- openxlsx2_options()
+  on.exit(options(op), add = TRUE)
 
   if (!is.null(dims)) {
     dims <- dims_to_rowcol(dims, as_integer = TRUE)
@@ -655,30 +689,32 @@ write_data_table <- function(
 
   ## special case - vector of hyperlinks
   is_hyperlink <- FALSE
-  if (is.null(dim(x))) {
-    is_hyperlink <- inherits(x, "hyperlink")
-  } else {
-    is_hyperlink <- vapply(x, inherits, what = "hyperlink", FALSE)
-  }
-
-  if (any(is_hyperlink)) {
-    # consider wbHyperlink?
-    # hlinkNames <- names(x)
+  if (applyCellStyle) {
     if (is.null(dim(x))) {
-      colNames <- FALSE
-      if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
-        x[is_hyperlink] <- create_hyperlink(text = x[is_hyperlink])
-      }
-      class(x[is_hyperlink]) <- c("character", "hyperlink")
+      is_hyperlink <- inherits(x, "hyperlink")
     } else {
-      # check should be in create_hyperlink and that apply should not be required either
-      if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
-        x[is_hyperlink] <- apply(
-          x[is_hyperlink], 1,
-          FUN = function(str) create_hyperlink(text = str)
-        )
+      is_hyperlink <- vapply(x, inherits, what = "hyperlink", FALSE)
+    }
+
+    if (any(is_hyperlink)) {
+      # consider wbHyperlink?
+      # hlinkNames <- names(x)
+      if (is.null(dim(x))) {
+        colNames <- FALSE
+        if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
+          x[is_hyperlink] <- create_hyperlink(text = x[is_hyperlink])
+        }
+        class(x[is_hyperlink]) <- c("character", "hyperlink")
+      } else {
+        # check should be in create_hyperlink and that apply should not be required either
+        if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
+          x[is_hyperlink] <- apply(
+            x[is_hyperlink], 1,
+            FUN = function(str) create_hyperlink(text = str)
+          )
+        }
+        class(x[, is_hyperlink]) <- c("character", "hyperlink")
       }
-      class(x[, is_hyperlink]) <- c("character", "hyperlink")
     }
   }
 
@@ -767,7 +803,8 @@ write_data_table <- function(
     applyCellStyle = applyCellStyle,
     removeCellStyle = removeCellStyle,
     na.strings = na.strings,
-    data_table = data_table
+    data_table = data_table,
+    inline_strings = inline_strings
   )
 
   ### Beg: Only in datatable ---------------------------------------------------
@@ -854,6 +891,7 @@ write_data_table <- function(
 #' @param applyCellStyle apply styles when writing on the sheet
 #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
+#' @param inline_strings write characters as inline strings
 #' @seealso [write_datatable()]
 #' @export write_data
 #' @details Formulae written using write_formula to a Workbook object will not get picked up by read_xlsx().
@@ -930,7 +968,8 @@ write_data <- function(
     name = NULL,
     applyCellStyle = TRUE,
     removeCellStyle = FALSE,
-    na.strings
+    na.strings,
+    inline_strings = TRUE
 ) {
 
   if (missing(na.strings)) na.strings <- substitute()
@@ -958,7 +997,8 @@ write_data <- function(
     applyCellStyle = applyCellStyle,
     removeCellStyle = removeCellStyle,
     data_table = FALSE,
-    na.strings = na.strings
+    na.strings = na.strings,
+    inline_strings = inline_strings
   )
 }
 
@@ -1119,11 +1159,12 @@ write_formula <- function(
 #'
 #' @param firstColumn logical. If TRUE, the first column is bold
 #' @param lastColumn logical. If TRUE, the last column is bold
-#' @param bandedRows logical. If TRUE, rows are colour banded
-#' @param bandedCols logical. If TRUE, the columns are colour banded
+#' @param bandedRows logical. If TRUE, rows are color banded
+#' @param bandedCols logical. If TRUE, the columns are color banded
 #' @param applyCellStyle apply styles when writing on the sheet
 #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
 #' @param na.strings optional na.strings argument. if missing #N/A is used. If NULL no cell value is written, if character or numeric this is written (even if NA is part of numeric data)
+#' @param inline_strings write characters as inline strings
 #' @details columns of x with class Date/POSIXt, currency, accounting,
 #' hyperlink, percentage are automatically styled as dates, currency, accounting,
 #' hyperlinks, percentages respectively.
@@ -1236,7 +1277,8 @@ write_datatable <- function(
     bandedCols = FALSE,
     applyCellStyle = TRUE,
     removeCellStyle = FALSE,
-    na.strings
+    na.strings,
+    inline_strings = TRUE
 ) {
 
   if (missing(na.strings)) na.strings <- substitute()
@@ -1264,6 +1306,7 @@ write_datatable <- function(
     data_table = TRUE,
     applyCellStyle = applyCellStyle,
     removeCellStyle = removeCellStyle,
-    na.strings = na.strings
+    na.strings = na.strings,
+    inline_strings = inline_strings
   )
 }

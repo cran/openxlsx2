@@ -1,3 +1,48 @@
+# openxlsx2 (0.5)
+
+## New features
+
+* Improve column and row grouping. It is now possible to group by list, so that you can create various levels of groupings. [486](https://github.com/JanMarvin/openxlsx2/pull/486)
+
+* `writeData()` calls `force(x)` to evaluate the object before options are set ([#264](https://github.com/ycphs/openxlsx/issues/264))
+
+* `tabColor` in `wb_add_worksheet()` now allows passing `wb_color()`. [500](https://github.com/JanMarvin/openxlsx2/pull/500)
+
+* Add `wb_copy_cells()` a wrapper that allows copying cell ranges in a workbook as direct copy, as reference or as value. [515](https://github.com/JanMarvin/openxlsx2/pull/515)
+
+* Experimental option: `openxlsx2.string_nums` to write string numerics differently. A string numeric is a numeric in a string like: `as.character(1.5)`. The option can be
+  * 0 = the current default. Writes string numeric as string (the incorrect way according to spreadsheet software)
+  * 1 = writes string numeric as numeric with a character flag (the correct way according to spreadsheet software)
+  * 2 = convert all string numeric to numeric when writing
+  
+  This is experimental, because the impact is somewhat unknown. It might trigger unintended side effects. Feedback is requested.
+  
+* Enable writing strings as `sharedStrings` with argument `inline_strings = FALSE`. This creates a `sharedStrings` table in openxml that allows to reuse strings in the workbook efficiently and can reduce the file size if a workbook has many cells that are duplicates. [499](https://github.com/JanMarvin/openxlsx2/pull/499)
+
+* Initial implementation of `wb_add_pivot_table()`. This allows adding native pivot tables to `openxlsx2` workbooks. The pivot table area will remain empty until the sheet is opened in spreadsheet software and evaluated successfully. This feature is newly developed and can cause unexpected side effects. Be aware that using it might currently break workbooks.
+
+## Fixes
+
+* Reading of files with frozen panes and more than one section node was restored. [495](https://github.com/JanMarvin/openxlsx2/pull/495)
+
+* Fixed a copy and paste mistake in `add_border()` which used left borders for right borders. [496](https://github.com/JanMarvin/openxlsx2/pull/496)
+
+* Improve XML unescaping. [497](https://github.com/JanMarvin/openxlsx2/pull/497)
+
+* Fix reading and saving workbooks with multiple slicers per sheet. [505](https://github.com/JanMarvin/openxlsx2/pull/505)
+
+* Fix tab selection always selecting the first sheet since #303. [506](https://github.com/JanMarvin/openxlsx2/pull/506)
+
+## Breaking changes
+
+* Do not export `write_data2()` anymore. This was used in development in the early stages of the package and should not be used directly anymore.
+
+* Only documentation: `openxlsx2` defaults to American English 'color' from now on. Though, we fully support the previous 'colour'. Users will not have to adjust their code. Our documentation only lists `color`, but you can pass `colour` just the same way you used to. [501](https://github.com/JanMarvin/openxlsx2/pull/501) [502](https://github.com/JanMarvin/openxlsx2/pull/502)
+
+
+***************************************************************************
+
+
 # openxlsx2  0.4.1
 
 ## New features
@@ -128,7 +173,7 @@
 
 * New argument `startCol` in read to data frame functions `wb_to_df()`, `wb_read()` and `read_xlsx()`. [330](https://github.com/JanMarvin/openxlsx2/issues/330)
 
-* New function `wb_colour()` to ease working with colour vectors used in `openxlsx2` styles. [292](https://github.com/JanMarvin/openxlsx2/issues/292)
+* New function `wb_colour()` to ease working with color vectors used in `openxlsx2` styles. [292](https://github.com/JanMarvin/openxlsx2/issues/292)
 
 * Deprecated `get_cell_style()` and `set_cell_style()` in favor of newly introduced wrapper functions `wb_get_cell_style()` and `wb_set_cell_style()`. [306](https://github.com/JanMarvin/openxlsx2/issues/306)
 

@@ -27,6 +27,7 @@ dims_to_dataframe <- function(dims, fill = FALSE) {
       dimensions <- strsplit(dim, ":")[[1]]
 
       rows <- as.numeric(gsub("[[:upper:]]", "", dimensions))
+      if (all(is.na(rows))) rows <- c(1, 1048576)
       rows <- seq.int(rows[1], rows[2])
 
       rows_out <- unique(c(rows_out, rows))
@@ -510,7 +511,7 @@ wb_to_df <- function(
   # text in v
   if (any(cc_tab %in% c("str", "e"))) {
     sel <- cc$c_t %in% c("str", "e")
-    cc$val[sel] <- cc$v[sel]
+    cc$val[sel] <- replaceXMLEntities(cc$v[sel])
     cc$typ[sel] <- "s"
   }
   if (showFormula) {

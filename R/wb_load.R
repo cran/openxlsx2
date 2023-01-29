@@ -136,7 +136,8 @@ wb_load <- function(
   ## remove all EXCEPT media and charts
   on.exit(
     unlink(
-      grep_xml("media|vmlDrawing|customXml|comment|embeddings|pivot|slicer|vbaProject|person", ignore.case = TRUE, invert = TRUE),
+      # TODO: this removes all files, the folders remain. grep instead grep_xml?
+      grep_xml("media|vmlDrawing|customXml|comment|embeddings|vbaProject|person", ignore.case = TRUE, invert = TRUE),
       recursive = TRUE, force = TRUE
     ),
     add = TRUE
@@ -417,11 +418,11 @@ wb_load <- function(
   ## xl\sharedStrings
   if (length(sharedStringsXML)) {
 
-    sst <- read_xml(sharedStringsXML)
+    sst <- read_xml(sharedStringsXML, escapes = TRUE)
     sst_attr <- xml_attr(sst, "sst")
     uniqueCount <- as.character(sst_attr[[1]]["uniqueCount"])
     vals <- xml_node(sst, "sst", "si")
-    text <- si_to_txt(sst)
+    text <- xml_si_to_txt(sst)
 
     attr(vals, "uniqueCount") <- uniqueCount
     attr(vals, "text") <- text
@@ -447,73 +448,40 @@ wb_load <- function(
     nPivotTables <- length(pivotDefXML)
     rIds <- 20000L + seq_len(nPivotTables)
 
-    ## pivot tables
-    pivotTableXML <- pivotTableXML[order(nchar(pivotTableXML), pivotTableXML)]
-    pivotTableRelsXML <- pivotTableRelsXML[order(nchar(pivotTableRelsXML), pivotTableRelsXML)]
-
-    ## Cache
-    pivotDefXML <- pivotDefXML[order(nchar(pivotDefXML), pivotDefXML)]
-    pivotDefRelsXML <- pivotDefRelsXML[order(nchar(pivotDefRelsXML), pivotDefRelsXML)]
-    pivotCacheRecords <- pivotCacheRecords[order(nchar(pivotCacheRecords), pivotCacheRecords)]
-
-
     wb$pivotDefinitionsRels <- character(nPivotTables)
 
     pivot_content_type <- NULL
 
-    if (length(pivotTableRelsXML)) {
-      wb$pivotTables.xml.rels <- unapply(pivotTableRelsXML, read_xml, pointer = FALSE)
-    }
-
-    # ## Check what caches are used
-    cache_keep <- unlist(
-      regmatches(
-        wb$pivotTables.xml.rels,
-        gregexpr("(?<=pivotCache/pivotCacheDefinition)[0-9]+(?=\\.xml)",
-                 wb$pivotTables.xml.rels,
-                 perl = TRUE, ignore.case = TRUE
-        )
-      )
-    )
-
-    ## pivot cache records
-    tmp <- unlist(regmatches(pivotCacheRecords, gregexpr("(?<=pivotCache/pivotCacheRecords)[0-9]+(?=\\.xml)", pivotCacheRecords, perl = TRUE, ignore.case = TRUE)))
-    pivotCacheRecords <- pivotCacheRecords[tmp %in% cache_keep]
-
-    ## pivot cache definitions rels
-    tmp <- unlist(regmatches(pivotDefRelsXML, gregexpr("(?<=_rels/pivotCacheDefinition)[0-9]+(?=\\.xml)", pivotDefRelsXML, perl = TRUE, ignore.case = TRUE)))
-    pivotDefRelsXML <- pivotDefRelsXML[tmp %in% cache_keep]
-
-    ## pivot cache definitions
-    tmp <- unlist(regmatches(pivotDefXML, gregexpr("(?<=pivotCache/pivotCacheDefinition)[0-9]+(?=\\.xml)", pivotDefXML, perl = TRUE, ignore.case = TRUE)))
-    pivotDefXML <- pivotDefXML[tmp %in% cache_keep]
-
     if (length(pivotTableXML)) {
-      wb$pivotTables[seq_along(pivotTableXML)] <- pivotTableXML
+      wb$pivotTables <- unapply(pivotTableXML, read_xml, pointer = FALSE)
       pivot_content_type <- c(
         pivot_content_type,
         sprintf('<Override PartName="/xl/pivotTables/pivotTable%s.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>', seq_along(pivotTableXML))
       )
     }
 
+    if (length(pivotTableRelsXML)) {
+      wb$pivotTables.xml.rels <- unapply(pivotTableRelsXML, read_xml, pointer = FALSE)
+    }
+
     if (length(pivotDefXML)) {
-      wb$pivotDefinitions[seq_along(pivotDefXML)] <- pivotDefXML
+      wb$pivotDefinitions <- unapply(pivotDefXML, read_xml, pointer = FALSE)
       pivot_content_type <- c(
         pivot_content_type,
         sprintf('<Override PartName="/xl/pivotCache/pivotCacheDefinition%s.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/>', seq_along(pivotDefXML))
       )
     }
 
+    if (length(pivotDefRelsXML)) {
+      wb$pivotDefinitionsRels <- unapply(pivotDefRelsXML, read_xml, pointer = FALSE)
+    }
+
     if (length(pivotCacheRecords)) {
-      wb$pivotRecords[seq_along(pivotCacheRecords)] <- pivotCacheRecords
+      wb$pivotRecords <- unapply(pivotCacheRecords, read_xml, pointer = FALSE)
       pivot_content_type <- c(
         pivot_content_type,
         sprintf('<Override PartName="/xl/pivotCache/pivotCacheRecords%s.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"/>', seq_along(pivotCacheRecords))
       )
-    }
-
-    if (length(pivotDefRelsXML)) {
-      wb$pivotDefinitionsRels[seq_along(pivotDefRelsXML)] <- pivotDefRelsXML
     }
 
     ## update content_types
@@ -738,15 +706,22 @@ wb_load <- function(
 
             freezePane <- paste0(
               vapply(
-                xml_nams,
-                function(x) xml_node(sheetViews, "sheetViews", "sheetView", x),
+                unique(xml_nams),
+                function(x) {
+                  xml <- xml_node(sheetViews, "sheetViews", "sheetView", x)
+                  paste(xml, collapse = "")
+                },
                 NA_character_
               ),
               collapse = ""
             )
 
             for (xml_nam in xml_nams) {
-              sheetViews <- xml_rm_child(sheetViews, xml_child = xml_nam, level = "sheetView")
+              sheetViews <- xml_rm_child(
+                sheetViews,
+                xml_child = xml_nam,
+                level = "sheetView"
+              )
             }
 
             wb$worksheets[[i]]$freezePane <- freezePane
@@ -833,6 +808,7 @@ wb_load <- function(
     xml <- lapply(seq_along(allRels), function(i) {
       if (haveRels[i]) {
         xml <- xml_node(allRels[[i]], "Relationships", "Relationship")
+        if (length(xml) == 0) return(character())
 
         xml_relship <- rbindlist(xml_attr(xml, "Relationship"))
         # xml_relship$Target[basename(xml_relship$Type) == "drawing"] <- sprintf("../drawings/drawing%s.xml", i)
@@ -874,26 +850,15 @@ wb_load <- function(
       wb$slicers <- vapply(slicerXML, read_xml, pointer = FALSE,
                            FUN.VALUE = NA_character_, USE.NAMES = FALSE)
 
-      slicersFiles <- lapply(xml, function(x) as.integer(regmatches(x, regexpr("(?<=slicer)[0-9]+(?=\\.xml)", x, perl = TRUE))))
-      inds <- lengths(slicersFiles)
-
       ## worksheet_rels Id for slicer will be rId0
-      k <- 1L
-      for (i in seq_len(nSheets)) {
-
-        ## read in slicer[j].XML sheets into sheet[i]
-        if (inds[i]) {
+      for (i in seq_along(wb$slicers)) {
 
           # this will add slicers to Content_Types. Ergo if worksheets with
           # slicers are removed, the slicer needs to remain in the worksheet
           wb$append(
             "Content_Types",
-            sprintf('<Override PartName="/xl/slicers/slicer%s.xml" ContentType="application/vnd.ms-excel.slicer+xml"/>', k)
+            sprintf('<Override PartName="/xl/slicers/slicer%s.xml" ContentType="application/vnd.ms-excel.slicer+xml"/>', i)
           )
-
-          k <- k + 1L
-
-        }
       }
     }
 
@@ -902,8 +867,10 @@ wb_load <- function(
       wb$slicerCaches <- vapply(slicerCachesXML, read_xml, pointer = FALSE,
                                 FUN.VALUE = NA_character_, USE.NAMES = FALSE)
 
-      wb$append("Content_Types", sprintf('<Override PartName="/xl/slicerCaches/slicerCache%s.xml" ContentType="application/vnd.ms-excel.slicerCache+xml"/>', inds[inds > 0]))
-      wb$append("workbook.xml.rels", sprintf('<Relationship Id="rId%s" Type="http://schemas.microsoft.com/office/2007/relationships/slicerCache" Target="slicerCaches/slicerCache%s.xml"/>', 1E5 + inds[inds > 0], inds[inds > 0]))
+      for (i in seq_along(wb$slicerCaches)) {
+        wb$append("Content_Types", sprintf('<Override PartName="/xl/slicerCaches/slicerCache%s.xml" ContentType="application/vnd.ms-excel.slicerCache+xml"/>', i))
+        wb$append("workbook.xml.rels", sprintf('<Relationship Id="rId%s" Type="http://schemas.microsoft.com/office/2007/relationships/slicerCache" Target="slicerCaches/slicerCache%s.xml"/>', 1E5 + i, i))
+      }
 
       # get extLst object. select the slicerCaches and replace it
       ext_nams <- xml_node_name(wb$workbook$extLst, "extLst", "ext")

@@ -328,15 +328,17 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Add a chart sheet to the workbook
     #' @param sheet sheet
-    #' @param tabColour tabColour
+    #' @param tabColor tabColor
     #' @param zoom zoom
     #' @param visible visible
+    #' @param ... ...
     #' @return The `wbWorkbook` object, invisibly
     add_chartsheet = function(
       sheet     = next_sheet(),
-      tabColour = NULL,
+      tabColor  = NULL,
       zoom      = 100,
-      visible   = c("true", "false", "hidden", "visible", "veryhidden")
+      visible   = c("true", "false", "hidden", "visible", "veryhidden"),
+      ...
     ) {
       visible <- tolower(as.character(visible))
       visible <- match.arg(visible)
@@ -379,8 +381,13 @@ wbWorkbook <- R6::R6Class(
         )
       )
 
-      if (!is.null(tabColour)) {
-        tabColour <- validateColour(tabColour, "Invalid tabColour in add_worksheet.")
+      standardize_color_names(...)
+      if (!is.null(tabColor)) {
+        if (is_wbColour(tabColor)) {
+          tabColor <- as.character(tabColor)
+        } else {
+          tabColor <- validateColor(tabColor, "Invalid tabColor in add_chartsheet.")
+        }
       }
 
       if (!is.numeric(zoom)) {
@@ -398,7 +405,7 @@ wbWorkbook <- R6::R6Class(
 
       self$append("worksheets",
         wbChartSheet$new(
-          tabColour   = tabColour
+          tabColor = tabColor
         )
       )
 
@@ -455,7 +462,7 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param gridLines gridLines
     #' @param rowColHeaders rowColHeaders
-    #' @param tabColour tabColour
+    #' @param tabColor tabColor
     #' @param zoom zoom
     #' @param header header
     #' @param footer footer
@@ -471,12 +478,13 @@ wbWorkbook <- R6::R6Class(
     #' @param orientation orientation
     #' @param hdpi hdpi
     #' @param vdpi vdpi
+    #' @param ... ...
     #' @return The `wbWorkbook` object, invisibly
     add_worksheet = function(
       sheet       = next_sheet(),
       gridLines   = TRUE,
       rowColHeaders = TRUE,
-      tabColour   = NULL,
+      tabColor    = NULL,
       zoom        = 100,
       header      = NULL,
       footer      = NULL,
@@ -491,7 +499,8 @@ wbWorkbook <- R6::R6Class(
       paperSize   = getOption("openxlsx2.paperSize", default = 9),
       orientation = getOption("openxlsx2.orientation", default = "portrait"),
       hdpi        = getOption("openxlsx2.hdpi", default = getOption("openxlsx2.dpi", default = 300)),
-      vdpi        = getOption("openxlsx2.vdpi", default = getOption("openxlsx2.dpi", default = 300))
+      vdpi        = getOption("openxlsx2.vdpi", default = getOption("openxlsx2.dpi", default = 300)),
+      ...
     ) {
       visible <- tolower(as.character(visible))
       visible <- match.arg(visible)
@@ -525,8 +534,13 @@ wbWorkbook <- R6::R6Class(
         msg <- c(msg, "gridLines must be a logical of length 1.")
       }
 
-      if (!is.null(tabColour)) {
-        tabColour <- validateColour(tabColour, "Invalid tabColour in add_worksheet.")
+      standardize_color_names(...)
+      if (!is.null(tabColor)) {
+        if (is_wbColour(tabColor)) {
+          tabColor <- as.character(tabColor)
+        } else {
+          tabColor <- validateColor(tabColor, "Invalid tabColor in add_worksheet.")
+        }
       }
 
       if (!is.numeric(zoom)) {
@@ -625,7 +639,7 @@ wbWorkbook <- R6::R6Class(
       ## append to worksheets list
       self$append("worksheets",
         wbWorksheet$new(
-          tabColour   = tabColour,
+          tabColor   = tabColor,
           oddHeader   = oddHeader,
           oddFooter   = oddFooter,
           evenHeader  = evenHeader,
@@ -1009,6 +1023,7 @@ wbWorkbook <- R6::R6Class(
     #' @param applyCellStyle applyCellStyle
     #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
     #' @param na.strings na.strings
+    #' @param inline_strings write characters as inline strings
     #' @param return The `wbWorkbook` object
     add_data = function(
         sheet           = current_sheet(),
@@ -1025,7 +1040,8 @@ wbWorkbook <- R6::R6Class(
         sep             = ", ",
         applyCellStyle  = TRUE,
         removeCellStyle = FALSE,
-        na.strings
+        na.strings,
+        inline_strings  = TRUE
       ) {
 
       if (missing(na.strings)) na.strings <- substitute()
@@ -1046,7 +1062,8 @@ wbWorkbook <- R6::R6Class(
         sep             = sep,
         applyCellStyle  = applyCellStyle,
         removeCellStyle = removeCellStyle,
-        na.strings      = na.strings
+        na.strings      = na.strings,
+        inline_strings  = inline_strings
       )
       invisible(self)
     },
@@ -1071,53 +1088,186 @@ wbWorkbook <- R6::R6Class(
     #' @param applyCellStyle applyCellStyle
     #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
     #' @param na.strings na.strings
+    #' @param inline_strings write characters as inline strings
     #' @returns The `wbWorkbook` object
     add_data_table = function(
-        sheet       = current_sheet(),
+        sheet           = current_sheet(),
         x,
-        startCol    = 1,
-        startRow    = 1,
-        dims        = rowcol_to_dims(startRow, startCol),
-        xy          = NULL,
-        colNames    = TRUE,
-        rowNames    = FALSE,
-        tableStyle  = "TableStyleLight9",
-        tableName   = NULL,
-        withFilter  = TRUE,
-        sep         = ", ",
-        firstColumn = FALSE,
-        lastColumn  = FALSE,
-        bandedRows  = TRUE,
-        bandedCols  = FALSE,
-        applyCellStyle = TRUE,
+        startCol        = 1,
+        startRow        = 1,
+        dims            = rowcol_to_dims(startRow, startCol),
+        xy              = NULL,
+        colNames        = TRUE,
+        rowNames        = FALSE,
+        tableStyle      = "TableStyleLight9",
+        tableName       = NULL,
+        withFilter      = TRUE,
+        sep             = ", ",
+        firstColumn     = FALSE,
+        lastColumn      = FALSE,
+        bandedRows      = TRUE,
+        bandedCols      = FALSE,
+        applyCellStyle  = TRUE,
         removeCellStyle = FALSE,
-        na.strings
+        na.strings,
+        inline_strings  = TRUE
     ) {
 
       if (missing(na.strings)) na.strings <- substitute()
 
       write_datatable(
-        wb          = self,
-        sheet       = sheet,
-        x           = x,
-        dims        = dims,
-        startCol    = startCol,
-        startRow    = startRow,
-        xy          = xy,
-        colNames    = colNames,
-        rowNames    = rowNames,
-        tableStyle  = tableStyle,
-        tableName   = tableName,
-        withFilter  = withFilter,
-        sep         = sep,
-        firstColumn = firstColumn,
-        lastColumn  = lastColumn,
-        bandedRows  = bandedRows,
-        bandedCols  = bandedCols,
-        applyCellStyle = applyCellStyle,
+        wb              = self,
+        sheet           = sheet,
+        x               = x,
+        dims            = dims,
+        startCol        = startCol,
+        startRow        = startRow,
+        xy              = xy,
+        colNames        = colNames,
+        rowNames        = rowNames,
+        tableStyle      = tableStyle,
+        tableName       = tableName,
+        withFilter      = withFilter,
+        sep             = sep,
+        firstColumn     = firstColumn,
+        lastColumn      = lastColumn,
+        bandedRows      = bandedRows,
+        bandedCols      = bandedCols,
+        applyCellStyle  = applyCellStyle,
         removeCellStyle = removeCellStyle,
-        na.strings  = na.strings
+        na.strings      = na.strings,
+        inline_strings  = inline_strings
       )
+      invisible(self)
+    },
+
+
+    #' @description add pivot table
+    #' @param x a wb_data object
+    #' @param sheet a worksheet
+    #' @param dims the worksheet cell where the pivot table is placed
+    #' @param filter a character object with names used to filter
+    #' @param rows a character object with names used as rows
+    #' @param cols a character object with names used as cols
+    #' @param data a character object with names used as data
+    #' @param fun a character object of functions to be used with the data
+    #' @param params a list of parameters to modify pivot table creation
+    #' @details
+    #' `fun` can be either of AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV,
+    #' STDEVP, SUM, VAR, VARP
+    #' @returns The `wbWorkbook` object
+    add_pivot_table = function(
+      x,
+      sheet = next_sheet(),
+      dims = "A3",
+      filter,
+      rows,
+      cols,
+      data,
+      fun,
+      params
+    ) {
+
+      if (missing(x))
+        stop("x cannot be missing in add_pivot_table")
+
+      assert_class(x, "wb_data")
+      add_sheet <- is_waiver(sheet)
+      sheet <- private$get_sheet_index(sheet)
+
+      if (missing(filter)) filter <- substitute()
+      if (missing(rows))   rows   <- substitute()
+      if (missing(cols))   cols   <- substitute()
+      if (missing(data))   data   <- substitute()
+      if (missing(fun))    fun    <- substitute()
+      if (missing(params)) params <- NULL
+
+      if (!missing(fun) && !missing(data)) {
+        if (length(fun) < length(data)) {
+          fun <- rep(fun[1], length(data))
+        }
+      }
+
+      # for now we use a new worksheet
+      if (add_sheet) {
+        self$add_worksheet()
+      }
+
+      pivot_table <- create_pivot_table(
+        x      = x,
+        dims   = dims,
+        filter = filter,
+        rows   = rows,
+        cols   = cols,
+        data   = data,
+        n      = length(self$pivotTables) + 1L,
+        fun    = fun,
+        params = params
+      )
+
+      if (missing(filter)) filter <- ""
+      if (missing(rows))   rows   <- ""
+      if (missing(cols))   cols   <- ""
+      if (missing(data))   data   <- ""
+
+      self$append("pivotTables", pivot_table)
+      self$append("pivotDefinitions", pivot_def_xml(x, filter, rows, cols, data))
+
+      cacheId <- length(self$pivotTables)
+
+      self$append("pivotDefinitionsRels", pivot_def_rel(cacheId))
+      self$append("pivotRecords", pivot_rec_xml(x))
+      self$append("pivotTables.xml.rels", pivot_xml_rels(cacheId))
+
+
+      rId <- paste0("rId", 20000 + cacheId)
+
+      pivotCache <- sprintf(
+        "<pivotCache cacheId=\"%s\" r:id=\"%s\"/>",
+        cacheId,
+        rId
+      )
+      if (length(self$workbook$pivotCaches)) {
+        self$workbook$pivotCaches <- xml_add_child(self$workbook$pivotCaches, xml_child = pivotCache)
+      } else {
+        self$workbook$pivotCaches <- xml_node_create("pivotCaches", xml_children = pivotCache)
+      }
+
+      if (length(self$worksheets_rels[[sheet]])) {
+        rlshp <- rbindlist(xml_attr(self$worksheets_rels[[sheet]], "Relationship"))
+        rlshp$id <- as.integer(gsub("\\D+", "", rlshp$Id))
+        next_id <- paste0("rId", max(rlshp$id) + 1L)
+      } else {
+        next_id <- "rId1"
+      }
+
+      self$worksheets_rels[[sheet]] <- c(
+        self$worksheets_rels[[sheet]],
+        sprintf(
+          '<Relationship Id=\"%s\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable\" Target=\"../pivotTables/pivotTable%s.xml\"/>',
+          next_id,
+          cacheId
+        )
+      )
+
+      self$append("workbook.xml.rels",
+        sprintf(
+          "<Relationship Id=\"%s\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition\" Target=\"pivotCache/pivotCacheDefinition%s.xml\"/>",
+          rId,
+          cacheId
+        )
+      )
+
+      self$append("Content_Types",
+                  c(
+                    sprintf("<Override PartName=\"/xl/pivotTables/pivotTable%s.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml\"/>", cacheId),
+                    sprintf("<Override PartName=\"/xl/pivotCache/pivotCacheDefinition%s.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml\"/>", cacheId),
+                    sprintf("<Override PartName=\"/xl/pivotCache/pivotCacheRecords%s.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml\"/>", cacheId)
+                  )
+      )
+
+      self$worksheets[[sheet]]$sheetFormatPr <- "<sheetFormatPr baseColWidth=\"10\" defaultRowHeight=\"15\" x14ac:dyDescent=\"0.2\"/>"
+
       invisible(self)
     },
 
@@ -1144,15 +1294,15 @@ wbWorkbook <- R6::R6Class(
         removeCellStyle = FALSE
     ) {
       write_formula(
-        wb       = self,
-        sheet    = sheet,
-        x        = x,
-        startCol = startCol,
-        startRow = startRow,
-        dims     = dims,
-        array    = array,
-        xy       = xy,
-        applyCellStyle = applyCellStyle,
+        wb              = self,
+        sheet           = sheet,
+        x               = x,
+        startCol        = startCol,
+        startRow        = startRow,
+        dims            = dims,
+        array           = array,
+        xy              = xy,
+        applyCellStyle  = applyCellStyle,
         removeCellStyle = removeCellStyle
       )
       invisible(self)
@@ -1328,15 +1478,38 @@ wbWorkbook <- R6::R6Class(
         pivotCacheDir      <- dir_create(tmpDir, "xl", "pivotCache")
         pivotCacheRelsDir  <- dir_create(tmpDir, "xl", "pivotCache", "_rels")
 
-        file_copy_wb_save(self$pivotTables,          "pivotTable%i.xml",                pivotTablesDir)
-        file_copy_wb_save(self$pivotDefinitions,     "pivotCacheDefinition%i.xml",      pivotCacheDir)
-        file_copy_wb_save(self$pivotRecords,         "pivotCacheRecords%i.xml",         pivotCacheDir)
-        file_copy_wb_save(self$pivotDefinitionsRels, "pivotCacheDefinition%i.xml.rels", pivotCacheRelsDir)
+        for (i in seq_along(self$pivotTables)) {
+          write_file(
+            body = self$pivotTables[[i]],
+            fl = file.path(pivotTablesDir, sprintf("pivotTable%s.xml", i))
+          )
+        }
 
         for (i in seq_along(self$pivotTables.xml.rels)) {
           write_file(
             body = self$pivotTables.xml.rels[[i]],
             fl = file.path(pivotTablesRelsDir, sprintf("pivotTable%s.xml.rels", i))
+          )
+        }
+
+        for (i in seq_along(self$pivotRecords)) {
+          write_file(
+            body = self$pivotRecords[[i]],
+            fl = file.path(pivotCacheDir, sprintf("pivotCacheRecords%s.xml", i))
+          )
+        }
+
+        for (i in seq_along(self$pivotDefinitions)) {
+          write_file(
+            body = self$pivotDefinitions[[i]],
+            fl = file.path(pivotCacheDir, sprintf("pivotCacheDefinition%s.xml", i))
+          )
+        }
+
+        for (i in seq_along(self$pivotDefinitionsRels)) {
+          write_file(
+            body = self$pivotDefinitionsRels[[i]],
+            fl = file.path(pivotCacheRelsDir, sprintf("pivotCacheDefinition%s.xml.rels", i))
           )
         }
       }
@@ -1950,6 +2123,93 @@ wbWorkbook <- R6::R6Class(
       invisible(self)
     },
 
+    ### copy cells ----
+
+    #' @description
+    #' copy cells around in a workbook
+    #' @param sheet a worksheet
+    #' @param dims cell used as start
+    #' @param data a wb_data object
+    #' @param as_value should a copy of the value be written
+    #' @param as_ref should references to the cell be written
+    #' @param transpose should the data be written transposed
+    #' @return The `wbWorksheet` object, invisibly
+    copy_cells = function(
+      sheet     = current_sheet(),
+      dims      = "A1",
+      data,
+      as_value  = FALSE,
+      as_ref    = FALSE,
+      transpose = FALSE
+    ) {
+
+      assert_class(data, "wb_data")
+      sheet <- private$get_sheet_index(sheet)
+
+      to_ncol <- ncol(data) - 1
+      to_nrow <- nrow(data) - 1
+
+      start_col <- col2int(dims)
+      start_row <- as.integer(gsub("\\D+", "", dims))
+
+      to_cols <- seq.int(start_col, start_col + to_ncol)
+      to_rows <- seq.int(start_row, start_row + to_nrow)
+
+      to_dims    <- rowcol_to_dims(to_rows, to_cols)
+      to_dims_i  <- dims_to_dataframe(to_dims, fill = FALSE)
+      to_dims_f  <- dims_to_dataframe(to_dims, fill = TRUE)
+
+      if (transpose) {
+        to_dims_i <- as.data.frame(t(to_dims_i))
+        to_dims_f  <- as.data.frame(t(to_dims_f))
+      }
+
+      to_dims_f <- unname(unlist(to_dims_f))
+
+      from_sheet <- attr(data, "sheet")
+      from_dims  <- attr(data, "dims")
+
+      from_sheet <- wb_validate_sheet(self, from_sheet)
+      from_dims  <- as.character(unlist(from_dims))
+      cc <- self$worksheets[[from_sheet]]$sheet_data$cc
+
+      # TODO improve this. It should use v or inlineStr from cc
+      if (as_value) {
+        to_data <- data
+
+        if (transpose) {
+          data <- t(data)
+        }
+
+        self$add_data(sheet = sheet, x = data, dims = to_dims_f[[1]], colNames = FALSE)
+
+        return(invisible(self))
+      }
+
+      # initialize dims we write to as empty cells
+      private$do_cell_init(sheet, to_dims)
+
+      to_cc <- cc[match(from_dims, cc$r), ]
+      from_cells <- to_cc$r
+      to_cc[c("r", "row_r", "c_r")] <- cbind(
+        to_dims_f,
+        gsub("\\D+", "", to_dims_f),
+        int2col(col2int(to_dims_f))
+      )
+
+      if (as_ref) {
+        from_sheet_name <- self$get_sheet_names()[[from_sheet]]
+        to_cc[c("c_t", "c_cm", "c_ph", "c_vm", "v", "f", "f_t", "f_ref", "f_ca", "f_si", "is")] <- ""
+        to_cc[c("f")] <- paste0(shQuote(from_sheet_name, type = "sh"), "!", from_cells)
+      }
+
+      cc <- self$worksheets[[sheet]]$sheet_data$cc
+      cc[match(to_dims_f, cc$r), ] <- to_cc
+
+      self$worksheets[[sheet]]$sheet_data$cc <- cc
+
+      invisible(self)
+    },
 
     ### base font ----
 
@@ -1960,7 +2220,7 @@ wbWorkbook <- R6::R6Class(
       baseFont <- self$styles_mgr$styles$fonts[[1]]
 
       sz     <- unlist(xml_attr(baseFont, "font", "sz"))
-      colour <- unlist(xml_attr(baseFont, "font", "color"))
+      color <- unlist(xml_attr(baseFont, "font", "color"))
       name   <- unlist(xml_attr(baseFont, "font", "name"))
 
       if (length(sz[[1]]) == 0) {
@@ -1969,10 +2229,10 @@ wbWorkbook <- R6::R6Class(
         sz <- as.list(sz)
       }
 
-      if (length(colour[[1]]) == 0) {
-        colour <- list("rgb" = "#000000")
+      if (length(color[[1]]) == 0) {
+        color <- list("rgb" = "#000000")
       } else {
-        colour <- as.list(colour)
+        color <- as.list(color)
       }
 
       if (length(name[[1]]) == 0) {
@@ -1983,7 +2243,7 @@ wbWorkbook <- R6::R6Class(
 
       list(
         size   = sz,
-        colour = colour,
+        color = color,
         name   = name
       )
     },
@@ -1991,13 +2251,15 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Get the base font
     #' @param fontSize fontSize
-    #' @param fontColour fontColour
+    #' @param fontColor fontColor
     #' @param fontName fontName
+    #' @param ... ...
     #' @return The `wbWorkbook` object
-    set_base_font = function(fontSize = 11, fontColour = wb_colour(theme = "1"), fontName = "Calibri") {
+    set_base_font = function(fontSize = 11, fontColor = wb_color(theme = "1"), fontName = "Calibri", ...) {
       if (fontSize < 0) stop("Invalid fontSize")
-      if (is.character(fontColour) && is.null(names(fontColour))) fontColour <- wb_colour(fontColour)
-      self$styles_mgr$styles$fonts[[1]] <- create_font(sz = as.character(fontSize), color = fontColour, name = fontName)
+      standardize_color_names(...)
+      if (is.character(fontColor) && is.null(names(fontColor))) fontColor <- wb_color(fontColor)
+      self$styles_mgr$styles$fonts[[1]] <- create_font(sz = as.character(fontSize), color = fontColor, name = fontName)
     },
 
     ### book views ----
@@ -2259,6 +2521,30 @@ wbWorkbook <- R6::R6Class(
     group_cols = function(sheet = current_sheet(), cols, collapsed = FALSE, levels = NULL) {
       sheet <- private$get_sheet_index(sheet)
 
+      sPr <- self$worksheets[[sheet]]$sheetPr
+      xml_sumRig <- unlist(xml_attr(sPr, "sheetPr", "outlinePr"))["summaryRight"]
+
+      if (!is.null(xml_sumRig) && xml_sumRig == "0")
+        right <- FALSE
+      else
+        right <- TRUE
+
+      if (is.list(cols)) {
+        levels <- unlist(
+          lapply(names(cols), function(x) {
+            lvls <- rep(as.character(x), length(cols[[x]]))
+            collapse_in <- ifelse(right, length(lvls), 1)
+            lvls[collapse_in] <- ""
+            lvls
+          })
+        )
+        cols <- unlist(cols)
+      } else {
+        levels <- levels %||% rep("1", length(cols))
+        collapse_in <- ifelse(right, length(levels), 1)
+        levels[collapse_in] <- ""
+      }
+
       if (length(collapsed) > length(cols)) {
         stop("Collapses argument is of greater length than number of cols.")
       }
@@ -2271,8 +2557,8 @@ wbWorkbook <- R6::R6Class(
         stop("Invalid rows entered (<= 0).")
       }
 
+      hidden <- all(collapsed == TRUE)
       collapsed <- rep(as.character(as.integer(collapsed)), length.out = length(cols))
-      levels <- levels %||% rep("1", length(cols))
 
       # Remove duplicates
       ok <- !duplicated(cols)
@@ -2288,23 +2574,16 @@ wbWorkbook <- R6::R6Class(
         message("worksheet has no columns. please create some with createCols")
       }
 
-      # reverse to make it easier to get the fist
-      cols_rev <- rev(cols)
-
       # get the selection based on the col_attr frame.
 
       # the first n -1 cols get outlineLevel
-      select <- col_attr$min %in% as.character(cols_rev[-1])
+      select <- col_attr$min %in% as.character(cols)
+      collapse_in <- ifelse(right, length(cols), 1)
+      select_n1 <- col_attr$min %in% as.character(cols[-collapse_in])
       if (length(select)) {
-        col_attr$outlineLevel[select] <- as.character(levels[-1])
-        col_attr$collapsed[select] <- as.character(as.integer(collapsed[-1]))
-        col_attr$hidden[select] <- as.character(as.integer(collapsed[-1]))
-      }
-
-      # the n-th row gets only collapsed
-      select <- col_attr$min %in% as.character(cols_rev[1])
-      if (length(select)) {
-        col_attr$collapsed[select] <- as.character(as.integer(collapsed[1]))
+        col_attr$outlineLevel[select] <- as.character(levels)
+        col_attr$collapsed[select] <- as_binary(collapsed)
+        col_attr$hidden[select_n1] <- as_binary(hidden)
       }
 
       self$worksheets[[sheet]]$fold_cols(col_attr)
@@ -2312,7 +2591,9 @@ wbWorkbook <- R6::R6Class(
 
       # check if there are valid outlineLevel in col_attr and assign outlineLevelRow the max outlineLevel (thats in the documentation)
       if (any(col_attr$outlineLevel != "")) {
-        self$worksheets[[sheet]]$sheetFormatPr <- xml_attr_mod(self$worksheets[[sheet]]$sheetFormatPr, xml_attributes = c(outlineLevelCol = as.character(max(as.integer(col_attr$outlineLevel), na.rm = TRUE))))
+        self$worksheets[[sheet]]$sheetFormatPr <- xml_attr_mod(
+          self$worksheets[[sheet]]$sheetFormatPr,
+          xml_attributes = c(outlineLevelCol = as.character(max(as.integer(col_attr$outlineLevel), na.rm = TRUE))))
       }
 
       invisible(self)
@@ -2482,6 +2763,31 @@ wbWorkbook <- R6::R6Class(
     group_rows = function(sheet = current_sheet(), rows, collapsed = FALSE, levels = NULL) {
       sheet <- private$get_sheet_index(sheet)
 
+      sPr <- self$worksheets[[sheet]]$sheetPr
+      xml_sumBel <- unlist(xml_attr(sPr, "sheetPr", "outlinePr"))["summaryBelow"]
+
+      if (!is.null(xml_sumBel) && xml_sumBel == "0") {
+        below <- FALSE
+      } else {
+        below <- TRUE
+      }
+
+      if (is.list(rows)) {
+        levels <- unlist(
+          lapply(names(rows), function(x) {
+            lvls <- rep(as.character(x), length(rows[[x]]))
+            collapse_in <- ifelse(below, length(lvls), 1)
+            lvls[collapse_in] <- ""
+            lvls
+          })
+        )
+        rows <- unlist(rows)
+      } else {
+        levels <- levels %||% rep("1", length(rows))
+        collapse_in <- ifelse(below, length(levels), 1)
+        levels[collapse_in] <- ""
+      }
+
       if (length(collapsed) > length(rows)) {
         stop("Collapses argument is of greater length than number of rows.")
       }
@@ -2494,9 +2800,8 @@ wbWorkbook <- R6::R6Class(
         stop("Invalid rows entered (<= 0).")
       }
 
+      hidden <- all(collapsed == TRUE)
       collapsed <- rep(as.character(as.integer(collapsed)), length.out = length(rows))
-
-      levels <- levels %||% rep("1", length(rows))
 
       # Remove duplicates
       ok <- !duplicated(rows)
@@ -2508,29 +2813,25 @@ wbWorkbook <- R6::R6Class(
       # fetch the row_attr data.frame
       row_attr <- self$worksheets[[sheet]]$sheet_data$row_attr
 
-      rows_rev <- rev(rows)
-
       # get the selection based on the row_attr frame.
 
       # the first n -1 rows get outlineLevel
-      select <- row_attr$r %in% as.character(rows_rev[-1])
+      select <- row_attr$r %in% as.character(rows)
+      collapse_in <- ifelse(below, length(rows), 1)
+      select_n1 <- row_attr$r %in% as.character(rows[-collapse_in])
       if (length(select)) {
-        row_attr$outlineLevel[select] <- as.character(levels[-1])
-        row_attr$collapsed[select] <- as.character(as.integer(collapsed[-1]))
-        row_attr$hidden[select] <- as.character(as.integer(collapsed[-1]))
-      }
-
-      # the n-th row gets only collapsed
-      select <- row_attr$r %in% as.character(rows_rev[1])
-      if (length(select)) {
-        row_attr$collapsed[select] <- as.character(as.integer(collapsed[1]))
+        row_attr$outlineLevel[select] <- as.character(levels)
+        row_attr$collapsed[select] <- as_binary(collapsed)
+        row_attr$hidden[select_n1] <- as_binary(hidden)
       }
 
       self$worksheets[[sheet]]$sheet_data$row_attr <- row_attr
 
       # check if there are valid outlineLevel in row_attr and assign outlineLevelRow the max outlineLevel (thats in the documentation)
       if (any(row_attr$outlineLevel != "")) {
-        self$worksheets[[sheet]]$sheetFormatPr <- xml_attr_mod(self$worksheets[[sheet]]$sheetFormatPr, xml_attributes = c(outlineLevelRow = as.character(max(as.integer(row_attr$outlineLevel), na.rm = TRUE))))
+        self$worksheets[[sheet]]$sheetFormatPr <- xml_attr_mod(
+          self$worksheets[[sheet]]$sheetFormatPr,
+          xml_attributes = c(outlineLevelRow = as.character(max(as.integer(row_attr$outlineLevel), na.rm = TRUE))))
       }
 
       invisible(self)
@@ -3165,8 +3466,13 @@ wbWorkbook <- R6::R6Class(
         rule  = NULL,
         style = NULL,
         # TODO add vector of possible values
-        type = c("expression", "colorScale", "dataBar", "duplicatedValues",
-                 "containsText", "notContainsText", "beginsWith", "endsWith",
+        type = c("expression", "colorScale",
+                 "dataBar", "iconSet",
+                 "duplicatedValues", "uniqueValues",
+                 "containsErrors", "notContainsErrors",
+                 "containsBlanks", "notContainsBlanks",
+                 "containsText", "notContainsText",
+                 "beginsWith", "endsWith",
                  "between", "topN", "bottomN"),
         params = list(
           showValue = TRUE,
@@ -3196,10 +3502,12 @@ wbWorkbook <- R6::R6Class(
       params <- validate_cf_params(params)
       values <- NULL
 
-      sel <- c("expression", "duplicatedValues", "containsText", "notContainsText", "beginsWith", "endsWith", "between", "topN", "bottomN")
+      sel <- c("expression", "duplicatedValues", "containsText", "notContainsText", "beginsWith",
+               "endsWith", "between", "topN", "bottomN", "uniqueValues", "iconSet",
+               "containsErrors", "notContainsErrors", "containsBlanks", "notContainsBlanks")
       if (is.null(style) && type %in% sel) {
         smp <- random_string()
-        style <- create_dxfs_style(font_color = wb_colour(hex = "FF9C0006"), bgFill = wb_colour(hex = "FFFFC7CE"))
+        style <- create_dxfs_style(font_color = wb_color(hex = "FF9C0006"), bgFill = wb_color(hex = "FFFFC7CE"))
         self$styles_mgr$add(style, smp)
         dxfId <- self$styles_mgr$get_dxf_id(smp)
       }
@@ -3231,12 +3539,12 @@ wbWorkbook <- R6::R6Class(
         },
 
         colorScale = {
-          # - style is a vector of colours with length 2 or 3
+          # - style is a vector of colors with length 2 or 3
           # - rule specifies the quantiles (numeric vector of length 2 or 3), if NULL min and max are used
-          msg <- "When type == 'colourScale', "
+          msg <- "When type == 'colorScale', "
 
           if (!is.character(style)) {
-            stop(msg, "style must be a vector of colours of length 2 or 3.")
+            stop(msg, "style must be a vector of colors of length 2 or 3.")
           }
 
           if (!length(style) %in% 2:3) {
@@ -3249,7 +3557,7 @@ wbWorkbook <- R6::R6Class(
             }
           }
 
-          style <- check_valid_colour(style)
+          style <- check_valid_color(style)
 
           if (isFALSE(style)) {
             stop(msg, "style must be valid colors")
@@ -3260,14 +3568,14 @@ wbWorkbook <- R6::R6Class(
         },
 
         dataBar = {
-          # - style is a vector of colours of length 2 or 3
+          # - style is a vector of colors of length 2 or 3
           # - rule specifies the quantiles (numeric vector of length 2 or 3), if NULL min and max are used
           msg <- "When type == 'dataBar', "
           style <- style %||% "#638EC6"
 
           # TODO use inherits() not class()
           if (!inherits(style, "character")) {
-            stop(msg, "style must be a vector of colours of length 1 or 2.")
+            stop(msg, "style must be a vector of colors of length 1 or 2.")
           }
 
           if (!length(style) %in% 1:2) {
@@ -3282,7 +3590,7 @@ wbWorkbook <- R6::R6Class(
 
           ## Additional parameters passed by ...
           # showValue, gradient, border
-          style <- check_valid_colour(style)
+          style <- check_valid_color(style)
 
           if (isFALSE(style)) {
             stop(msg, "style must be valid colors")
@@ -3292,10 +3600,56 @@ wbWorkbook <- R6::R6Class(
           rule <- style
         },
 
+        iconSet = {
+          # - rule is the iconSet values
+          msg <- "When type == 'iconSet', "
+          values <- rule
+        },
+
         duplicatedValues = {
           # type == "duplicatedValues"
           # - style is a Style object
           # - rule is ignored
+
+          rule <- style
+        },
+
+        uniqueValues = {
+          # type == "uniqueValues"
+          # - style is a Style object
+          # - rule is ignored
+
+          rule <- style
+        },
+
+        containsBlanks = {
+          # - style is Style object
+          # - rule is cell to check for errors
+          msg <- "When type == 'containsBlanks', "
+
+          rule <- style
+        },
+
+        notContainsBlanks = {
+          # - style is Style object
+          # - rule is cell to check for errors
+          msg <- "When type == 'notContainsBlanks', "
+
+          rule <- style
+        },
+
+        containsErrors = {
+          # - style is Style object
+          # - rule is cell to check for errors
+          msg <- "When type == 'containsErrors', "
+
+          rule <- style
+        },
+
+        notContainsErrors = {
+          # - style is Style object
+          # - rule is cell to check for errors
+          msg <- "When type == 'notContainsErrors', "
 
           rule <- style
         },
@@ -4691,6 +5045,7 @@ wbWorkbook <- R6::R6Class(
     #' @param dims dimensions on the worksheet e.g. "A1", "A1:A5", "A1:H5"
     #' @param bottom_color,left_color,right_color,top_color,inner_hcolor,inner_vcolor a color, either something openxml knows or some RGB color
     #' @param left_border,right_border,top_border,bottom_border,inner_hgrid,inner_vgrid the border style, if NULL no border is drawn. See create_border for possible border styles
+    #' @param ... ...
     #' @seealso create_border
     #' @examples
     #'
@@ -4705,12 +5060,12 @@ wbWorkbook <- R6::R6Class(
     #' wb$add_border(1, dims = "C2:C5")
     #' wb$add_border(1, dims = "G2:H3")
     #' wb$add_border(1, dims = "G12:H13",
-    #'  left_color = wb_colour(hex = "FF9400D3"), right_color = wb_colour(hex = "FF4B0082"),
-    #'  top_color = wb_colour(hex = "FF0000FF"), bottom_color = wb_colour(hex = "FF00FF00"))
+    #'  left_color = wb_color(hex = "FF9400D3"), right_color = wb_color(hex = "FF4B0082"),
+    #'  top_color = wb_color(hex = "FF0000FF"), bottom_color = wb_color(hex = "FF00FF00"))
     #' wb$add_border(1, dims = "A20:C23")
     #' wb$add_border(1, dims = "B12:D14",
-    #'  left_color = wb_colour(hex = "FFFFFF00"), right_color = wb_colour(hex = "FFFF7F00"),
-    #'  bottom_color = wb_colour(hex = "FFFF0000"))
+    #'  left_color = wb_color(hex = "FFFFFF00"), right_color = wb_color(hex = "FFFF7F00"),
+    #'  bottom_color = wb_color(hex = "FFFF0000"))
     #' wb$add_border(1, dims = "D28:E28")
     #' # if (interactive()) wb$open()
     #'
@@ -4721,10 +5076,10 @@ wbWorkbook <- R6::R6Class(
     add_border = function(
       sheet         = current_sheet(),
       dims          = "A1",
-      bottom_color  = wb_colour(hex = "FF000000"),
-      left_color    = wb_colour(hex = "FF000000"),
-      right_color   = wb_colour(hex = "FF000000"),
-      top_color     = wb_colour(hex = "FF000000"),
+      bottom_color  = wb_color(hex = "FF000000"),
+      left_color    = wb_color(hex = "FF000000"),
+      right_color   = wb_color(hex = "FF000000"),
+      top_color     = wb_color(hex = "FF000000"),
       bottom_border = "thin",
       left_border   = "thin",
       right_border  = "thin",
@@ -4732,7 +5087,8 @@ wbWorkbook <- R6::R6Class(
       inner_hgrid   = NULL,
       inner_hcolor  = NULL,
       inner_vgrid   = NULL,
-      inner_vcolor  = NULL
+      inner_vcolor  = NULL,
+      ...
     ) {
 
       # TODO merge styles and if a style is already present, only add the newly
@@ -4740,6 +5096,8 @@ wbWorkbook <- R6::R6Class(
 
       # cc <- wb$worksheets[[sheet]]$sheet_data$cc
       # df_s <- as.data.frame(lapply(df, function(x) cc$c_s[cc$r %in% x]))
+
+      standardize_color_names(...)
 
       df <- dims_to_dataframe(dims, fill = TRUE)
       sheet <- private$get_sheet_index(sheet)
@@ -4751,28 +5109,28 @@ wbWorkbook <- R6::R6Class(
         top = top_border, top_color = top_color,
         bottom = bottom_border, bottom_color = bottom_color,
         left = left_border, left_color = left_color,
-        right = left_border, right_color = right_color
+        right = right_border, right_color = right_color
       )
 
       top_single <- create_border(
         top = top_border, top_color = top_color,
         bottom = inner_hgrid, bottom_color = inner_hcolor,
         left = left_border, left_color = left_color,
-        right = left_border, right_color = right_color
+        right = right_border, right_color = right_color
       )
 
       middle_single <- create_border(
         top = inner_hgrid, top_color = inner_hcolor,
         bottom = inner_hgrid, bottom_color = inner_hcolor,
         left = left_border, left_color = left_color,
-        right = left_border, right_color = right_color
+        right = right_border, right_color = right_color
       )
 
       bottom_single <- create_border(
         top = inner_hgrid, top_color = inner_hcolor,
         bottom = bottom_border, bottom_color = bottom_color,
         left = left_border, left_color = left_color,
-        right = left_border, right_color = right_color
+        right = right_border, right_color = right_color
       )
 
       left_single <- create_border(
@@ -4807,7 +5165,7 @@ wbWorkbook <- R6::R6Class(
         top = top_border, top_color = top_color,
         bottom = inner_hgrid, bottom_color = inner_hcolor,
         left = inner_vgrid, left_color = inner_vcolor,
-        right = left_border, right_color = right_color
+        right = right_border, right_color = right_color
       )
 
       bottom_left <- create_border(
@@ -4821,7 +5179,7 @@ wbWorkbook <- R6::R6Class(
         top = inner_hgrid, top_color = inner_hcolor,
         bottom = bottom_border, bottom_color = bottom_color,
         left = inner_vgrid, left_color = inner_vcolor,
-        right = left_border, right_color = right_color
+        right = right_border, right_color = right_color
       )
 
       top_center <- create_border(
@@ -5114,7 +5472,7 @@ wbWorkbook <- R6::R6Class(
     #' @description provide simple fill function
     #' @param sheet the worksheet
     #' @param dims the cell range
-    #' @param color the colors to apply, e.g. yellow: wb_colour(hex = "FFFFFF00")
+    #' @param color the colors to apply, e.g. yellow: wb_color(hex = "FFFFFF00")
     #' @param pattern various default "none" but others are possible:
     #'  "solid", "mediumGray", "darkGray", "lightGray", "darkHorizontal",
     #'  "darkVertical", "darkDown", "darkUp", "darkGrid", "darkTrellis",
@@ -5123,6 +5481,7 @@ wbWorkbook <- R6::R6Class(
     #' @param gradient_fill a gradient fill xml pattern.
     #' @param every_nth_col which col should be filled
     #' @param every_nth_row which row should be filled
+    #' @param ... ...
     #' @examples
     #'  # example from the gradient fill manual page
     #'  gradient_fill <- "<gradientFill degree=\"90\">
@@ -5133,11 +5492,12 @@ wbWorkbook <- R6::R6Class(
     add_fill = function(
         sheet         = current_sheet(),
         dims          = "A1",
-        color         = wb_colour(hex = "FFFFFF00"),
+        color         = wb_color(hex = "FFFFFF00"),
         pattern       = "solid",
         gradient_fill = "",
         every_nth_col = 1,
-        every_nth_row = 1
+        every_nth_row = 1,
+        ...
     ) {
       sheet <- private$get_sheet_index(sheet)
       private$do_cell_init(sheet, dims)
@@ -5153,6 +5513,8 @@ wbWorkbook <- R6::R6Class(
       cc <- self$worksheets[[sheet]]$sheet_data$cc
       cc <- cc[cc$r %in% dims, ]
       styles <- unique(cc[["c_s"]])
+
+      standardize_color_names(...)
 
       for (style in styles) {
         dim <- cc[cc$c_s == style, "r"]
@@ -5192,15 +5554,16 @@ wbWorkbook <- R6::R6Class(
     #' @param shadow shadow
     #' @param extend extend
     #' @param vertAlign vertical alignment
+    #' @param ... ...
     #' @examples
     #'  wb <- wb_workbook()$add_worksheet("S1")$add_data("S1", mtcars)
-    #'  wb$add_font("S1", "A1:K1", name = "Arial", color = wb_colour(theme = "4"))
+    #'  wb$add_font("S1", "A1:K1", name = "Arial", color = wb_color(theme = "4"))
     #' @return The `wbWorksheetObject`, invisibly
     add_font = function(
         sheet     = current_sheet(),
         dims      = "A1",
         name      = "Calibri",
-        color     = wb_colour(hex = "FF000000"),
+        color     = wb_color(hex = "FF000000"),
         size      = "11",
         bold      = "",
         italic    = "",
@@ -5214,7 +5577,8 @@ wbWorkbook <- R6::R6Class(
         family    = "",
         scheme    = "",
         shadow    = "",
-        vertAlign = ""
+        vertAlign = "",
+        ...
     ) {
       sheet <- private$get_sheet_index(sheet)
       private$do_cell_init(sheet, dims)
@@ -5225,6 +5589,8 @@ wbWorkbook <- R6::R6Class(
       cc <- self$worksheets[[sheet]]$sheet_data$cc
       cc <- cc[cc$r %in% dims, ]
       styles <- unique(cc[["c_s"]])
+
+      standardize_color_names(...)
 
       for (style in styles) {
         dim <- cc[cc$c_s == style, "r"]
@@ -6257,7 +6623,7 @@ wbWorkbook <- R6::R6Class(
       cfRule <- switch(
         type,
 
-        ## colourScale ----
+        ## colorScale ----
         colorScale = cf_create_colorscale(formula, values),
 
         ## dataBar ----
@@ -6289,6 +6655,24 @@ wbWorkbook <- R6::R6Class(
 
         ## bottomN ----
         bottomN = cf_bottom_n(dxfId, values),
+
+        ## uniqueValues ---
+        uniqueValues = cf_unique_values(dxfId),
+
+        ## iconSet ----
+        iconSet = cf_icon_set(values, params),
+
+        ## containsErrors ----
+        containsErrors = cf_iserror(dxfId, sqref),
+
+        ## notContainsErrors ----
+        notContainsErrors = cf_isnoerror(dxfId, sqref),
+
+        ## containsBlanks ----
+        containsBlanks = cf_isblank(dxfId, sqref),
+
+        ## notContainsBlanks ----
+        notContainsBlanks = cf_isnoblank(dxfId, sqref),
 
         # do we have a match.arg() anywhere or will it just be showned in this switch()?
         stop("type `", type, "` is not a valid formatting rule")
@@ -6435,9 +6819,8 @@ wbWorkbook <- R6::R6Class(
         )
 
       # Failsafe: hidden sheet can not be selected.
-      self$worksheets[[visible_sheet_index]]$set_sheetview(tabSelected = TRUE)
-      if (nSheets > 1) {
-        for (i in setdiff(seq_len(nSheets), visible_sheet_index)) {
+      if (any(hidden)) {
+        for (i in which(hidden)) {
           self$worksheets[[i]]$set_sheetview(tabSelected = FALSE)
         }
       }
@@ -6491,26 +6874,6 @@ wbWorkbook <- R6::R6Class(
 
 
 # helpers -----------------------------------------------------------------
-
-
-file_copy_wb_save <- function(from, pattern, dir) {
-  # specifically used within wbWoorkbook$save()
-
-  stopifnot(
-    dir.exists(dir),
-    is.character(pattern),
-    length(pattern) == 1L
-  )
-
-  if (length(from)) {
-    file.copy(
-      from = from,
-      to = file.path(dir, sprintf(pattern, seq_along(from))),
-      overwrite = TRUE,
-      copy.date = TRUE
-    )
-  }
-}
 
 lcr <- function(var) {
   # quick function for specifying error message

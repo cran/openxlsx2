@@ -355,13 +355,13 @@ still function arguments that use camel-case).</p>
 <p>The basic read function changed from <code>read.xlsx</code> to
 <code>read_xlsx</code>. Using a default xlsx file included in the
 package:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>xlsxFile <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;readTest.xlsx&quot;</span>, <span class="at">package =</span> <span class="st">&quot;openxlsx2&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>xlsxFile <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;readTest.xlsx&quot;</span>, <span class="at">package =</span> <span class="st">&quot;openxlsx2&quot;</span>)</span></code></pre></div>
 <p>The old syntax looked like this:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># read in openxlsx</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>openxlsx<span class="sc">::</span><span class="fu">read.xlsx</span>(xlsxFile)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># read in openxlsx</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>openxlsx<span class="sc">::</span><span class="fu">read.xlsx</span>(xlsxFile)</span></code></pre></div>
 <p>This has changed to this:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># read in openxlsx2</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>openxlsx2<span class="sc">::</span><span class="fu">read_xlsx</span>(xlsxFile)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># read in openxlsx2</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>openxlsx2<span class="sc">::</span><span class="fu">read_xlsx</span>(xlsxFile)</span></code></pre></div>
 <pre><code>##     Var1 Var2 NA  Var3  Var4       Var5         Var6    Var7
 ## 2   TRUE    1 NA     1     a 2015-02-07 3209324 This #DIV/0!
 ## 3   TRUE   NA NA #NUM!     b 2015-02-06         &lt;NA&gt;    &lt;NA&gt;
@@ -386,19 +386,19 @@ created for backward comparability.</p>
 </div>
 <div id="write-xlsx-files" class="section level2">
 <h2>Write xlsx files</h2>
-<p>Basic writing in <code>openxlsx</code> behaves identical to
+<p>Basic writing in <code>openxlsx2</code> behaves identical to
 <code>openxlsx</code>. Though be aware that <code>overwrite</code> is an
-optional parameter in <code>openxlsx</code> and just like in other
+optional parameter in <code>openxlsx2</code> and just like in other
 functions like <code>base::write.csv</code> if you write onto an
 existing file name, this file will be replaced.</p>
 <p>Setting the output to some temporary xlsx file</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>output <span class="ot">&lt;-</span> <span class="fu">temp_xlsx</span>()</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>output <span class="ot">&lt;-</span> <span class="fu">temp_xlsx</span>()</span></code></pre></div>
 <p>The previous write function looks like this:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># write in openxlsx</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>openxlsx<span class="sc">::</span><span class="fu">write.xlsx</span>(iris, <span class="at">file =</span> output, <span class="at">colNames =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># write in openxlsx</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>openxlsx<span class="sc">::</span><span class="fu">write.xlsx</span>(iris, <span class="at">file =</span> output, <span class="at">colNames =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 <p>The new function looks quite similar:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># write in openxlsx2</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>openxlsx2<span class="sc">::</span><span class="fu">write_xlsx</span>(iris, <span class="at">file =</span> output, <span class="at">colNames =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># write in openxlsx2</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>openxlsx2<span class="sc">::</span><span class="fu">write_xlsx</span>(iris, <span class="at">file =</span> output, <span class="at">colNames =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 </div>
 <div id="basic-workbook-functions" class="section level2">
 <h2>Basic workbook functions</h2>
@@ -411,9 +411,9 @@ workbook.</p>
 <p>A major feature in <code>openxlsx</code> are workbooks. Obviously
 they remain a central piece in <code>openxlsx2</code>. Previous you
 would load them with:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">loadWorkbook</span>(xlsxFile)</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">loadWorkbook</span>(xlsxFile)</span></code></pre></div>
 <p>In <code>openxlsx2</code> loading was changed to:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_load</span>(xlsxFile)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_load</span>(xlsxFile)</span></code></pre></div>
 <p>There are plenty of functions to interact with workbooks and we will
 not describe every single one here. A detailed list can be found over at
 <a href="https://janmarvin.github.io/openxlsx2/reference/index.html">our
@@ -423,35 +423,35 @@ references</a></p>
 <h3>Styles</h3>
 <p>One of the biggest user facing change was the removal of the
 <code>stylesObject</code>. In the following section we use code from <a href="https://ycphs.github.io/openxlsx/reference/addStyle.html">addStyle</a></p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Create a new workbook</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">createWorkbook</span>(<span class="st">&quot;My name here&quot;</span>)</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="fu">addWorksheet</span>(wb, <span class="st">&quot;Expenditure&quot;</span>, <span class="at">gridLines =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="fu">writeData</span>(wb, <span class="at">sheet =</span> <span class="dv">1</span>, USPersonalExpenditure, <span class="at">rowNames =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="do">## style for body</span></span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>bodyStyle <span class="ot">&lt;-</span> <span class="fu">createStyle</span>(<span class="at">border =</span> <span class="st">&quot;TopBottom&quot;</span>, <span class="at">borderColour =</span> <span class="st">&quot;#4F81BD&quot;</span>)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="fu">addStyle</span>(wb, <span class="at">sheet =</span> <span class="dv">1</span>, bodyStyle, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">6</span>, <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>, <span class="at">gridExpand =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="do">## set column width for row names column</span></span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="fu">setColWidths</span>(wb, <span class="dv">1</span>, <span class="at">cols =</span> <span class="dv">1</span>, <span class="at">widths =</span> <span class="dv">21</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="do">## Create a new workbook</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">createWorkbook</span>(<span class="st">&quot;My name here&quot;</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="fu">addWorksheet</span>(wb, <span class="st">&quot;Expenditure&quot;</span>, <span class="at">gridLines =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">writeData</span>(wb, <span class="at">sheet =</span> <span class="dv">1</span>, USPersonalExpenditure, <span class="at">rowNames =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="do">## style for body</span></span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>bodyStyle <span class="ot">&lt;-</span> <span class="fu">createStyle</span>(<span class="at">border =</span> <span class="st">&quot;TopBottom&quot;</span>, <span class="at">borderColor =</span> <span class="st">&quot;#4F81BD&quot;</span>)</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="fu">addStyle</span>(wb, <span class="at">sheet =</span> <span class="dv">1</span>, bodyStyle, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">6</span>, <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>, <span class="at">gridExpand =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="do">## set column width for row names column</span></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="fu">setColWidths</span>(wb, <span class="dv">1</span>, <span class="at">cols =</span> <span class="dv">1</span>, <span class="at">widths =</span> <span class="dv">21</span>)</span></code></pre></div>
 <p>In <code>openxlsx2</code> the same code looks something like
 this:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>border_color <span class="ot">&lt;-</span> <span class="fu">wb_colour</span>(<span class="at">hex =</span> <span class="st">&quot;FF4F81BD&quot;</span>)</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>(<span class="st">&quot;My name here&quot;</span>)<span class="sc">$</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Expenditure&quot;</span>, <span class="at">gridLines =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> USPersonalExpenditure, <span class="at">rowNames =</span> <span class="cn">TRUE</span>)<span class="sc">$</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_border</span>( <span class="co"># add the outer and inner border</span></span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">dims =</span> <span class="st">&quot;A1:F6&quot;</span>,</span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">top_border =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">top_color =</span> border_color,</span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">bottom_border =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">bottom_color =</span> border_color,</span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">inner_hgrid =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">inner_hcolor =</span> border_color,</span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">left_border =</span> <span class="st">&quot;&quot;</span>, <span class="at">right_border =</span> <span class="st">&quot;&quot;</span></span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>  )<span class="sc">$</span></span>
-<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_col_widths</span>( <span class="co"># set column width</span></span>
-<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>,</span>
-<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">widths =</span> <span class="fu">c</span>(<span class="st">&quot;20&quot;</span>, <span class="fu">rep</span>(<span class="st">&quot;10&quot;</span>, <span class="dv">5</span>))</span>
-<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>  )<span class="sc">$</span> <span class="co"># remove the value in A1</span></span>
-<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">dims =</span> <span class="st">&quot;A1&quot;</span>, <span class="at">x =</span> <span class="st">&quot;&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>border_color <span class="ot">&lt;-</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;FF4F81BD&quot;</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>(<span class="st">&quot;My name here&quot;</span>)<span class="sc">$</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Expenditure&quot;</span>, <span class="at">gridLines =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> USPersonalExpenditure, <span class="at">rowNames =</span> <span class="cn">TRUE</span>)<span class="sc">$</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="fu">add_border</span>( <span class="co"># add the outer and inner border</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    <span class="at">dims =</span> <span class="st">&quot;A1:F6&quot;</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    <span class="at">top_border =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">top_color =</span> border_color,</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>    <span class="at">bottom_border =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">bottom_color =</span> border_color,</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>    <span class="at">inner_hgrid =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">inner_hcolor =</span> border_color,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    <span class="at">left_border =</span> <span class="st">&quot;&quot;</span>, <span class="at">right_border =</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  )<span class="sc">$</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  <span class="fu">set_col_widths</span>( <span class="co"># set column width</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>    <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>,</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>    <span class="at">widths =</span> <span class="fu">c</span>(<span class="st">&quot;20&quot;</span>, <span class="fu">rep</span>(<span class="st">&quot;10&quot;</span>, <span class="dv">5</span>))</span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>  )<span class="sc">$</span> <span class="co"># remove the value in A1</span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">dims =</span> <span class="st">&quot;A1&quot;</span>, <span class="at">x =</span> <span class="st">&quot;&quot;</span>)</span></code></pre></div>
 <p>The code above uses chaining. If you prefer piping, we provide the
 chained functions with the prefix <code>wb_</code> so
 <code>wb_add_worksheet()</code>, <code>wb_add_data()</code>,
@@ -472,30 +472,30 @@ vignette.</p>
 <h3>Conditional formatting</h3>
 <p>Extended examples for conditional formatting can be found in the
 conditional formatting vignette. A minimal example is the following:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;a&quot;</span>)<span class="sc">$</span></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">colNames =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_conditional_formatting</span>(<span class="at">cols =</span> <span class="dv">1</span>, <span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">rule =</span> <span class="st">&quot;&gt;2&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;a&quot;</span>)<span class="sc">$</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">colNames =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="fu">add_conditional_formatting</span>(<span class="at">cols =</span> <span class="dv">1</span>, <span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">rule =</span> <span class="st">&quot;&gt;2&quot;</span>)</span></code></pre></div>
 </div>
 <div id="data-validation" class="section level3">
 <h3>Data validation</h3>
 <p>Similar data validation has been updated and improved. This
 <code>openxlsx</code> code for data validation</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">createWorkbook</span>()</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">addWorksheet</span>(wb, <span class="st">&quot;Sheet 1&quot;</span>)</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="fu">writeDataTable</span>(wb, <span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ])</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="fu">dataValidation</span>(wb, <span class="dv">1</span>,</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">createWorkbook</span>()</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">addWorksheet</span>(wb, <span class="st">&quot;Sheet 1&quot;</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="fu">writeDataTable</span>(wb, <span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ])</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="fu">dataValidation</span>(wb, <span class="dv">1</span>,</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>)</span></code></pre></div>
 <p>looks in <code>openxlsx2</code> something like this:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Sheet 1&quot;</span>)<span class="sc">$</span></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_data_table</span>(<span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ])<span class="sc">$</span></span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_data_validation</span>(<span class="dv">1</span>,</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Sheet 1&quot;</span>)<span class="sc">$</span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="fu">add_data_table</span>(<span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ])<span class="sc">$</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="fu">add_data_validation</span>(<span class="dv">1</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>    <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>    <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>  )</span></code></pre></div>
 </div>
 <div id="saving" class="section level3">
 <h3>Saving</h3>

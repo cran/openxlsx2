@@ -10,8 +10,8 @@ library(openxlsx2)
 
 ## -----------------------------------------------------------------------------
 wb <- wb_workbook()
-negStyle <- create_dxfs_style(font_color = wb_colour(hex = "FF9C0006"), bgFill = wb_colour(hex = "FFFFC7CE"))
-posStyle <- create_dxfs_style(font_color = wb_colour(hex = "FF006100"), bgFill = wb_colour(hex = "FFC6EFCE"))
+negStyle <- create_dxfs_style(font_color = wb_color(hex = "FF9C0006"), bgFill = wb_color(hex = "FFFFC7CE"))
+posStyle <- create_dxfs_style(font_color = wb_color(hex = "FF006100"), bgFill = wb_color(hex = "FFC6EFCE"))
 wb$styles_mgr$add(negStyle, "negStyle")
 wb$styles_mgr$add(posStyle, "posStyle")
 
@@ -144,7 +144,7 @@ wb$add_conditional_formatting(
   "containsText",
   cols = 1,
   rows = 1:10,
-  type = "contains",
+  type = "containsText",
   rule = "A"
 )
 wb$add_worksheet("notcontainsText")
@@ -226,7 +226,7 @@ wb <- wb_add_conditional_formatting(
   cols = 1,
   rows = 1:11,
   type = "dataBar"
-) ## Default colours
+) ## Default colors
 
 wb$add_data("databar", -5:5, startCol = 3)
 wb <- wb_add_conditional_formatting(
@@ -239,7 +239,7 @@ wb <- wb_add_conditional_formatting(
     showValue = FALSE,
     gradient = FALSE
   )
-) ## Default colours
+) ## Default colors
 
 wb$add_data("databar", -5:5, startCol = 5)
 wb <- wb_add_conditional_formatting(

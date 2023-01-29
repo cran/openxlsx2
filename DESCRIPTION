@@ -1,7 +1,7 @@
 Type: Package
 Package: openxlsx2
 Title: Read, Write and Edit 'xlsx' Files
-Version: 0.4.1
+Version: 0.5
 Language: en-US
 Authors@R: c(
   person("Jordan Mark", "Barbone", email = "jmbarbone@gmail.com", role = "aut", comment = c(ORCID = "0000-0001-9788-3628")),
@@ -23,16 +23,15 @@ Suggests: covr, ggplot2, knitr, mschart (>= 0.4), rmarkdown, roxygen2,
 VignetteBuilder: knitr
 Encoding: UTF-8
 RoxygenNote: 7.2.3
-SystemRequirements: C++11
 Config/testthat/edition: 3
 Config/testthat/parallel: true
 Config/testthat/start-first: read_sources
 NeedsCompilation: yes
-Packaged: 2022-12-18 09:10:22 UTC; janmarvingarbuszus
+Packaged: 2023-01-29 15:04:53 UTC; janmarvingarbuszus
 Author: Jordan Mark Barbone [aut] (<https://orcid.org/0000-0001-9788-3628>),
   Jan Marvin Garbuszus [aut, cre],
   openxlsx authors [cph] (openxlsx package),
   Arseny Kapoulkine [ctb, cph] (Author of included pugixml code)
 Maintainer: Jan Marvin Garbuszus <jan.garbuszus@ruhr-uni-bochum.de>
 Repository: CRAN
-Date/Publication: 2022-12-18 09:50:02 UTC
+Date/Publication: 2023-01-29 15:40:05 UTC

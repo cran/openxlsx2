@@ -37,14 +37,14 @@ wb <- wb_load(xlsxFile)
 #  writeData(wb, sheet = 1, USPersonalExpenditure, rowNames = TRUE)
 #  
 #  ## style for body
-#  bodyStyle <- createStyle(border = "TopBottom", borderColour = "#4F81BD")
+#  bodyStyle <- createStyle(border = "TopBottom", borderColor = "#4F81BD")
 #  addStyle(wb, sheet = 1, bodyStyle, rows = 2:6, cols = 1:6, gridExpand = TRUE)
 #  
 #  ## set column width for row names column
 #  setColWidths(wb, 1, cols = 1, widths = 21)
 
 ## ----new_style----------------------------------------------------------------
-border_color <- wb_colour(hex = "FF4F81BD")
+border_color <- wb_color(hex = "FF4F81BD")
 wb <- wb_workbook("My name here")$
   add_worksheet("Expenditure", gridLines = FALSE)$
   add_data(x = USPersonalExpenditure, rowNames = TRUE)$
