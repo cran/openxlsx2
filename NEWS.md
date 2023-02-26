@@ -1,3 +1,32 @@
+
+# openxlsx2 (0.5.1)
+
+## New features
+
+* Allow hierarchical grouping. `wb_group_cols`/`wb_group_rows` now accept nested lists as grouping variable. [537](https://github.com/JanMarvin/openxlsx2/pull/537)
+
+* It is now possible to add form control types `Checkbox`, `Radio` and `Drop` to a workbook using `wb_add_form_control()`. [533](https://github.com/JanMarvin/openxlsx2/pull/533)
+
+* Improve `wb_to_df(fillMergedCells = TRUE)` to work better with dimensions. It is now possible to fill cells where the merged cells intersect with the selected dimensions. [541](https://github.com/JanMarvin/openxlsx2/pull/541)
+
+* Speedup cell initialization. This is used in wb_style functions like `wb_add_numfmt()`. The previous loop was replaced with a faster implementation. [545](https://github.com/JanMarvin/openxlsx2/pull/545)
+
+* Improve date detection in `wb_to_df()`. This improves date and posix detection with custom date formats. [547](https://github.com/JanMarvin/openxlsx2/pull/547)
+
+* `na_strings()` is now used as the explicit default value for `na.strings` parameters in exported workbook functions. [473](https://github.com/JanMarvin/openxlsx2/issues/473)
+
+* waiver functions (i.e., `next_worksheet()`, `current_worksheet()`, and `na_strings()`) are now exports [474](https://github.com/JanMarvin/openxlsx2/issues/474)
+
+## Fixes
+
+* Fixed a bug when loading input with multiple sheets where not every sheet contains a drawing/comment. Previously we assumed that every sheet had a comment and ordered them incorrectly. This caused confusion in spreadsheet software. [536](https://github.com/JanMarvin/openxlsx2/pull/536)
+
+* Fixed a bug with files containing 10 or more external references. In this case we did not load the references in numeric order and instead as "1.xml", "10.xml", ..., "2.xml", ... This jumbled up the external references. [538](https://github.com/JanMarvin/openxlsx2/pull/538)
+
+
+***************************************************************************
+
+
 # openxlsx2 (0.5)
 
 ## New features
@@ -38,7 +67,6 @@
 * Do not export `write_data2()` anymore. This was used in development in the early stages of the package and should not be used directly anymore.
 
 * Only documentation: `openxlsx2` defaults to American English 'color' from now on. Though, we fully support the previous 'colour'. Users will not have to adjust their code. Our documentation only lists `color`, but you can pass `colour` just the same way you used to. [501](https://github.com/JanMarvin/openxlsx2/pull/501) [502](https://github.com/JanMarvin/openxlsx2/pull/502)
-
 
 ***************************************************************************
 

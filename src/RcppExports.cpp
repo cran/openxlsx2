@@ -11,6 +11,17 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// to_long
+bool to_long(std::string path);
+RcppExport SEXP _openxlsx2_to_long(SEXP pathSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type path(pathSEXP);
+    rcpp_result_gen = Rcpp::wrap(to_long(path));
+    return rcpp_result_gen;
+END_RCPP
+}
 // openxlsx2_type
 SEXP openxlsx2_type(SEXP x);
 RcppExport SEXP _openxlsx2_openxlsx2_type(SEXP xSEXP) {
@@ -829,6 +840,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_openxlsx2_to_long", (DL_FUNC) &_openxlsx2_to_long, 1},
     {"_openxlsx2_openxlsx2_type", (DL_FUNC) &_openxlsx2_openxlsx2_type, 1},
     {"_openxlsx2_int_to_col", (DL_FUNC) &_openxlsx2_int_to_col, 1},
     {"_openxlsx2_col_to_int", (DL_FUNC) &_openxlsx2_col_to_int, 1},

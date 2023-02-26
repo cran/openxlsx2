@@ -90,7 +90,8 @@ wb_save <- function(wb, path = NULL, overwrite = TRUE) {
 #' @param sep Only applies to list columns. The separator used to collapse list columns to a character vector e.g. sapply(x$list_column, paste, collapse = sep).
 #' @param applyCellStyle Should we write cell styles to the workbook
 #' @param removeCellStyle keep the cell style?
-#' @param na.strings na.strings
+#' @param na.strings Value used for replacing `NA` values from `x`. Default
+#'   `na_strings()` uses the special `#N/A` value within the workbook.
 #' @param inline_strings write characters as inline strings
 #' @export
 #' @details Formulae written using write_formula to a Workbook object will not get picked up by read_xlsx().
@@ -115,13 +116,10 @@ wb_add_data <- function(
     sep             = ", ",
     applyCellStyle  = TRUE,
     removeCellStyle = FALSE,
-    na.strings,
+    na.strings      = na_strings(),
     inline_strings  = TRUE
 ) {
   assert_workbook(wb)
-
-  if (missing(na.strings)) na.strings <- substitute()
-
   wb$clone(deep = TRUE)$add_data(
     sheet           = sheet,
     x               = x,
@@ -175,7 +173,8 @@ wb_add_data <- function(
 #' @param bandedCols logical. If TRUE, the columns are color banded
 #' @param applyCellStyle Should we write cell styles to the workbook
 #' @param removeCellStyle keep the cell style?
-#' @param na.strings optional
+#' @param na.strings Value used for replacing `NA` values from `x`. Default
+#'   `na_strings()` uses the special `#N/A` value within the workbook.
 #' @param inline_strings write characters as inline strings
 #'
 #' @details columns of x with class Date/POSIXt, currency, accounting,
@@ -205,12 +204,10 @@ wb_add_data_table <- function(
     bandedCols  = FALSE,
     applyCellStyle  = TRUE,
     removeCellStyle = FALSE,
-    na.strings,
+    na.strings     = na_strings(),
     inline_strings = TRUE
 ) {
   assert_workbook(wb)
-  if (missing(na.strings)) na.strings <- substitute()
-
   wb$clone()$add_data_table(
     sheet       = sheet,
     x           = x,
@@ -2696,6 +2693,44 @@ wb_remove_comment <- function(
     dims = dims,
     gridExpand = gridExpand
   )
+}
+
+#' Add form control Checkbox, Radiobuttons or Dropmenu
+#' @param wb A workbook object
+#' @param sheet A worksheet of the workbook
+#' @param dims Optional row and column as spreadsheet dimension, e.g. "A1"
+#' @param type A type "Checkbox" (the default), "Radio" a radio button or "Drop" a drop down menu
+#' @param text A text to be shown next to the Checkbox or radio button
+#' @param link A cell range to link to
+#' @param range A cell range used as input
+#' @param checked A logical indicating if the Checkbox or radio button is checked
+#' @returns The `wbWorkbook` object
+#' @examples
+#' wb <- wb_workbook() %>% wb_add_worksheet() %>%
+#'   wb_add_form_control()
+#' @export
+wb_add_form_control <- function(
+    wb,
+    sheet   = current_sheet(),
+    dims    = "A1",
+    type    = NULL,
+    text    = NULL,
+    link    = NULL,
+    range   = NULL,
+    checked = FALSE
+) {
+
+  assert_workbook(wb)
+  wb$clone()$add_form_control(
+      sheet   = sheet,
+      dims    = dims,
+      type    = type,
+      text    = text,
+      link    = link,
+      range   = range,
+      checked = checked
+  )
+
 }
 
 #' Add conditional formatting to cells
