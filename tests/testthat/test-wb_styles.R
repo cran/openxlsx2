@@ -1,12 +1,5 @@
 test_that("wb_clone_sheet_style", {
 
-  fl <- system.file("extdata", "oxlsx2_sheet.xlsx", package = "openxlsx2")
-  wb <- wb_load(fl)$clone_worksheet("SUM", "clone")
-  wb <- wb$clean_sheet(sheet = "clone", numbers = TRUE, characters = TRUE, styles = TRUE, merged_cells = FALSE)
-  wb <- wb_clone_sheet_style(wb, "SUM", "clone")
-
-  expect_warning(cloneSheetStyle(wb, "SUM", "clone"), "deprecated")
-
   # clone style to empty sheet (creates cells and style)
   fl <- system.file("extdata", "oxlsx2_sheet.xlsx", package = "openxlsx2")
   wb <- wb_load(fl)$add_worksheet("copy")
@@ -519,6 +512,21 @@ test_that("add numfmt is no longer slow", {
       add_data(dims = "Z1", x = 5, colNames = FALSE)$
       add_data(dims = "Z10000", x = 5, colNames = FALSE)$
       add_fill(dims = "A1:Z10000", color = wb_color("yellow"))
+  )
+
+})
+
+test_that("logical and numeric work too", {
+
+  wb <- wb_workbook() %>% wb_add_worksheet("S1") %>% wb_add_data("S1", mtcars)
+
+  wb2 <- wb %>% wb_add_font("S1", "A1:K1", name = "Arial", bold = "1", size = "14")
+
+  wb3 <- wb %>% wb_add_font("S1", "A2:K2", name = "Arial", bold = TRUE, size = 14)
+
+  expect_equal(
+    wb2$styles_mgr$styles$fonts,
+    wb3$styles_mgr$styles$fonts
   )
 
 })

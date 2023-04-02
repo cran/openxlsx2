@@ -61,11 +61,44 @@ wb <- wb_workbook("My name here")$
   )$ # remove the value in A1
   add_data(dims = "A1", x = "")
 
+## ----new_style_pipes----------------------------------------------------------
+border_color <- wb_color(hex = "FF4F81BD")
+wb <- wb_workbook("My name here") %>%
+  wb_add_worksheet("Expenditure", gridLines = FALSE) %>%
+  wb_add_data(x = USPersonalExpenditure, rowNames = TRUE) %>%
+  wb_add_border( # add the outer and inner border
+    dims = "A1:F6",
+    top_border = "thin", top_color = border_color,
+    bottom_border = "thin", bottom_color = border_color,
+    inner_hgrid = "thin", inner_hcolor = border_color,
+    left_border = "", right_border = ""
+  ) %>%
+  wb_set_col_widths( # set column width
+    cols = 1:6,
+    widths = c("20", rep("10", 5))
+  ) %>% # remove the value in A1
+  wb_add_data(dims = "A1", x = "")
+
+## ----pipe_chain---------------------------------------------------------------
+wbp <- wb_workbook() %>% wb_add_worksheet()
+wbc <- wb_workbook()$add_worksheet()
+
+# need to assign wbp
+wbp <- wbp %>% wb_add_data(x = iris)
+wbc$add_data(x = iris)
+
 ## ----new_cf-------------------------------------------------------------------
+# with chains
 wb <- wb_workbook()$
   add_worksheet("a")$
   add_data(x = 1:4, colNames = FALSE)$
   add_conditional_formatting(cols = 1, rows = 1:4, rule = ">2")
+
+# with pipes
+wb <- wb_workbook() %>%
+  wb_add_worksheet("a") %>%
+  wb_add_data(x = 1:4, colNames = FALSE) %>%
+  wb_add_conditional_formatting(cols = 1, rows = 1:4, rule = ">2")
 
 ## ----old_dv, eval = FALSE-----------------------------------------------------
 #  wb <- createWorkbook()
@@ -77,10 +110,20 @@ wb <- wb_workbook()$
 #  )
 
 ## ----new_dv-------------------------------------------------------------------
+# with chains
 wb <- wb_workbook()$
   add_worksheet("Sheet 1")$
   add_data_table(1, x = iris[1:30, ])$
   add_data_validation(1,
+    col = 1:3, rows = 2:31, type = "whole",
+    operator = "between", value = c(1, 9)
+  )
+
+# with pipes
+wb <- wb_workbook() %>%
+  wb_add_worksheet("Sheet 1") %>%
+  wb_add_data_table(1, x = iris[1:30, ]) %>%
+  wb_add_data_validation(1,
     col = 1:3, rows = 2:31, type = "whole",
     operator = "between", value = c(1, 9)
   )

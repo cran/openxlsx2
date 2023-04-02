@@ -220,7 +220,6 @@ style_is_posix <- function(cellXfs, numfmt_date) {
 #' @param startCol first column to begin looking for data.
 #' @param rows A numeric vector specifying which rows in the Excel file to read. If NULL, all rows are read.
 #' @param cols A numeric vector specifying which columns in the Excel file to read. If NULL, all columns are read.
-#' @param definedName (deprecated) Character string with a definedName. If no sheet is selected, the first appearance will be selected.
 #' @param named_region Character string with a named_region (defined name or table). If no sheet is selected, the first appearance will be selected.
 #' @param types A named numeric indicating, the type of the data. 0: character, 1: numeric, 2: date, 3: posixt, 4:logical. Names must match the returned data
 #' @param na.strings A character vector of strings which are to be interpreted as NA. Blank cells will be returned as NA.
@@ -317,7 +316,6 @@ wb_to_df <- function(
     showFormula     = FALSE,
     convert         = TRUE,
     types,
-    definedName,
     named_region
 ) {
 
@@ -336,14 +334,9 @@ wb_to_df <- function(
     wb <- wb_load(xlsxFile, sheet = sheet, data_only = TRUE) # nolint
   }
 
-  if (!missing(definedName)) {
-    warning("wb_to_df(definedName = .) is deprecated.  Use wb_to_df(named_region = .) instead")
-    named_region <- definedName
-  }
-
   if (!missing(named_region)) {
 
-    nr <- get_named_regions(wb)
+    nr <- wb_get_named_regions(wb)
 
     if ((named_region %in% nr$name) && missing(sheet)) {
       sel   <- nr[nr$name == named_region, ][1, ]
@@ -595,10 +588,6 @@ wb_to_df <- function(
   if (any(zz$val == "", na.rm = TRUE)) zz <- zz[zz$val != "", ]
   long_to_wide(z, tt, zz)
 
-  # prepare colnames object
-  xlsx_cols_names <- colnames(z)
-  names(xlsx_cols_names) <- xlsx_cols_names
-
   # backward compatible option. get the mergedCells dimension and fill it with
   # the value of the first cell in the range. do the same for tt.
   if (fillMergedCells) {
@@ -639,6 +628,30 @@ wb_to_df <- function(
 
   }
 
+  # is.na needs convert
+  if (skipEmptyRows) {
+    empty <- vapply(seq_len(nrow(z)), function(x) all(is.na(z[x, ])), NA)
+
+    z  <- z[!empty, , drop = FALSE]
+    tt <- tt[!empty, , drop = FALSE]
+  }
+
+  if (skipEmptyCols) {
+
+    empty <- vapply(z, function(x) all(is.na(x)), NA)
+
+    if (any(empty)) {
+      sel <- which(empty)
+      z[sel]  <- NULL
+      tt[sel] <- NULL
+    }
+
+  }
+
+  # prepare colnames object
+  xlsx_cols_names <- colnames(z)
+  names(xlsx_cols_names) <- xlsx_cols_names
+
   # if colNames, then change tt too
   if (colNames) {
     # select first row as colnames, but do not yet assing. it might contain
@@ -664,11 +677,18 @@ wb_to_df <- function(
   # # faster guess_col_type alternative? to avoid tt
   # types <- ftable(cc$row_r ~ cc$c_r ~ cc$typ)
 
+  date_conv     <- NULL
+  datetime_conv <- NULL
+
   if (missing(types)) {
     types <- guess_col_type(tt)
+    date_conv     <- as.Date
+    datetime_conv <- as.POSIXct
   } else {
     # assign types the correct column name "A", "B" etc.
     names(types) <- names(xlsx_cols_names[names(types) %in% xlsx_cols_names])
+    date_conv     <- convert_date
+    datetime_conv <- convert_datetime
   }
 
   # could make it optional or explicit
@@ -683,8 +703,8 @@ wb_to_df <- function(
       # convert "#NUM!" to "NaN" -- then converts to NaN
       # maybe consider this an option to instead return NA?
       if (length(nums)) z[nums] <- lapply(z[nums], function(i) as.numeric(replace(i, i == "#NUM!", "NaN")))
-      if (length(dtes)) z[dtes] <- lapply(z[dtes], as.Date)
-      if (length(poxs)) z[poxs] <- lapply(z[poxs], as.POSIXct)
+      if (length(dtes)) z[dtes] <- lapply(z[dtes], date_conv)
+      if (length(poxs)) z[poxs] <- lapply(z[poxs], datetime_conv)
       if (length(logs)) z[logs] <- lapply(z[logs], as.logical)
     } else {
       warning("could not convert. All missing in row used for variable names")
@@ -694,26 +714,6 @@ wb_to_df <- function(
   if (colNames) {
     names(z)  <- xlsx_cols_names
     names(tt) <- xlsx_cols_names
-  }
-
-  # is.na needs convert
-  if (skipEmptyRows) {
-    empty <- apply(z, 1, function(x) all(is.na(x)), simplify = TRUE)
-
-    z  <- z[!empty, , drop = FALSE]
-    tt <- tt[!empty, , drop = FALSE]
-  }
-
-  if (skipEmptyCols) {
-
-    empty <- vapply(z, function(x) all(is.na(x)), NA)
-
-    if (any(empty)) {
-      sel <- which(names(empty) %in% names(empty[empty == TRUE]))
-      z[sel]  <- NULL
-      tt[sel] <- NULL
-    }
-
   }
 
   attr(z, "tt") <- tt

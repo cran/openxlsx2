@@ -49,11 +49,9 @@ test_that("silent with numfmt option", {
   wb$add_worksheet("S2")
 
   wb$add_data_table("S1", x = iris)
-  expect_warning(
-    wb$add_data_table("S2",
-                 x = mtcars, xy = c("B", 3), rowNames = TRUE,
-                 tableStyle = "TableStyleLight9")
-  )
+  wb$add_data_table("S2",
+                    x = mtcars, dims = "B3", rowNames = TRUE,
+                    tableStyle = "TableStyleLight9")
 
   # [1:4] to ignore factor
   expect_equal(iris[1:4], wb_to_df(wb, "S1")[1:4], ignore_attr = TRUE)
@@ -475,5 +473,39 @@ test_that("writing pivot tables works", {
   wb$add_pivot_table(df, dims = "A30", sheet = 2, rows = "cyl", cols = "gear", data = c("disp", "hp"), fun = c("sum", "average"))
 
   expect_equal(4L, length(wb$pivotTables))
+
+})
+
+test_that("writing na.strings = NULL works", {
+
+  # write na.strings = na_strings()
+  tmp <- temp_xlsx()
+  write_xlsx(matrix(NA, 2, 2), tmp)
+  wb <- wb_load(tmp)
+
+  exp <- "#N/A"
+  got <- unique(wb$worksheets[[1]]$sheet_data$cc$v[3:6])
+  expect_equal(exp, got)
+
+  # write na.strings = ""
+  tmp <- temp_xlsx()
+  write_xlsx(matrix(NA, 2, 2), tmp, na.strings = "")
+  wb <- wb_load(tmp)
+
+  exp <- "<is><t/></is>"
+  got <- unique(wb$worksheets[[1]]$sheet_data$cc$is[3:6])
+  expect_equal(exp, got)
+
+  # write na.strings = NULL
+  tmp <- temp_xlsx()
+  write_xlsx(matrix(NA, 2, 2), tmp, na.strings = NULL)
+  wb <- wb_load(tmp)
+
+  exp <- ""
+  got <- unique(wb$worksheets[[1]]$sheet_data$cc$v[3:6])
+  expect_equal(exp, got)
+
+  got <- unique(wb$worksheets[[1]]$sheet_data$cc$is[3:6])
+  expect_equal(exp, got)
 
 })

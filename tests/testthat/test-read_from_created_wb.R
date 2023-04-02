@@ -131,3 +131,45 @@ test_that("reading with multiple sections in freezePane works", {
   wb$save(temp)
   expect_silent(wb <- wb_load(temp))
 })
+
+test_that("skipEmtpyCols keeps empty named columns", {
+
+  ## initialize empty cells
+  na_mat <- matrix(NA, nrow = 22, ncol = 7)
+
+  ## create artificial data with empty column
+  dat    <- iris[1:20, ]
+  dat$Species <- NA_real_
+  dat <- rbind(dat, NA)
+
+  ## create the workbook
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = na_mat, colNames = FALSE)$
+    add_data(x = dat)
+
+  got <- wb_to_df(wb, skipEmptyCols = TRUE)
+  expect_equal(dat, got, ignore_attr = TRUE)
+
+})
+
+test_that("reading with pre defined types works", {
+
+  dat <- data.frame(
+    numeric = rnorm(n = 5),
+    integer = sample(1:5, 5, TRUE),
+    date = Sys.Date() - 0:4,
+    datetime = Sys.time() - 0:4,
+    character = letters[1:5]
+  )
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = dat)
+
+  got <- wb_to_df(wb)
+  expect_equal(got, dat, ignore_attr = TRUE)
+
+  types <- c(numeric = 1, integer = 1, date = 2, datetime = 3, character = 0)
+  got <- wb_to_df(wb, types = types)
+  expect_equal(got, dat, ignore_attr = TRUE)
+
+})

@@ -1,3 +1,39 @@
+# openxlsx2 (0.6)
+
+## New features
+
+* Styles arguments now accept logical and numeric arguments where applicable. [558](https://github.com/JanMarvin/openxlsx2/pull/558)
+
+* Adding `dims` argument to `wb_clean_sheet()`. This allows to clean only a selected range. [563](https://github.com/JanMarvin/openxlsx2/pull/563)
+
+## Fixes
+
+* `na.strings = NULL` is no longer ignored in `write_xlsx()` [552](https://github.com/JanMarvin/openxlsx2/issues/552)
+
+* Explicit type conversion to date and datetime is finally available. [551](https://github.com/JanMarvin/openxlsx2/pull/551)
+
+## Breaking changes
+
+* `skipEmptyCols` and `skipEmptyRows` behavior in `wb_to_df()` related functions was switched to include empty columns that have a name. Previously we would exclude columns if they were empty, even if they had a name. [555](https://github.com/JanMarvin/openxlsx2/pull/555)
+
+* Cleanups in [548](https://github.com/JanMarvin/openxlsx2/pull/548)
+  * remove deprecated functions
+    * `cloneSheetStyle()`
+    * `get_cell_style()`
+    * `set_cell_style()`
+    * `wb_conditional_formatting()`
+  
+  * remove deprecated arguments
+    * `xy` argument for `write_data_table()` interacting functions
+    * `file` from `xl_open()`
+    * `definedName` from `wb_to_df()` interacting functions
+  
+  * deprecating function
+    * `get_named_regions()` for `wb_get_named_regions()`
+
+
+***************************************************************************
+
 
 # openxlsx2 (0.5.1)
 
@@ -43,9 +79,9 @@
   * 0 = the current default. Writes string numeric as string (the incorrect way according to spreadsheet software)
   * 1 = writes string numeric as numeric with a character flag (the correct way according to spreadsheet software)
   * 2 = convert all string numeric to numeric when writing
-  
+
   This is experimental, because the impact is somewhat unknown. It might trigger unintended side effects. Feedback is requested.
-  
+
 * Enable writing strings as `sharedStrings` with argument `inline_strings = FALSE`. This creates a `sharedStrings` table in openxml that allows to reuse strings in the workbook efficiently and can reduce the file size if a workbook has many cells that are duplicates. [499](https://github.com/JanMarvin/openxlsx2/pull/499)
 
 * Initial implementation of `wb_add_pivot_table()`. This allows adding native pivot tables to `openxlsx2` workbooks. The pivot table area will remain empty until the sheet is opened in spreadsheet software and evaluated successfully. This feature is newly developed and can cause unexpected side effects. Be aware that using it might currently break workbooks.

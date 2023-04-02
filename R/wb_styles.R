@@ -1,17 +1,6 @@
 
 # functions interacting with styles
 
-#' clone sheets style
-#'
-#' @param wb workbook
-#' @param from_sheet sheet we select the style from
-#' @param to_sheet sheet we apply the style from
-#' @export
-cloneSheetStyle <- function(wb, from_sheet, to_sheet) {
-  .Deprecated("use wb_clone_sheet_style")
-  wb_clone_sheet_style(wb, from_sheet, to_sheet)
-}
-
 # internal function used in wb_load
 # @param x character string containing styles.xml
 import_styles <- function(x) {
@@ -181,8 +170,8 @@ create_border <- function(
 create_numfmt <- function(numFmtId, formatCode) {
 
   df_numfmt <- data.frame(
-    numFmtId = numFmtId,
-    formatCode  = formatCode,
+    numFmtId = as_xml_attr(numFmtId),
+    formatCode  = as_xml_attr(formatCode),
     stringsAsFactors = FALSE
   )
   numfmt <- write_numfmt(df_numfmt)
@@ -239,7 +228,7 @@ create_font <- function(
   standardize_color_names(...)
 
   if (b != "") {
-    b <- xml_node_create("b", xml_attributes = c("val" = b))
+    b <- xml_node_create("b", xml_attributes = c("val" = as_xml_attr(b)))
   }
 
   if (charset != "") {
@@ -252,11 +241,11 @@ create_font <- function(
   }
 
   if (condense != "") {
-    condense <- xml_node_create("condense", xml_attributes = c("val" = condense))
+    condense <- xml_node_create("condense", xml_attributes = c("val" = as_xml_attr(condense)))
   }
 
   if (extend != "") {
-    extend <- xml_node_create("extend", xml_attributes = c("val" = extend))
+    extend <- xml_node_create("extend", xml_attributes = c("val" = as_xml_attr(extend)))
   }
 
   if (family != "") {
@@ -264,7 +253,7 @@ create_font <- function(
   }
 
   if (i != "") {
-    i <- xml_node_create("i", xml_attributes = c("val" = i))
+    i <- xml_node_create("i", xml_attributes = c("val" = as_xml_attr(i)))
   }
 
   if (is.null(name)) name <- ""
@@ -273,7 +262,7 @@ create_font <- function(
   }
 
   if (outline != "") {
-    outline <- xml_node_create("outline", xml_attributes = c("val" = outline))
+    outline <- xml_node_create("outline", xml_attributes = c("val" = as_xml_attr(outline)))
   }
 
   if (scheme != "") {
@@ -281,25 +270,23 @@ create_font <- function(
   }
 
   if (shadow != "") {
-    shadow <- xml_node_create("shadow", xml_attributes = c("val" = shadow))
+    shadow <- xml_node_create("shadow", xml_attributes = c("val" = as_xml_attr(shadow)))
   }
 
   if (strike != "") {
-    strike <- xml_node_create("strike", xml_attributes = c("val" = strike))
+    strike <- xml_node_create("strike", xml_attributes = c("val" = as_xml_attr(strike)))
   }
 
-  if (is.null(sz)) sz <- ""
-
   if (sz != "") {
-    sz <- xml_node_create("sz", xml_attributes = c("val" = sz))
+    sz <- xml_node_create("sz", xml_attributes = c("val" = as_xml_attr(sz)))
   }
 
   if (u != "") {
-    u <- xml_node_create("u", xml_attributes = c("val" = u))
+    u <- xml_node_create("u", xml_attributes = c("val" = as_xml_attr(u)))
   }
 
   if (vertAlign != "") {
-    vertAlign <- xml_node_create("vertAlign", xml_attributes = c("val" = vertAlign))
+    vertAlign <- xml_node_create("vertAlign", xml_attributes = c("val" = as_xml_attr(vertAlign)))
   }
 
   df_font <- data.frame(
@@ -328,7 +315,7 @@ create_font <- function(
 #' create fill
 #'
 #' @param gradientFill complex fills
-#' @param patternType various default is "none", but also "solid", or a color like "gray125"
+#' @param patternType various: default is "none", but also "solid", or a color like "gray125"
 #' @param bgColor hex8 color with alpha, red, green, blue only for patternFill
 #' @param fgColor hex8 color with alpha, red, green, blue only for patternFill
 #' @param ... ...
@@ -478,25 +465,25 @@ create_cell_style <- function(
     applyNumberFormat = rep(applyNumberFormat, n),
     applyProtection = rep(applyProtection, n),
 
-    borderId = rep(borderId, n),
-    fillId = rep(fillId, n),
-    fontId = rep(fontId, n),
-    numFmtId = numFmtId,
-    pivotButton = rep(pivotButton, n),
-    quotePrefix = rep(quotePrefix, n),
-    xfId = rep(xfId, n),
-    horizontal = rep(horizontal, n),
-    indent = rep(indent, n),
-    justifyLastLine = rep(justifyLastLine, n),
-    readingOrder = rep(readingOrder, n),
-    relativeIndent = rep(relativeIndent, n),
-    shrinkToFit = rep(shrinkToFit, n),
-    textRotation = rep(textRotation, n),
-    vertical = rep(vertical, n),
-    wrapText = rep(wrapText, n),
+    borderId = rep(as_xml_attr(borderId), n),
+    fillId = rep(as_xml_attr(fillId), n),
+    fontId = rep(as_xml_attr(fontId), n),
+    numFmtId = as_xml_attr(numFmtId),
+    pivotButton = rep(as_xml_attr(pivotButton), n),
+    quotePrefix = rep(as_xml_attr(quotePrefix), n),
+    xfId = rep(as_xml_attr(xfId), n),
+    horizontal = rep(as_xml_attr(horizontal), n),
+    indent = rep(as_xml_attr(indent), n),
+    justifyLastLine = rep(as_xml_attr(justifyLastLine), n),
+    readingOrder = rep(as_xml_attr(readingOrder), n),
+    relativeIndent = rep(as_xml_attr(relativeIndent), n),
+    shrinkToFit = rep(as_xml_attr(shrinkToFit), n),
+    textRotation = rep(as_xml_attr(textRotation), n),
+    vertical = rep(as_xml_attr(vertical), n),
+    wrapText = rep(as_xml_attr(wrapText), n),
     extLst = rep(extLst, n),
-    hidden = rep(hidden, n),
-    locked = rep(locked, n),
+    hidden = rep(as_xml_attr(hidden), n),
+    locked = rep(as_xml_attr(locked), n),
     stringsAsFactors = FALSE
   )
 
@@ -511,7 +498,7 @@ create_cell_style <- function(
 set_border <- function(xf_node, border_id) {
   z <- read_xf(read_xml(xf_node))
   z$applyBorder <- "1"
-  z$borderId <- border_id
+  z$borderId <- as_xml_attr(border_id)
   write_xf(z)
 }
 
@@ -522,7 +509,7 @@ set_border <- function(xf_node, border_id) {
 set_fill <- function(xf_node, fill_id) {
   z <- read_xf(read_xml(xf_node))
   z$applyFill <- "1"
-  z$fillId <- fill_id
+  z$fillId <- as_xml_attr(fill_id)
   write_xf(z)
 }
 
@@ -533,7 +520,7 @@ set_fill <- function(xf_node, fill_id) {
 set_font <- function(xf_node, font_id) {
   z <- read_xf(read_xml(xf_node))
   z$applyFont <- "1"
-  z$fontId <- font_id
+  z$fontId <- as_xml_attr(font_id)
   write_xf(z)
 }
 
@@ -544,7 +531,7 @@ set_font <- function(xf_node, font_id) {
 set_numfmt <- function(xf_node, numfmt) {
   z <- read_xf(read_xml(xf_node))
   z$applyNumberFormat <- "1"
-  z$numFmtId <- numfmt
+  z$numFmtId <- as_xml_attr(numfmt)
   write_xf(z)
 }
 
@@ -640,54 +627,6 @@ get_cell_styles <- function(wb, sheet, cell) {
   }
 
   out
-}
-
-#' helper get_cell_style
-#' @param wb a workbook
-#' @param sheet a worksheet
-#' @param cell a cell
-#' @export
-get_cell_style <- function(wb, sheet, cell) {
-  .Deprecated("wb_get_cell_style")
-  wb_get_cell_style(wb, sheet, dims = cell)
-}
-
-#' helper set_cell_style
-#' @param wb a workbook
-#' @param sheet a worksheet
-#' @param cell a cell
-#' @param value a value to assign
-#' @examples
-#' # create a numeric data matrix
-#' mat <- matrix(rnorm(28*28, mean = 44444, sd = 555), ncol = 28)
-#' wb <- wb_workbook()$
-#'   add_worksheet("test")$
-#'   add_data("test", mat, colNames = FALSE)
-#'
-#' # create known builtins 0 is the default
-#' builtins <- c( # "0",
-#'   "1", "2", "3", "4", "9", "10", "11", "12", "13", "14", "15", "16",
-#'   "17", "18", "19", "20", "21", "22", "37", "38", "39", "40", "45", "46",
-#'   "47", "48", "49"
-#' )
-#'
-#' # assign the style to the first row
-#' for (builtin in builtins) {
-#'   dim <- paste0(int2col(which(builtins %in% builtin)), "1")
-#'   wb$add_cell_style(dims = dim,
-#'                     numFmtId = builtin)
-#' }
-#'
-#' # new styles are 1:28, because s in a 0-index, they are in the
-#' # order we just assigned them above
-#' for (i in seq_along(wb$styles_mgr$styles$cellXfs)) {
-#'   cell <- sprintf("%s2:%s28", int2col(i), int2col(i))
-#'   wb$set_cell_style("test", cell, as.character(i))
-#' }
-#' @export
-set_cell_style <- function(wb, sheet, cell, value) {
-  .Deprecated("wb_set_cell_style")
-  wb_set_cell_style(wb, sheet, dims = cell, style = value)
 }
 
 #' @name create_dxfs_style

@@ -458,6 +458,30 @@ chained functions with the prefix <code>wb_</code> so
 <code>wb_add_border()</code> and <code>wb_set_col_widths()</code> would
 be the functions to use with pipes <code>%&gt;%</code> or
 <code>|&gt;</code>.</p>
+<p>With pipes the code from above becomes</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>border_color <span class="ot">&lt;-</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;FF4F81BD&quot;</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>(<span class="st">&quot;My name here&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="fu">wb_add_worksheet</span>(<span class="st">&quot;Expenditure&quot;</span>, <span class="at">gridLines =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="fu">wb_add_data</span>(<span class="at">x =</span> USPersonalExpenditure, <span class="at">rowNames =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="fu">wb_add_border</span>( <span class="co"># add the outer and inner border</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>    <span class="at">dims =</span> <span class="st">&quot;A1:F6&quot;</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>    <span class="at">top_border =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">top_color =</span> border_color,</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>    <span class="at">bottom_border =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">bottom_color =</span> border_color,</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>    <span class="at">inner_hgrid =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">inner_hcolor =</span> border_color,</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>    <span class="at">left_border =</span> <span class="st">&quot;&quot;</span>, <span class="at">right_border =</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>  <span class="fu">wb_set_col_widths</span>( <span class="co"># set column width</span></span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>    <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">6</span>,</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>    <span class="at">widths =</span> <span class="fu">c</span>(<span class="st">&quot;20&quot;</span>, <span class="fu">rep</span>(<span class="st">&quot;10&quot;</span>, <span class="dv">5</span>))</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> <span class="co"># remove the value in A1</span></span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>  <span class="fu">wb_add_data</span>(<span class="at">dims =</span> <span class="st">&quot;A1&quot;</span>, <span class="at">x =</span> <span class="st">&quot;&quot;</span>)</span></code></pre></div>
+<p>Be aware that chains modify an object in place and pipes do not.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>wbp <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>() <span class="sc">%&gt;%</span> <span class="fu">wb_add_worksheet</span>()</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>wbc <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co"># need to assign wbp</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>wbp <span class="ot">&lt;-</span> wbp <span class="sc">%&gt;%</span> <span class="fu">wb_add_data</span>(<span class="at">x =</span> iris)</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>wbc<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> iris)</span></code></pre></div>
 <p>You can re-use styles with <code>wb_get_cell_style()</code> and
 <code>wb_set_cell_style()</code>. Abandoning <code>stylesObject</code>
 in <code>openxlsx2</code> has the huge benefit that we can import and
@@ -472,30 +496,47 @@ vignette.</p>
 <h3>Conditional formatting</h3>
 <p>Extended examples for conditional formatting can be found in the
 conditional formatting vignette. A minimal example is the following:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;a&quot;</span>)<span class="sc">$</span></span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">colNames =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="fu">add_conditional_formatting</span>(<span class="at">cols =</span> <span class="dv">1</span>, <span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">rule =</span> <span class="st">&quot;&gt;2&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># with chains</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;a&quot;</span>)<span class="sc">$</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">colNames =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  <span class="fu">add_conditional_formatting</span>(<span class="at">cols =</span> <span class="dv">1</span>, <span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">rule =</span> <span class="st">&quot;&gt;2&quot;</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="co"># with pipes</span></span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>  <span class="fu">wb_add_worksheet</span>(<span class="st">&quot;a&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>  <span class="fu">wb_add_data</span>(<span class="at">x =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">colNames =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>  <span class="fu">wb_add_conditional_formatting</span>(<span class="at">cols =</span> <span class="dv">1</span>, <span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">rule =</span> <span class="st">&quot;&gt;2&quot;</span>)</span></code></pre></div>
 </div>
 <div id="data-validation" class="section level3">
 <h3>Data validation</h3>
 <p>Similar data validation has been updated and improved. This
 <code>openxlsx</code> code for data validation</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">createWorkbook</span>()</span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">addWorksheet</span>(wb, <span class="st">&quot;Sheet 1&quot;</span>)</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="fu">writeDataTable</span>(wb, <span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ])</span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="fu">dataValidation</span>(wb, <span class="dv">1</span>,</span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">createWorkbook</span>()</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="fu">addWorksheet</span>(wb, <span class="st">&quot;Sheet 1&quot;</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="fu">writeDataTable</span>(wb, <span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ])</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="fu">dataValidation</span>(wb, <span class="dv">1</span>,</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>  <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>  <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>)</span></code></pre></div>
 <p>looks in <code>openxlsx2</code> something like this:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Sheet 1&quot;</span>)<span class="sc">$</span></span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="fu">add_data_table</span>(<span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ])<span class="sc">$</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="fu">add_data_validation</span>(<span class="dv">1</span>,</span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>    <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>    <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>  )</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="co"># with chains</span></span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Sheet 1&quot;</span>)<span class="sc">$</span></span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>  <span class="fu">add_data_table</span>(<span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ])<span class="sc">$</span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>  <span class="fu">add_data_validation</span>(<span class="dv">1</span>,</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>    <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>    <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>  )</span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a></span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a><span class="co"># with pipes</span></span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a>  <span class="fu">wb_add_worksheet</span>(<span class="st">&quot;Sheet 1&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a>  <span class="fu">wb_add_data_table</span>(<span class="dv">1</span>, <span class="at">x =</span> iris[<span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, ]) <span class="sc">%&gt;%</span></span>
+<span id="cb16-14"><a href="#cb16-14" tabindex="-1"></a>  <span class="fu">wb_add_data_validation</span>(<span class="dv">1</span>,</span>
+<span id="cb16-15"><a href="#cb16-15" tabindex="-1"></a>    <span class="at">col =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, <span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">31</span>, <span class="at">type =</span> <span class="st">&quot;whole&quot;</span>,</span>
+<span id="cb16-16"><a href="#cb16-16" tabindex="-1"></a>    <span class="at">operator =</span> <span class="st">&quot;between&quot;</span>, <span class="at">value =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">9</span>)</span>
+<span id="cb16-17"><a href="#cb16-17" tabindex="-1"></a>  )</span></code></pre></div>
 </div>
 <div id="saving" class="section level3">
 <h3>Saving</h3>
