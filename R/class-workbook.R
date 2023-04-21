@@ -1325,6 +1325,107 @@ wbWorkbook <- R6::R6Class(
       invisible(self)
     },
 
+    ### to dataframe ----
+    #' @description to_df
+    #' @param sheet Either sheet name or index. When missing the first sheet in the workbook is selected.
+    #' @param colNames If TRUE, the first row of data will be used as column names.
+    #' @param rowNames If TRUE, the first col of data will be used as row names.
+    #' @param dims Character string of type "A1:B2" as optional dimensions to be imported.
+    #' @param detectDates If TRUE, attempt to recognize dates and perform conversion.
+    #' @param showFormula If TRUE, the underlying Excel formulas are shown.
+    #' @param convert If TRUE, a conversion to dates and numerics is attempted.
+    #' @param skipEmptyCols If TRUE, empty columns are skipped.
+    #' @param skipEmptyRows If TRUE, empty rows are skipped.
+    #' @param skipHiddenCols If TRUE, hidden columns are skipped.
+    #' @param skipHiddenRows If TRUE, hidden rows are skipped.
+    #' @param startRow first row to begin looking for data.
+    #' @param startCol first column to begin looking for data.
+    #' @param rows A numeric vector specifying which rows in the Excel file to read. If NULL, all rows are read.
+    #' @param cols A numeric vector specifying which columns in the Excel file to read. If NULL, all columns are read.
+    #' @param named_region Character string with a named_region (defined name or table). If no sheet is selected, the first appearance will be selected.
+    #' @param types A named numeric indicating, the type of the data. 0: character, 1: numeric, 2: date, 3: posixt, 4:logical. Names must match the returned data
+    #' @param na.strings A character vector of strings which are to be interpreted as NA. Blank cells will be returned as NA.
+    #' @param na.numbers A numeric vector of digits which are to be interpreted as NA. Blank cells will be returned as NA.
+    #' @param fillMergedCells If TRUE, the value in a merged cell is given to all cells within the merge.
+    #' @return a data frame
+    to_df = function(
+      sheet,
+      startRow        = 1,
+      startCol        = NULL,
+      rowNames        = FALSE,
+      colNames        = TRUE,
+      skipEmptyRows   = FALSE,
+      skipEmptyCols   = FALSE,
+      skipHiddenRows  = FALSE,
+      skipHiddenCols  = FALSE,
+      rows            = NULL,
+      cols            = NULL,
+      detectDates     = TRUE,
+      na.strings      = "#N/A",
+      na.numbers      = NA,
+      fillMergedCells = FALSE,
+      dims,
+      showFormula     = FALSE,
+      convert         = TRUE,
+      types,
+      named_region
+    ) {
+
+      if (missing(sheet)) sheet <- substitute()
+      if (missing(dims)) dims <- substitute()
+      if (missing(named_region)) named_region <- substitute()
+
+      wb_to_df(
+        xlsxFile        = self,
+        sheet           = sheet,
+        startRow        = startRow,
+        startCol        = startCol,
+        rowNames        = rowNames,
+        colNames        = colNames,
+        skipEmptyRows   = skipEmptyRows,
+        skipEmptyCols   = skipEmptyCols,
+        skipHiddenRows  = skipHiddenRows,
+        skipHiddenCols  = skipHiddenCols,
+        rows            = rows,
+        cols            = cols,
+        detectDates     = detectDates,
+        na.strings      = na.strings,
+        na.numbers      = na.numbers,
+        fillMergedCells = fillMergedCells,
+        dims            = dims,
+        showFormula     = showFormula,
+        convert         = convert,
+        types           = types,
+        named_region    = named_region
+      )
+    },
+
+    ### load workbook ----
+    #' @description load workbook
+    #' @param file file
+    #' @param xlsxFile xlsxFile
+    #' @param sheet sheet
+    #' @param data_only data_only
+    #' @param calc_chain calc_chain
+    #' @return The `wbWorkbook` object invisibly
+    load = function(
+      file,
+      xlsxFile   = NULL,
+      sheet,
+      data_only  = FALSE,
+      calc_chain = FALSE
+    ) {
+      if (missing(file)) file <- substitute()
+      if (missing(sheet)) sheet <- substitute()
+      wb_load(
+        file       = file,
+        xlsxFile   = xlsxFile,
+        sheet      = sheet,
+        data_only  = data_only,
+        calc_chain = calc_chain
+        )
+    },
+
     # TODO wb_save can be shortened a lot by some formatting and by using a
     # function that creates all the temporary directories and subdirectries as a
     # named list
@@ -3338,24 +3439,20 @@ wbWorkbook <- R6::R6Class(
     #' @param comment a comment to apply to the worksheet
     #' @returns The `wbWorkbook` object
     add_comment = function(
-        sheet = current_sheet(),
-        col,
-        row,
-        dims  = rowcol_to_dims(row, col),
-        comment) {
-
-      if (!missing(dims)) {
-        xy <- unlist(dims_to_rowcol(dims))
-        col <- xy[[1]]
-        row <- as.integer(xy[[2]])
-      }
+        sheet   = current_sheet(),
+        col     = NULL,
+        row     = NULL,
+        dims    = rowcol_to_dim(row, col),
+        comment
+    ) {
 
       write_comment(
-        wb = self,
-        sheet = sheet,
-        col = col,
-        row = row,
-        comment = comment
+        wb      = self,
+        sheet   = sheet,
+        col     = col,
+        row     = row,
+        comment = comment,
+        dims    = dims
       ) # has no use: xy
 
       invisible(self)
@@ -3369,22 +3466,21 @@ wbWorkbook <- R6::R6Class(
     #' @param gridExpand Remove all comments inside the grid. Similar to dims "A1:B2"
     #' @returns The `wbWorkbook` object
     remove_comment = function(
-      sheet = current_sheet(),
-      col,
-      row,
-      dims  = rowcol_to_dims(row, col),
+      sheet      = current_sheet(),
+      col        = NULL,
+      row        = NULL,
+      dims       = rowcol_to_dims(row, col),
       gridExpand = TRUE
     ) {
 
-      if (!missing(dims)) {
-        xy <- unlist(dims_to_rowcol(dims))
-        col <- xy[[1]]
-        row <- as.integer(xy[[2]])
-        # with gridExpand this is always true
-        gridExpand <- TRUE
-      }
-
-      remove_comment(wb = self, sheet = sheet, col = col, row = row, gridExpand = TRUE)
+      remove_comment(
+        wb         = self,
+        sheet      = sheet,
+        col        = col,
+        row        = row,
+        dims       = dims,
+        gridExpand = gridExpand
+      )
 
       invisible(self)
     },
@@ -3706,6 +3802,7 @@ wbWorkbook <- R6::R6Class(
     #' @param colOffset colOffset
     #' @param units units
     #' @param dpi dpi
+    #' @param dims dims
     #' @return The `wbWorkbook` object, invisibly
     add_image = function(
       sheet = current_sheet(),
@@ -3717,10 +3814,15 @@ wbWorkbook <- R6::R6Class(
       rowOffset = 0,
       colOffset = 0,
       units     = "in",
-      dpi       = 300
+      dpi       = 300,
+      dims      = rowcol_to_dim(startRow, startCol)
     ) {
       if (!file.exists(file)) {
-        stop("File does not exist.")
+        stop("File ", file, " does not exist.")
+      }
+
+      if (is.null(dims) && (startRow > 1 || startCol > 1)) {
+        warning("dims is NULL, startRow/startCol will have no impact")
       }
 
       # TODO require user to pass a valid path
@@ -3788,27 +3890,15 @@ wbWorkbook <- R6::R6Class(
       names(tmp) <- stri_join("image", mediaNo, ".", imageType)
       self$append("media", tmp)
 
-      ## create drawing.xml
-      from <- sprintf(
-        '<xdr:from>
-        <xdr:col>%s</xdr:col>
-        <xdr:colOff>%s</xdr:colOff>
-        <xdr:row>%s</xdr:row>
-        <xdr:rowOff>%s</xdr:rowOff>
-        </xdr:from>',
-        startCol - 1L,
-        colOffset,
-        startRow - 1L,
-        rowOffset
-      )
+      pos <- '<xdr:pos x="0" y="0" />'
 
       drawingsXML <- stri_join(
-        '<xdr:oneCellAnchor>',
-        from,
+        '<xdr:absoluteAnchor>',
+        pos,
         sprintf('<xdr:ext cx="%s" cy="%s"/>', width, height),
         genBasePic(imageNo),
         "<xdr:clientData/>",
-        "</xdr:oneCellAnchor>"
+        "</xdr:absoluteAnchor>"
       )
 
       xml_attr <- c(
@@ -3823,7 +3913,7 @@ wbWorkbook <- R6::R6Class(
         xml_attributes = xml_attr
       )
 
-      self$add_drawing(sheet, drawing)
+      self$add_drawing(sheet, drawing, dims, colOffset, rowOffset)
 
 
       # add image to drawings_rels
@@ -3857,6 +3947,7 @@ wbWorkbook <- R6::R6Class(
     #' @param fileType fileType
     #' @param units units
     #' @param dpi dpi
+    #' @param dims dims
     #' @returns The `wbWorkbook` object
     add_plot = function(
       sheet = current_sheet(),
@@ -3869,7 +3960,8 @@ wbWorkbook <- R6::R6Class(
       colOffset = 0,
       fileType  = "png",
       units     = "in",
-      dpi       = 300
+      dpi       = 300,
+      dims      = rowcol_to_dim(startRow, startCol)
     ) {
       if (is.null(dev.list()[[1]])) {
         warning("No plot to insert.")
@@ -3877,6 +3969,7 @@ wbWorkbook <- R6::R6Class(
       }
 
       if (!is.null(xy)) {
+        .Deprecated("dims", old = "xy")
         startCol <- xy[[1]]
         startRow <- xy[[2]]
       }
@@ -3900,6 +3993,11 @@ wbWorkbook <- R6::R6Class(
 
       fileName <- tempfile(pattern = "figureImage", fileext = paste0(".", fileType))
 
+      # Workaround for wrapper test. Otherwise tempfile names differ
+      if (requireNamespace("testthat")) {
+        if (testthat::is_testing()) fileName <- getOption("openxlsx2.temp_png")
+      }
+
       # TODO use switch()
       if (fileType == "bmp") {
         dev.copy(bmp, filename = fileName, width = width, height = height, units = units, res = dpi)
@@ -3913,6 +4011,7 @@ wbWorkbook <- R6::R6Class(
 
       ## write image
       invisible(dev.off())
+      stopifnot(file.exists(fileName))
 
       self$add_image(
         sheet     = sheet,
@@ -3924,7 +4023,8 @@ wbWorkbook <- R6::R6Class(
         rowOffset = rowOffset,
         colOffset = colOffset,
         units     = units,
-        dpi       = dpi
+        dpi       = dpi,
+        dims      = dims
       )
     },
 
@@ -3932,11 +4032,14 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param dims dims
     #' @param xml xml
+    #' @param colOffset,rowOffset offsets for column and row
     #' @returns The `wbWorkbook` object
     add_drawing = function(
       sheet = current_sheet(),
       xml,
-      dims = NULL
+      dims = NULL,
+      colOffset = 0,
+      rowOffset = 0
     ) {
       sheet <- private$get_sheet_index(sheet)
 
@@ -3970,6 +4073,7 @@ wbWorkbook <- R6::R6Class(
       }
 
       ext   <- xml_node(xml, "xdr:wsDr", "xdr:absoluteAnchor", "xdr:ext")
+      pic   <- xml_node(xml, "xdr:wsDr", "xdr:absoluteAnchor", "xdr:pic")
       grpSp <- xml_node(xml, "xdr:wsDr", "xdr:absoluteAnchor", "xdr:grpSp")
       grFrm <- xml_node(xml, "xdr:wsDr", "xdr:absoluteAnchor", "xdr:graphicFrame")
       clDt  <- xml_node(xml, "xdr:wsDr", "xdr:absoluteAnchor", "xdr:clientData")
@@ -3987,18 +4091,26 @@ wbWorkbook <- R6::R6Class(
           dims_list <- strsplit(dims, ":")[[1]]
           cols <- col2int(dims_list)
           rows <- as.numeric(gsub("\\D+", "", dims_list))
+          if (length(colOffset) != 2) colOffset <- rep(colOffset, 2)
+          if (length(rowOffset) != 2) rowOffset <- rep(rowOffset, 2)
 
           anchor <- paste0(
             "<xdr:from>",
-            "<xdr:col>%s</xdr:col><xdr:colOff>0</xdr:colOff>",
-            "<xdr:row>%s</xdr:row><xdr:rowOff>0</xdr:rowOff>",
+            "<xdr:col>%s</xdr:col><xdr:colOff>%s</xdr:colOff>",
+            "<xdr:row>%s</xdr:row><xdr:rowOff>%s</xdr:rowOff>",
             "</xdr:from>",
             "<xdr:to>",
-            "<xdr:col>%s</xdr:col><xdr:colOff>0</xdr:colOff>",
-            "<xdr:row>%s</xdr:row><xdr:rowOff>0</xdr:rowOff>",
+            "<xdr:col>%s</xdr:col><xdr:colOff>%s</xdr:colOff>",
+            "<xdr:row>%s</xdr:row><xdr:rowOff>%s</xdr:rowOff>",
             "</xdr:to>"
           )
-          anchor <- sprintf(anchor, cols[1] - 1L, rows[1] - 1L, cols[2], rows[2])
+          anchor <- sprintf(
+            anchor,
+            cols[1] - 1L, colOffset[1],
+            rows[1] - 1L, rowOffset[1],
+            cols[2], colOffset[2],
+            rows[2], rowOffset[2]
+          )
 
         } else {
 
@@ -4009,11 +4121,15 @@ wbWorkbook <- R6::R6Class(
 
           anchor <- paste0(
             "<xdr:from>",
-            "<xdr:col>%s</xdr:col><xdr:colOff>0</xdr:colOff>",
-            "<xdr:row>%s</xdr:row><xdr:rowOff>0</xdr:rowOff>",
+            "<xdr:col>%s</xdr:col><xdr:colOff>%s</xdr:colOff>",
+            "<xdr:row>%s</xdr:row><xdr:rowOff>%s</xdr:rowOff>",
             "</xdr:from>"
           )
-          anchor <- sprintf(anchor, cols[1] - 1L, rows[1] - 1L)
+          anchor <- sprintf(
+            anchor,
+            cols[1] - 1L, colOffset[1],
+            rows[1] - 1L, rowOffset[1]
+          )
 
         }
 
@@ -4022,6 +4138,7 @@ wbWorkbook <- R6::R6Class(
           xml_children = c(
             anchor,
             ext,
+            pic,
             grpSp,
             grFrm,
             clDt
@@ -4080,11 +4197,14 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param dims dims
     #' @param xml xml
+    #' @param colOffset,rowOffset startCol and startRow
     #' @returns The `wbWorkbook` object
     add_chart_xml = function(
-      sheet = current_sheet(),
+      sheet     = current_sheet(),
       xml,
-      dims = NULL
+      dims      = NULL,
+      colOffset = 0,
+      rowOffset = 0
     ) {
 
       sheet <- private$get_sheet_index(sheet)
@@ -4113,9 +4233,11 @@ wbWorkbook <- R6::R6Class(
 
       # create drawing. add it to self$drawings, the worksheet and rels
       self$add_drawing(
-        sheet = sheet,
-        xml = next_chart,
-        dims = dims
+        sheet     = sheet,
+        xml       = next_chart,
+        dims      = dims,
+        colOffset = colOffset,
+        rowOffset = rowOffset
       )
 
       sheet_drawing <- self$worksheets[[sheet]]$relships$drawing
@@ -4132,11 +4254,14 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet the sheet on which the graph will appear
     #' @param dims the dimensions where the sheet will appear
     #' @param graph mschart graph
+    #' @param colOffset,rowOffset startCol and startRow
     #' @returns The `wbWorkbook` object
     add_mschart = function(
-      sheet = current_sheet(),
-      dims = NULL,
-      graph
+      sheet     = current_sheet(),
+      dims      = NULL,
+      graph,
+      colOffset = 0,
+      rowOffset = 0
     ) {
 
       requireNamespace("mschart")
@@ -4158,11 +4283,11 @@ wbWorkbook <- R6::R6Class(
       # write the chart data to the workbook
       if (inherits(graph$data_series, "wb_data")) {
         self$
-          add_chart_xml(sheet = sheet, xml = out_xml, dims = dims)
+          add_chart_xml(sheet = sheet, xml = out_xml, dims = dims, colOffset = colOffset, rowOffset = rowOffset)
       } else {
         self$
           add_data(sheet = sheet, x = graph$data_series)$
-          add_chart_xml(sheet = sheet, xml = out_xml, dims = dims)
+          add_chart_xml(sheet = sheet, xml = out_xml, dims = dims, colOffset = colOffset, rowOffset = rowOffset)
       }
     },
 

@@ -216,6 +216,8 @@ style_is_posix <- function(cellXfs, numfmt_date) {
 #' @param convert If TRUE, a conversion to dates and numerics is attempted.
 #' @param skipEmptyCols If TRUE, empty columns are skipped.
 #' @param skipEmptyRows If TRUE, empty rows are skipped.
+#' @param skipHiddenCols If TRUE, hidden columns are skipped.
+#' @param skipHiddenRows If TRUE, hidden rows are skipped.
 #' @param startRow first row to begin looking for data.
 #' @param startCol first column to begin looking for data.
 #' @param rows A numeric vector specifying which rows in the Excel file to read. If NULL, all rows are read.
@@ -306,6 +308,8 @@ wb_to_df <- function(
     colNames        = TRUE,
     skipEmptyRows   = FALSE,
     skipEmptyCols   = FALSE,
+    skipHiddenRows  = FALSE,
+    skipHiddenCols  = FALSE,
     rows            = NULL,
     cols            = NULL,
     detectDates     = TRUE,
@@ -628,6 +632,29 @@ wb_to_df <- function(
 
   }
 
+  # the following two skip hidden columns and row and need a valid keep_rows and
+  # keep_cols length.
+  if (skipHiddenRows) {
+    sel <- row_attr$hidden == "1" | row_attr$hidden == "true"
+    if (any(sel)) {
+      hide   <- !keep_rows %in% row_attr$r[sel]
+
+      z  <- z[hide, , drop = FALSE]
+      tt <- tt[hide, , drop = FALSE]
+    }
+  }
+
+  if (skipHiddenCols) {
+    col_attr <- wb$worksheets[[sheet]]$unfold_cols()
+    sel <- col_attr$hidden == "1" | col_attr$hidden == "true"
+    if (any(sel)) {
+      hide     <- col2int(keep_cols) %in% as.integer(col_attr$min[sel])
+
+      z[hide]  <- NULL
+      tt[hide] <- NULL
+    }
+  }
+
   # is.na needs convert
   if (skipEmptyRows) {
     empty <- vapply(seq_len(nrow(z)), function(x) all(is.na(z[x, ])), NA)
@@ -840,6 +867,7 @@ wb_set_selected <- function(wb, sheet) {
 #' @param sheet the sheet on which the graph will appear
 #' @param dims the dimensions where the sheet will appear
 #' @param graph mschart object
+#' @param colOffset,rowOffset startCol and startRow
 #' @examples
 #' if (requireNamespace("mschart")) {
 #' require(mschart)
@@ -876,12 +904,14 @@ wb_set_selected <- function(wb, sheet) {
 #' @export
 wb_add_mschart <- function(
     wb,
-    sheet = current_sheet(),
-    dims = NULL,
-    graph
+    sheet     = current_sheet(),
+    dims      = NULL,
+    graph,
+    colOffset = 0,
+    rowOffset = 0
 ) {
   assert_workbook(wb)
-  wb$clone()$add_mschart(sheet = sheet, dims = dims, graph = graph)
+  wb$clone()$add_mschart(sheet = sheet, dims = dims, graph = graph, colOffset = colOffset, rowOffset = rowOffset)
 }
 
 #' provide wb_data object as mschart input

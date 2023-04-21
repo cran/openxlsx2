@@ -1,3 +1,23 @@
+# openxlsx2 (0.6.1)
+
+## New features
+
+* Improve `col2int()` to accept column ranges like `col2int("A:Z")`. This should allow using column ranges in various places like `wb_merge_cells(cols = "B:D", ...)` or `wb_read(cols = c("A","C:D"))`. [575](https://github.com/JanMarvin/openxlsx2/pull/575)
+
+* Add `dims` argument to `wb_add_image()` and `wb_add_plot()`. This can be used to place images starting at a cell or span a cell range. This deprecates `xy` in `wb_add_plot()`. This adds colOffset and rowOffset to `wb_add_drawing()` and `wb_add_mschart()` and `wb_add_chart_xml()`. [578](https://github.com/JanMarvin/openxlsx2/pull/578)
+
+* Add `skipHiddenCols` and `skipHiddenRows` to `wb_to_df()`. In this way, hidden columns and rows are ignored, assuming that the person who has hidden them assumes that they are not important. [579](https://github.com/JanMarvin/openxlsx2/pull/579)
+
+* When writing `tibble` use `to.data.frame()` just like in the `data.table` case. [582](https://github.com/JanMarvin/openxlsx2/pull/582)
+
+* Add cleanup internal comment code in `write_comment()`. This should not impact the workbook wrapper code in `wb_add_comment()`. [586](https://github.com/JanMarvin/openxlsx2/pull/586)
+
+* Added chain functions for `wb_to_df()` and `wb_load()`. [587](https://github.com/JanMarvin/openxlsx2/pull/587)
+
+
+***************************************************************************
+
+
 # openxlsx2 (0.6)
 
 ## New features

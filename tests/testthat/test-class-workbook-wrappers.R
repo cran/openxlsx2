@@ -30,6 +30,24 @@ test_that("wb_remove_worksheet() is a wrapper", {
   expect_wrapper("remove_worksheet", wb = wb, params = list(sheet = "sheet"))
 })
 
+
+# wb_to_df() ---------------------------------------------------------------
+
+# does not work as expected
+test_that("wb_to_df() is a wrapper", {
+  wb <- wb_workbook()$add_worksheet()$add_data(x = iris)
+  expect_pseudo_wrapper("to_df")
+})
+
+# wb_load() ---------------------------------------------------------------
+
+test_that("wb_load() is a wrapper", {
+  tmp_xlsx <- temp_xlsx()
+  wb_workbook()$add_worksheet()$add_data(x = iris)$save(tmp_xlsx)
+  expect_wrapper("load", params = list(file = tmp_xlsx), ignore_wb = TRUE,
+                 ignore_fields = "datetimeCreated")
+})
+
 # wb_save() ---------------------------------------------------------------
 
 test_that("wb_save() is a wrapper", {
@@ -166,25 +184,29 @@ test_that("wb_add_image() is a wrapper", {
 # wb_add_plot() -----------------------------------------------------------
 
 test_that("wb_add_plot() is a wrapper", {
-  # plot is written to file. test can only be completed in interactive mode
-  if (interactive()) {
 
-    plot(1:5, 1:5)
-    wb <- wb_workbook()$add_worksheet("a")
+  # workaround: this filename is inserted to the wrapper function
+  options("openxlsx2.temp_png" = tempfile(pattern = "figureImage", fileext = ".png"))
 
-    # okay, not the best but the results have different field names.  Maybe that's
-    # a feature to add to expect_wrapper()
-    expect_error(
-      expect_wrapper(
-        "add_plot",
-        "wb_add_plot",
-        wb = wb,
-        params = list(sheet = "a")
-      ),
-      "wbWorkbook$add_plot$media$image1.png vs wb_add_plot$media$image1.png",
-      fixed = TRUE
-    )
-  }
+  # create a device we can dev.copy() from
+  grDevices::pdf(NULL) # do not create "Rplots.pdf"
+  grDevices::dev.control("enable")
+  plot(1:5, 1:5)
+
+  wb <- wb_workbook()$add_worksheet("a")
+
+  expect_wrapper(
+    "add_plot",
+    "wb_add_plot",
+    wb = wb,
+    params = list(sheet = "a")
+  )
+
+  # # check that it is actually working
+  # wb$add_plot(sheet = "a")$save("~/test.xlsx")
+
+  grDevices::dev.off()
+
 })
 
 test_that("wb_add_drawing is a wrapper", {

@@ -825,6 +825,7 @@ wb_remove_row_heights <- function(wb, sheet = current_sheet(), rows) {
 #' @param fileType File type of image
 #' @param units Units of width and height. Can be `"in"`, `"cm"` or `"px"`
 #' @param dpi Image resolution
+#' @param dims Worksheet dimension, single cell ("A1") or cell range ("A1:D4")
 #' @seealso [wb_add_image()]
 #' @export
 #' @examples
@@ -849,7 +850,7 @@ wb_remove_row_heights <- function(wb, sheet = current_sheet(), rows) {
 #'
 #' ## Insert plot 2
 #' print(p2)
-#' wb$add_plot(1, xy = c("J", 2), width = 16, height = 10, fileType = "png", units = "cm")
+#' wb$add_plot(1, dims = "J2", width = 16, height = 10, fileType = "png", units = "cm")
 #'
 #' }
 wb_add_plot <- function(
@@ -864,7 +865,8 @@ wb_add_plot <- function(
     colOffset = 0,
     fileType  = "png",
     units     = "in",
-    dpi       = 300
+    dpi       = 300,
+    dims      = rowcol_to_dim(startRow, startCol)
 ) {
   assert_workbook(wb)
   wb$clone()$add_plot(
@@ -878,7 +880,8 @@ wb_add_plot <- function(
     colOffset = colOffset,
     fileType  = fileType,
     units     = units,
-    dpi       = dpi
+    dpi       = dpi,
+    dims      = dims
   )
 }
 
@@ -887,6 +890,7 @@ wb_add_plot <- function(
 #' @param sheet a sheet in the workbook
 #' @param xml the drawing xml as character or file
 #' @param dims the dimension where the drawing is added. Can be NULL
+#' @param colOffset,rowOffset offsets for column and row
 #' @examples
 #' if (requireNamespace("rvg") && interactive()) {
 #'
@@ -905,12 +909,20 @@ wb_add_plot <- function(
 #‘ @export
 wb_add_drawing <- function(
   wb,
-  sheet = current_sheet(),
+  sheet     = current_sheet(),
   xml,
-  dims = NULL
+  dims      = NULL,
+  colOffset = 0,
+  rowOffset = 0
 ) {
   assert_workbook(wb)
-  wb$clone()$add_drawing(sheet = sheet, xml = xml, dims = dims)
+  wb$clone()$add_drawing(
+    sheet     = sheet,
+    xml       = xml,
+    dims      = dims,
+    colOffset = colOffset,
+    rowOffset = rowOffset
+  )
 }
 
 #' @title Remove a worksheet from a workbook
@@ -2118,10 +2130,11 @@ wb_set_last_modified_by <- function(wb, LastModifiedBy) {
 #' @param height Height of figure.
 #' @param startRow Row coordinate of upper left corner of the image
 #' @param startCol Column coordinate of upper left corner of the image
-#' @param rowOffset offset within cell (row)
-#' @param colOffset offset within cell (column)
+#' @param rowOffset offset vector for one or two cell anchor within cell (row)
+#' @param colOffset offset vector for one or two cell anchor within cell (column)
 #' @param units Units of width and height. Can be `"in"`, `"cm"` or `"px"`
 #' @param dpi Image resolution used for conversion between units.
+#' @param dims Dimensions where to plot. Default absolute anchor, single cell (eg. "A1") oneCellAnchor, cell range (eg. "A1:D4") twoCellAnchor
 #' @seealso [wb_add_plot()]
 #' @export
 #' @examples
@@ -2149,7 +2162,8 @@ wb_add_image <- function(
   rowOffset = 0,
   colOffset = 0,
   units     = "in",
-  dpi       = 300
+  dpi       = 300,
+  dims      = rowcol_to_dim(startRow, startCol)
 ) {
   assert_workbook(wb)
   wb$clone()$add_image(
@@ -2162,7 +2176,8 @@ wb_add_image <- function(
     rowOffset = rowOffset,
     colOffset = colOffset,
     units     = units,
-    dpi       = dpi
+    dpi       = dpi,
+    dims      = dims
   )
 }
 
@@ -2172,15 +2187,18 @@ wb_add_image <- function(
 #' @param sheet the sheet on which the graph will appear
 #' @param xml chart xml
 #' @param dims the dimensions where the sheet will appear
+#' @param colOffset,rowOffset startCol and startRow
 #' @export
 wb_add_chart_xml <- function(
   wb,
-  sheet = current_sheet(),
+  sheet     = current_sheet(),
   xml,
-  dims = NULL
+  dims      = NULL,
+  colOffset = 0,
+  rowOffset = 0
 ) {
   assert_workbook(wb)
-  wb$clone()$add_chart_xml(sheet, xml, dims)
+  wb$clone()$add_chart_xml(sheet, xml, dims, colOffset, rowOffset)
 }
 
 
@@ -2627,19 +2645,15 @@ wb_add_cell_style <- function(
 #' @export
 wb_add_comment <- function(
     wb,
-    sheet = current_sheet(),
-    col,
-    row,
-    dims  = rowcol_to_dims(row, col),
+    sheet   = current_sheet(),
+    col     = NULL,
+    row     = NULL,
+    dims    = rowcol_to_dim(row, col),
     comment
   ) {
 
   assert_workbook(wb)
   assert_comment(comment)
-
-  if (missing(col))  col <- substitute()
-  if (missing(row))  row <- substitute()
-  if (missing(dims)) dims <- substitute()
 
   wb$clone()$add_comment(
     sheet   = sheet,
@@ -2662,24 +2676,20 @@ wb_add_comment <- function(
 #' @export
 wb_remove_comment <- function(
     wb,
-    sheet = current_sheet(),
-    col,
-    row,
-    dims  = rowcol_to_dims(row, col),
+    sheet      = current_sheet(),
+    col        = NULL,
+    row        = NULL,
+    dims       = rowcol_to_dims(row, col),
     gridExpand = TRUE
   ) {
 
   assert_workbook(wb)
 
-  if (missing(col))  col <- substitute()
-  if (missing(row))  row <- substitute()
-  if (missing(dims)) dims <- substitute()
-
   wb$clone()$remove_comment(
-    sheet = sheet,
-    col = col,
-    row = row,
-    dims = dims,
+    sheet      = sheet,
+    col        = col,
+    row        = row,
+    dims       = dims,
     gridExpand = gridExpand
   )
 }

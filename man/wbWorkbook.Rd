@@ -267,6 +267,8 @@ is created, not when the Excel files are saved.}
 \item \href{#method-wbWorkbook-add_pivot_table}{\code{wbWorkbook$add_pivot_table()}}
 \item \href{#method-wbWorkbook-add_formula}{\code{wbWorkbook$add_formula()}}
 \item \href{#method-wbWorkbook-add_style}{\code{wbWorkbook$add_style()}}
+\item \href{#method-wbWorkbook-to_df}{\code{wbWorkbook$to_df()}}
+\item \href{#method-wbWorkbook-load}{\code{wbWorkbook$load()}}
 \item \href{#method-wbWorkbook-save}{\code{wbWorkbook$save()}}
 \item \href{#method-wbWorkbook-open}{\code{wbWorkbook$open()}}
 \item \href{#method-wbWorkbook-buildTable}{\code{wbWorkbook$buildTable()}}
@@ -791,6 +793,119 @@ add style
 \item{\code{style_name}}{style_name}
 }
 \if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-to_df"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-to_df}{}}}
+\subsection{Method \code{to_df()}}{
+to_df
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$to_df(
+  sheet,
+  startRow = 1,
+  startCol = NULL,
+  rowNames = FALSE,
+  colNames = TRUE,
+  skipEmptyRows = FALSE,
+  skipEmptyCols = FALSE,
+  skipHiddenRows = FALSE,
+  skipHiddenCols = FALSE,
+  rows = NULL,
+  cols = NULL,
+  detectDates = TRUE,
+  na.strings = "#N/A",
+  na.numbers = NA,
+  fillMergedCells = FALSE,
+  dims,
+  showFormula = FALSE,
+  convert = TRUE,
+  types,
+  named_region
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{Either sheet name or index. When missing the first sheet in the workbook is selected.}
+
+\item{\code{startRow}}{first row to begin looking for data.}
+
+\item{\code{startCol}}{first column to begin looking for data.}
+
+\item{\code{rowNames}}{If TRUE, the first col of data will be used as row names.}
+
+\item{\code{colNames}}{If TRUE, the first row of data will be used as column names.}
+
+\item{\code{skipEmptyRows}}{If TRUE, empty rows are skipped.}
+
+\item{\code{skipEmptyCols}}{If TRUE, empty columns are skipped.}
+
+\item{\code{skipHiddenRows}}{If TRUE, hidden rows are skipped.}
+
+\item{\code{skipHiddenCols}}{If TRUE, hidden columns are skipped.}
+
+\item{\code{rows}}{A numeric vector specifying which rows in the Excel file to read. If NULL, all rows are read.}
+
+\item{\code{cols}}{A numeric vector specifying which columns in the Excel file to read. If NULL, all columns are read.}
+
+\item{\code{detectDates}}{If TRUE, attempt to recognize dates and perform conversion.}
+
+\item{\code{na.strings}}{A character vector of strings which are to be interpreted as NA. Blank cells will be returned as NA.}
+
+\item{\code{na.numbers}}{A numeric vector of digits which are to be interpreted as NA. Blank cells will be returned as NA.}
+
+\item{\code{fillMergedCells}}{If TRUE, the value in a merged cell is given to all cells within the merge.}
+
+\item{\code{dims}}{Character string of type "A1:B2" as optional dimensions to be imported.}
+
+\item{\code{showFormula}}{If TRUE, the underlying Excel formulas are shown.}
+
+\item{\code{convert}}{If TRUE, a conversion to dates and numerics is attempted.}
+
+\item{\code{types}}{A named numeric indicating, the type of the data. 0: character, 1: numeric, 2: date, 3: posixt, 4:logical. Names must match the returned data}
+
+\item{\code{named_region}}{Character string with a named_region (defined name or table). If no sheet is selected, the first appearance will be selected.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+a data frame
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-load"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-load}{}}}
+\subsection{Method \code{load()}}{
+load workbook
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$load(
+  file,
+  xlsxFile = NULL,
+  sheet,
+  data_only = FALSE,
+  calc_chain = FALSE
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{file}}{file}
+
+\item{\code{xlsxFile}}{xlsxFile}
+
+\item{\code{sheet}}{sheet}
+
+\item{\code{data_only}}{data_only}
+
+\item{\code{calc_chain}}{calc_chain}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorkbook} object invisibly
 }
 }
 \if{html}{\out{<hr>}}
@@ -1461,9 +1576,9 @@ Add comment
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_comment(
   sheet = current_sheet(),
-  col,
-  row,
-  dims = rowcol_to_dims(row, col),
+  col = NULL,
+  row = NULL,
+  dims = rowcol_to_dim(row, col),
   comment
 )}\if{html}{\out{</div>}}
 }
@@ -1492,8 +1607,8 @@ Remove comment
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$remove_comment(
   sheet = current_sheet(),
-  col,
-  row,
+  col = NULL,
+  row = NULL,
   dims = rowcol_to_dims(row, col),
   gridExpand = TRUE
 )}\if{html}{\out{</div>}}
@@ -1572,7 +1687,8 @@ Insert an image into a sheet
   rowOffset = 0,
   colOffset = 0,
   units = "in",
-  dpi = 300
+  dpi = 300,
+  dims = rowcol_to_dim(startRow, startCol)
 )}\if{html}{\out{</div>}}
 }
 
@@ -1598,6 +1714,8 @@ Insert an image into a sheet
 \item{\code{units}}{units}
 
 \item{\code{dpi}}{dpi}
+
+\item{\code{dims}}{dims}
 }
 \if{html}{\out{</div>}}
 }
@@ -1622,7 +1740,8 @@ Add plot. A wrapper for add_image()
   colOffset = 0,
   fileType = "png",
   units = "in",
-  dpi = 300
+  dpi = 300,
+  dims = rowcol_to_dim(startRow, startCol)
 )}\if{html}{\out{</div>}}
 }
 
@@ -1650,6 +1769,8 @@ Add plot. A wrapper for add_image()
 \item{\code{units}}{units}
 
 \item{\code{dpi}}{dpi}
+
+\item{\code{dims}}{dims}
 }
 \if{html}{\out{</div>}}
 }
@@ -1660,7 +1781,13 @@ Add plot. A wrapper for add_image()
 \subsection{Method \code{add_drawing()}}{
 Add xml drawing
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_drawing(sheet = current_sheet(), xml, dims = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_drawing(
+  sheet = current_sheet(),
+  xml,
+  dims = NULL,
+  colOffset = 0,
+  rowOffset = 0
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1671,6 +1798,8 @@ Add xml drawing
 \item{\code{xml}}{xml}
 
 \item{\code{dims}}{dims}
+
+\item{\code{colOffset, rowOffset}}{offsets for column and row}
 }
 \if{html}{\out{</div>}}
 }
@@ -1684,7 +1813,13 @@ Add xml drawing
 
 Add xml chart
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_chart_xml(sheet = current_sheet(), xml, dims = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_chart_xml(
+  sheet = current_sheet(),
+  xml,
+  dims = NULL,
+  colOffset = 0,
+  rowOffset = 0
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1695,6 +1830,8 @@ Add xml chart
 \item{\code{xml}}{xml}
 
 \item{\code{dims}}{dims}
+
+\item{\code{colOffset, rowOffset}}{startCol and startRow}
 }
 \if{html}{\out{</div>}}
 }
@@ -1705,7 +1842,13 @@ Add xml chart
 \subsection{Method \code{add_mschart()}}{
 Add mschart chart to the workbook
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_mschart(sheet = current_sheet(), dims = NULL, graph)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_mschart(
+  sheet = current_sheet(),
+  dims = NULL,
+  graph,
+  colOffset = 0,
+  rowOffset = 0
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1716,6 +1859,8 @@ Add mschart chart to the workbook
 \item{\code{dims}}{the dimensions where the sheet will appear}
 
 \item{\code{graph}}{mschart graph}
+
+\item{\code{colOffset, rowOffset}}{startCol and startRow}
 }
 \if{html}{\out{</div>}}
 }

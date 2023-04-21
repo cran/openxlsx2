@@ -79,7 +79,7 @@ test_that("wb_to_df", {
   got <- wb_to_df(wb1, cols = c(1, 4), types = c("Var1" = 0, "Var3" = 1))
   test <- exp[c("Var1", "Var3")]
   test["Var1"] <- lapply(test["Var1"], as.character)
-  suppressWarnings(test["Var3"] <- lapply(test["Var3"], as.numeric))
+  suppressWarnings(test["Var3"] <- lapply(test["Var3"], function(x) as.numeric(replace(x, x == "#NUM!", "NaN"))))
   expect_equal(test, got, ignore_attr = TRUE)
 
   # start in row 5
@@ -259,6 +259,27 @@ test_that("improve date detection", {
 
   exp <- Sys.Date()
   got <- df$A
+  expect_equal(exp, got)
+
+})
+
+test_that("skip hidden columns and rows works", {
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = mtcars)$
+    set_col_widths(cols = c(1, 4, 6, 7, 9), hidden = TRUE)$
+    set_row_heights(rows = c(3, 5, 8:30), hidden = TRUE)$
+    add_data(dims = "M1", x = iris)
+
+  dat <- wb_to_df(wb, dims = "A1:K33", skipHiddenRows = TRUE, skipHiddenCols = TRUE)
+
+  exp <- c("2", "4", "6", "7", "31", "32", "33")
+  got <- rownames(dat)
+  expect_equal(exp, got)
+
+  exp <- c("cyl", "disp", "drat", "vs", "gear", "carb")
+  got <- names(dat)
   expect_equal(exp, got)
 
 })
