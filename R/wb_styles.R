@@ -143,6 +143,12 @@ create_border <- function(
   bottom   <- xml_node_create("bottom", xml_children = bottom_color, xml_attributes = bottom)
   diagonal <- xml_node_create("diagonal", xml_children = diagonal_color, xml_attributes = diagonal)
 
+  if (left     == "<left/>")     left     <- ""
+  if (right    == "<right/>")    right    <- ""
+  if (top      == "<top/>")      top      <- ""
+  if (bottom   == "<bottom/>")   bottom   <- ""
+  if (diagonal == "<diagonal/>") diagonal <- ""
+
   df_border <- data.frame(
     start = start,
     end = end,
@@ -235,7 +241,7 @@ create_font <- function(
     charset <- xml_node_create("charset", xml_attributes = c("val" = charset))
   }
 
-  if (!is.null(color) && all(color != "")) {
+  if (!is.null(color) && !all(color == "")) {
     # alt xml_attributes(theme:)
     color <- xml_node_create("color", xml_attributes = color)
   }
@@ -309,6 +315,9 @@ create_font <- function(
   )
   font <- write_font(df_font)
 
+  if (font == "<font/>")
+    font <- ""
+
   return(font)
 }
 
@@ -331,11 +340,11 @@ create_fill <- function(
 
   standardize_color_names(...)
 
-  if (!is.null(bgColor) && all(bgColor != "")) {
+  if (!is.null(bgColor) && !all(bgColor == "")) {
     bgColor <- xml_node_create("bgColor", xml_attributes = bgColor)
   }
 
-  if (!is.null(fgColor) && all(fgColor != "")) {
+  if (!is.null(fgColor) && !all(fgColor == "")) {
     fgColor <- xml_node_create("fgColor", xml_attributes = fgColor)
   }
 
@@ -343,7 +352,7 @@ create_fill <- function(
   # we end up with a solid black fill
   if (gradientFill == "") {
     patternFill <- xml_node_create("patternFill",
-                                   xml_children = c(bgColor, fgColor),
+                                   xml_children = c(fgColor, bgColor),
                                    xml_attributes = c(patternType = patternType))
   } else {
     patternFill <- ""
@@ -645,11 +654,13 @@ get_cell_styles <- function(wb, sheet, cell) {
 #' @param border_color "black"
 #' @param border_style "thin"
 #' @param bgFill Cell background fill color.
+#' @param fgColor Cell foreground fill color.
 #' @param text_bold bold
 #' @param text_strike strikeout
 #' @param text_italic italic
 #' @param text_underline underline 1, true, single or double
 #' @param ... ...
+#' @details It is possible to override border_color and border_style with {left, right, top, bottom}_color, {left, right, top, bottom}_style.
 #' @return A dxfs style node
 #' @seealso [wb_add_style()]
 #' @examples
@@ -682,6 +693,7 @@ create_dxfs_style <- function(
     border_color   = wb_color(getOption("openxlsx2.borderColor", "black")),
     border_style   = getOption("openxlsx2.borderStyle", "thin"),
     bgFill         = NULL,
+    fgColor        = NULL,
     text_bold      = NULL,
     text_strike    = NULL,
     text_italic    = NULL,
@@ -690,6 +702,9 @@ create_dxfs_style <- function(
 ) {
 
   standardize_color_names(...)
+
+  args <- list(...)
+  nams <- names(args)
 
   if (is.null(font_color)) font_color <- ""
   if (is.null(font_size)) font_size <- ""
@@ -707,21 +722,40 @@ create_dxfs_style <- function(
                       u = text_underline,
                       family = "", scheme = "")
 
-  if (!is.null(bgFill) && bgFill != "")
-    fill <- create_fill(patternType = "solid", bgColor = bgFill)
+  if ("patternType" %in% nams) {
+    patternType <- args$patternType
+  } else {
+    patternType <- "solid"
+  }
+
+  if (!is.null(bgFill) && !all(bgFill == ""))
+    fill <- create_fill(patternType = patternType, bgColor = bgFill, fgColor = fgColor)
   else
     fill <- NULL
 
   # untested
-  if (!is.null(border))
-    border <- create_border(left = border_style,
-                            left_color = border_color,
-                            right = border_style,
-                            right_color = border_color,
-                            top = border_style,
-                            top_color = border_color,
-                            bottom = border_style,
-                            bottom_color = border_color)
+  if (!is.null(border)) {
+
+    left_color   <- if ("left_color" %in% nams)   args$left_color   else border_color
+    left_style   <- if ("left_style" %in% nams)   args$left_style   else border_style
+    right_color  <- if ("right_color" %in% nams)  args$right_color  else border_color
+    right_style  <- if ("right_style" %in% nams)  args$right_style  else border_style
+    top_color    <- if ("top_color" %in% nams)    args$top_color    else border_color
+    top_style    <- if ("top_style" %in% nams)    args$top_style    else border_style
+    bottom_color <- if ("bottom_color" %in% nams) args$bottom_color else border_color
+    bottom_style <- if ("bottom_style" %in% nams) args$bottom_style else border_style
+
+    border <- create_border(
+      left         = left_style,
+      left_color   = left_color,
+      right        = right_style,
+      right_color  = right_color,
+      top          = top_style,
+      top_color    = top_color,
+      bottom       = bottom_style,
+      bottom_color = bottom_color
+    )
+  }
 
   xml_node_create(
     "dxf",
@@ -731,6 +765,150 @@ create_dxfs_style <- function(
       fill,
       border
     )
+  )
+
+}
+
+#' create tableStyle
+#' @param name name
+#' @param wholeTable wholeTable
+#' @param headerRow headerRow
+#' @param totalRow totalRow
+#' @param firstColumn firstColumn
+#' @param lastColumn lastColumn
+#' @param firstRowStripe firstRowStripe
+#' @param secondRowStripe secondRowStripe
+#' @param firstColumnStripe firstColumnStripe
+#' @param secondColumnStripe secondColumnStripe
+#' @param firstHeaderCell firstHeaderCell
+#' @param lastHeaderCell lastHeaderCell
+#' @param firstTotalCell firstTotalCell
+#' @param lastTotalCell lastTotalCell
+#' @export
+create_tablestyle <- function(
+    name,
+    wholeTable         = NULL,
+    headerRow          = NULL,
+    totalRow           = NULL,
+    firstColumn        = NULL,
+    lastColumn         = NULL,
+    firstRowStripe     = NULL,
+    secondRowStripe    = NULL,
+    firstColumnStripe  = NULL,
+    secondColumnStripe = NULL,
+    firstHeaderCell    = NULL,
+    lastHeaderCell     = NULL,
+    firstTotalCell     = NULL,
+    lastTotalCell      = NULL
+) {
+
+  tab_wholeTable <- NULL
+  if (length(wholeTable)) {
+    tab_wholeTable <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "wholeTable", dxfId = wholeTable))
+  }
+  tab_headerRow <- NULL
+  if (length(headerRow)) {
+    tab_headerRow <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "headerRow", dxfId = headerRow))
+  }
+  tab_totalRow <- NULL
+  if (length(totalRow)) {
+    tab_totalRow <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "totalRow", dxfId = totalRow))
+  }
+  tab_firstColumn <- NULL
+  if (length(firstColumn)) {
+    tab_firstColumn <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstColumn", dxfId = firstColumn))
+  }
+  tab_lastColumn <- NULL
+  if (length(lastColumn)) {
+    tab_lastColumn <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "lastColumn", dxfId = lastColumn))
+  }
+  tab_firstRowStripe <- NULL
+  if (length(firstRowStripe)) {
+    tab_firstRowStripe <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstRowStripe", dxfId = firstRowStripe))
+  }
+  tab_secondRowStripe <- NULL
+  if (length(secondRowStripe)) {
+    tab_secondRowStripe <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "secondRowStripe", dxfId = secondRowStripe))
+  }
+  tab_firstColumnStripe <- NULL
+  if (length(firstColumnStripe)) {
+    tab_firstColumnStripe <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstColumnStripe", dxfId = firstColumnStripe))
+  }
+  tab_secondColumnStripe <- NULL
+  if (length(secondColumnStripe)) {
+    tab_secondColumnStripe <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "secondColumnStripe", dxfId = secondColumnStripe))
+  }
+  tab_firstHeaderCell <- NULL
+  if (length(firstHeaderCell)) {
+    tab_firstHeaderCell <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstHeaderCell", dxfId = firstHeaderCell))
+  }
+  tab_lastHeaderCell <- NULL
+  if (length(lastHeaderCell)) {
+    tab_lastHeaderCell <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "lastHeaderCell", dxfId = lastHeaderCell))
+  }
+  tab_firstTotalCell <- NULL
+  if (length(firstTotalCell)) {
+    tab_firstTotalCell <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstTotalCell", dxfId = firstTotalCell))
+  }
+  tab_lastTotalCell <- NULL
+  if (length(lastTotalCell)) {
+    tab_lastTotalCell <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "lastTotalCell", dxfId = lastTotalCell))
+  }
+
+  xml_elements <- c(
+    tab_wholeTable,
+    tab_headerRow,
+    tab_totalRow,
+    tab_firstColumn,
+    tab_lastColumn,
+    tab_firstRowStripe,
+    tab_secondRowStripe,
+    tab_firstColumnStripe,
+    tab_secondColumnStripe,
+    tab_firstHeaderCell,
+    tab_lastHeaderCell,
+    tab_firstTotalCell,
+    tab_lastTotalCell
+  )
+
+  rand_str <- random_string(length = 12, pattern = "[A-Z0-9]")
+
+  xml_node_create(
+    "tableStyle",
+    xml_attributes = c(
+      name      = name,
+      pivot     = "0", # pivot uses different styles
+      count     = as_xml_attr(length(xml_elements)),
+      `xr9:uid` = sprintf("{CE23B8CA-E823-724F-9713-%s}", rand_str
+      )
+    ),
+    xml_children = xml_elements
   )
 
 }

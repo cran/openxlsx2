@@ -149,8 +149,6 @@ create_border
 
 \item{\code{calcChain}}{calcChain}
 
-\item{\code{apps}}{apps}
-
 \item{\code{charts}}{charts}
 
 \item{\code{is_chartsheet}}{is_chartsheet}
@@ -206,8 +204,6 @@ create_border
 \item{\code{sharedStrings}}{sharedStrings}
 
 \item{\code{styles_mgr}}{styles_mgr}
-
-\item{\code{styles_xml}}{styles_xml}
 
 \item{\code{tables}}{tables}
 
@@ -272,6 +268,7 @@ is created, not when the Excel files are saved.}
 \item \href{#method-wbWorkbook-save}{\code{wbWorkbook$save()}}
 \item \href{#method-wbWorkbook-open}{\code{wbWorkbook$open()}}
 \item \href{#method-wbWorkbook-buildTable}{\code{wbWorkbook$buildTable()}}
+\item \href{#method-wbWorkbook-update_table}{\code{wbWorkbook$update_table()}}
 \item \href{#method-wbWorkbook-copy_cells}{\code{wbWorkbook$copy_cells()}}
 \item \href{#method-wbWorkbook-get_base_font}{\code{wbWorkbook$get_base_font()}}
 \item \href{#method-wbWorkbook-set_base_font}{\code{wbWorkbook$set_base_font()}}
@@ -331,6 +328,8 @@ is created, not when the Excel files are saved.}
 \item \href{#method-wbWorkbook-set_cell_style}{\code{wbWorkbook$set_cell_style()}}
 \item \href{#method-wbWorkbook-clone_sheet_style}{\code{wbWorkbook$clone_sheet_style()}}
 \item \href{#method-wbWorkbook-add_sparklines}{\code{wbWorkbook$add_sparklines()}}
+\item \href{#method-wbWorkbook-add_ignore_error}{\code{wbWorkbook$add_ignore_error()}}
+\item \href{#method-wbWorkbook-set_sheetview}{\code{wbWorkbook$set_sheetview()}}
 \item \href{#method-wbWorkbook-clone}{\code{wbWorkbook$clone()}}
 }
 }
@@ -749,6 +748,7 @@ add formula
   startRow = 1,
   dims = rowcol_to_dims(startRow, startCol),
   array = FALSE,
+  cm = FALSE,
   applyCellStyle = TRUE,
   removeCellStyle = FALSE
 )}\if{html}{\out{</div>}}
@@ -768,6 +768,8 @@ add formula
 \item{\code{dims}}{dims}
 
 \item{\code{array}}{array}
+
+\item{\code{cm}}{cm}
 
 \item{\code{applyCellStyle}}{applyCellStyle}
 
@@ -1000,6 +1002,30 @@ Build table
 \item{\code{showRowStripes}}{showRowStripes}
 
 \item{\code{showColumnStripes}}{showColumnStripes}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorksheet} object, invisibly
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-update_table"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-update_table}{}}}
+\subsection{Method \code{update_table()}}{
+update a data_table
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$update_table(sheet = current_sheet(), dims = "A1", tabname)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{a worksheet}
+
+\item{\code{dims}}{cell used as start}
+
+\item{\code{tabname}}{a tablename}
 }
 \if{html}{\out{</div>}}
 }
@@ -1929,7 +1955,7 @@ Protect a workbook
   password = NULL,
   lockStructure = FALSE,
   lockWindows = FALSE,
-  type = c("1", "2", "4", "8"),
+  type = 1,
   fileSharing = FALSE,
   username = unname(Sys.info()["user"]),
   readOnlyRecommended = FALSE
@@ -2198,7 +2224,7 @@ get tables
 \subsection{Method \code{remove_tables()}}{
 remove tables
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$remove_tables(sheet = current_sheet(), table)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$remove_tables(sheet = current_sheet(), table, remove_data = TRUE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -2207,6 +2233,8 @@ remove tables
 \item{\code{sheet}}{sheet}
 
 \item{\code{table}}{table}
+
+\item{\code{remove_data}}{removes the data as well}
 }
 \if{html}{\out{</div>}}
 }
@@ -2910,6 +2938,134 @@ apply sparkline to worksheet
 \item{\code{sparklines}}{sparkline created by \code{create_sparkline()}}
 }
 \if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-add_ignore_error"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-add_ignore_error}{}}}
+\subsection{Method \code{add_ignore_error()}}{
+Ignore error on worksheet
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_ignore_error(
+  sheet = current_sheet(),
+  dims = "A1",
+  calculatedColumn = FALSE,
+  emptyCellReference = FALSE,
+  evalError = FALSE,
+  formula = FALSE,
+  formulaRange = FALSE,
+  listDataValidation = FALSE,
+  numberStoredAsText = FALSE,
+  twoDigitTextYear = FALSE,
+  unlockedFormula = FALSE
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{sheet}
+
+\item{\code{dims}}{dims}
+
+\item{\code{calculatedColumn}}{calculatedColumn}
+
+\item{\code{emptyCellReference}}{emptyCellReference}
+
+\item{\code{evalError}}{evalError}
+
+\item{\code{formula}}{formula}
+
+\item{\code{formulaRange}}{formulaRange}
+
+\item{\code{listDataValidation}}{listDataValidation}
+
+\item{\code{numberStoredAsText}}{numberStoredAsText}
+
+\item{\code{twoDigitTextYear}}{twoDigitTextYear}
+
+\item{\code{unlockedFormula}}{unlockedFormula}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-set_sheetview"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-set_sheetview}{}}}
+\subsection{Method \code{set_sheetview()}}{
+add sheetview
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$set_sheetview(
+  sheet = current_sheet(),
+  colorId = NULL,
+  defaultGridColor = NULL,
+  rightToLeft = NULL,
+  showFormulas = NULL,
+  showGridLines = NULL,
+  showOutlineSymbols = NULL,
+  showRowColHeaders = NULL,
+  showRuler = NULL,
+  showWhiteSpace = NULL,
+  showZeros = NULL,
+  tabSelected = NULL,
+  topLeftCell = NULL,
+  view = NULL,
+  windowProtection = NULL,
+  workbookViewId = NULL,
+  zoomScale = NULL,
+  zoomScaleNormal = NULL,
+  zoomScalePageLayoutView = NULL,
+  zoomScaleSheetLayoutView = NULL
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{sheet}
+
+\item{\code{colorId}}{colorId}
+
+\item{\code{defaultGridColor}}{defaultGridColor}
+
+\item{\code{rightToLeft}}{rightToLeft}
+
+\item{\code{showFormulas}}{showFormulas}
+
+\item{\code{showGridLines}}{showGridLines}
+
+\item{\code{showOutlineSymbols}}{showOutlineSymbols}
+
+\item{\code{showRowColHeaders}}{showRowColHeaders}
+
+\item{\code{showRuler}}{showRuler}
+
+\item{\code{showWhiteSpace}}{showWhiteSpace}
+
+\item{\code{showZeros}}{showZeros}
+
+\item{\code{tabSelected}}{tabSelected}
+
+\item{\code{topLeftCell}}{topLeftCell}
+
+\item{\code{view}}{view}
+
+\item{\code{windowProtection}}{windowProtection}
+
+\item{\code{workbookViewId}}{workbookViewId}
+
+\item{\code{zoomScale}}{zoomScale}
+
+\item{\code{zoomScaleNormal}}{zoomScaleNormal}
+
+\item{\code{zoomScalePageLayoutView}}{zoomScalePageLayoutView}
+
+\item{\code{zoomScaleSheetLayoutView}}{zoomScaleSheetLayoutView}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorksheetObject}, invisibly
 }
 }
 \if{html}{\out{<hr>}}

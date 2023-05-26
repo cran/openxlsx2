@@ -94,6 +94,7 @@ wb_save <- function(wb, path = NULL, overwrite = TRUE) {
 #' @details Formulae written using write_formula to a Workbook object will not get picked up by read_xlsx().
 #' This is because only the formula is written and left to Excel to evaluate the formula when the file is opened in Excel.
 #' The string `"_openxlsx_NA"` is reserved for `openxlsx2`. If the data frame contains this string, the output will be broken.
+#' Many base classes are covered, though not all and far from all third-party classes. When data of an unknown class is written, it is handled with `as.character()`.
 #' @rdname write_data
 #' @family workbook wrappers
 #' @return A clone of `wb``
@@ -307,32 +308,50 @@ wb_add_pivot_table <- function(
 #' @param startRow A vector specifying the starting row to write to.
 #' @param dims Spreadsheet dimensions that will determine startCol and startRow: "A1", "A1:B2", "A:B"
 #' @param array A bool if the function written is of type array
+#' @param cm A special kind of array function that hides the curly braces in the cell. Add this, if you see "@" inserted into your formulas
 #' @param applyCellStyle Should we write cell styles to the workbook
 #' @param removeCellStyle keep the cell style?
 #' @family workbook wrappers
 #' @export
 wb_add_formula <- function(
     wb,
-    sheet    = current_sheet(),
+    sheet           = current_sheet(),
     x,
-    startCol = 1,
-    startRow = 1,
-    dims     = rowcol_to_dims(startRow, startCol),
-    array    = FALSE,
+    startCol        = 1,
+    startRow        = 1,
+    dims            = rowcol_to_dims(startRow, startCol),
+    array           = FALSE,
+    cm              = FALSE,
     applyCellStyle  = TRUE,
     removeCellStyle = FALSE
 ) {
   assert_workbook(wb)
   wb$clone()$add_formula(
-    sheet    = sheet,
-    x        = x,
-    startCol = startCol,
-    startRow = startRow,
-    dims     = dims,
-    array    = array,
+    sheet           = sheet,
+    x               = x,
+    startCol        = startCol,
+    startRow        = startRow,
+    dims            = dims,
+    array           = array,
+    cm              = cm,
     applyCellStyle  = applyCellStyle,
     removeCellStyle = removeCellStyle
   )
+}
+
+#' update a data_table
+#' @param wb workbook
+#' @param sheet a worksheet
+#' @param dims cell used as start
+#' @param tabname a tablename
+#' @details Be aware that this function does not alter any filter. Excluding or adding rows does not make rows appear nor will it hide them.
+#' @examples
+#' wb <- wb_workbook()$add_worksheet()$add_data_table(x = mtcars)
+#' wb$update_table(tabname = "Table1", dims = "A1:J4")
+#' @export
+wb_update_table <- function(wb, sheet = current_sheet(), dims = "A1", tabname) {
+  assert_workbook(wb)
+  wb$clone()$update_table(sheet = sheet, dims = dims, tabname = tabname)
 }
 
 #' copy cells around
@@ -1024,6 +1043,7 @@ wb_get_base_font <- function(wb) {
 #' @param xWindow xWindow
 #' @param yWindow yWindow
 #' @return The `wbWorkbook` object
+#' @export
 wb_set_bookview <- function(
     wb,
     activeTab              = NULL,
@@ -1404,7 +1424,7 @@ wb_protect <- function(
     password            = NULL,
     lockStructure       = FALSE,
     lockWindows         = FALSE,
-    type                = c("1", "2", "4", "8"),
+    type                = 1,
     fileSharing         = FALSE,
     username            = unname(Sys.info()["user"]),
     readOnlyRecommended = FALSE
@@ -1875,6 +1895,7 @@ wb_get_tables <- function(wb, sheet = current_sheet()) {
 #' @param wb A workbook object
 #' @param sheet A name or index of a worksheet
 #' @param table Name of table to remove. See [wb_get_tables()]
+#' @param remove_data Removes the data as well
 #' @return character vector of table names on the specified sheet
 #' @examples
 #'
@@ -1899,9 +1920,9 @@ wb_get_tables <- function(wb, sheet = current_sheet()) {
 #' wb$remove_tables(sheet = 1, table = "iris")
 #' wb$add_data_table(sheet = 1, x = iris, tableName = "iris", startCol = 1)
 #' @export
-wb_remove_tables <- function(wb, sheet = current_sheet(), table) {
+wb_remove_tables <- function(wb, sheet = current_sheet(), table, remove_data = TRUE) {
   assert_workbook(wb)
-  wb$clone()$remove_tables(sheet = sheet, table = table)
+  wb$clone()$remove_tables(sheet = sheet, table = table, remove_data = remove_data)
 }
 
 
@@ -2866,4 +2887,133 @@ wb_clone_sheet_style <- function(wb, from = current_sheet(), to) {
 wb_add_sparklines <- function(wb, sheet = current_sheet(), sparklines) {
   assert_workbook(wb)
   wb$clone(deep = TRUE)$add_sparklines(sheet, sparklines)
+}
+
+#' Ignore error on worksheet
+#'
+#' @param wb workbook
+#' @param sheet sheet
+#' @param dims dims
+#' @param calculatedColumn calculatedColumn
+#' @param emptyCellReference emptyCellReference
+#' @param evalError evalError
+#' @param formula formula
+#' @param formulaRange formulaRange
+#' @param listDataValidation listDataValidation
+#' @param numberStoredAsText numberStoredAsText
+#' @param twoDigitTextYear twoDigitTextYear
+#' @param unlockedFormula unlockedFormula
+wb_add_ignore_error <- function(
+    wb,
+    sheet              = current_sheet(),
+    dims               = "A1",
+    calculatedColumn   = FALSE,
+    emptyCellReference = FALSE,
+    evalError          = FALSE,
+    formula            = FALSE,
+    formulaRange       = FALSE,
+    listDataValidation = FALSE,
+    numberStoredAsText = FALSE,
+    twoDigitTextYear   = FALSE,
+    unlockedFormula    = FALSE
+) {
+  assert_workbook(wb)
+  wb$clone()$add_ignore_error(
+    sheet              = sheet,
+    dims               = dims,
+    calculatedColumn   = calculatedColumn,
+    emptyCellReference = emptyCellReference,
+    evalError          = evalError,
+    formula            = formula,
+    formulaRange       = formulaRange,
+    listDataValidation = listDataValidation,
+    numberStoredAsText = numberStoredAsText,
+    twoDigitTextYear   = twoDigitTextYear,
+    unlockedFormula    = unlockedFormula
+    )
+}
+
+#' add sheetview
+#' @param wb workbook
+#' @param sheet sheet
+#' @param colorId,defaultGridColor Integer: A color, default is 64
+#' @param rightToLeft Logical: if TRUE column ordering is right  to left
+#' @param showFormulas Logical: if TRUE cell formulas are shown
+#' @param showGridLines Logical: if TRUE the worksheet grid is shown
+#' @param showOutlineSymbols Logical: if TRUE outline symbols are shown
+#' @param showRowColHeaders Logical: if TRUE row and column headers are shown
+#' @param showRuler Logical: if TRUE a ruler is shown in page layout view
+#' @param showWhiteSpace Logical: if TRUE margins are shown in page layout view
+#' @param showZeros Logical: if FALSE cells containing zero are shown blank if !showFormulas
+#' @param tabSelected Integer: zero vector indicating the selected tab
+#' @param topLeftCell Cell: the cell shown in the top left corner / or top right with rightToLeft
+#' @param view View: "normal", "pageBreakPreview" or "pageLayout"
+#' @param windowProtection Logical: if TRUE the panes are protected
+#' @param workbookViewId Interger: Pointing to some other view inside the workbook
+#' @param zoomScale,zoomScaleNormal,zoomScalePageLayoutView,zoomScaleSheetLayoutView Integer: the zoom scale should be between 10 and 400. These are values for current, normal etc.
+#' @examples
+#' wb <- wb_workbook()$add_worksheet()
+#'
+#' wb$set_sheetview(
+#'   zoomScale = 75,
+#'   rightToLeft = FALSE,
+#'   showFormulas = TRUE,
+#'   showGridLines = TRUE,
+#'   showOutlineSymbols = FALSE,
+#'   showRowColHeaders = TRUE,
+#'   showRuler = TRUE,
+#'   showWhiteSpace = FALSE,
+#'   tabSelected = 1,
+#'   topLeftCell = "B1",
+#'   view = "normal",
+#'   windowProtection = TRUE
+#' )
+#' @return The `wbWorksheetObject`, invisibly
+#' @export
+wb_set_sheetview <- function(
+    wb,
+    sheet                    = current_sheet(),
+    colorId                  = NULL,
+    defaultGridColor         = NULL,
+    rightToLeft              = NULL,
+    showFormulas             = NULL,
+    showGridLines            = NULL,
+    showOutlineSymbols       = NULL,
+    showRowColHeaders        = NULL,
+    showRuler                = NULL,
+    showWhiteSpace           = NULL,
+    showZeros                = NULL,
+    tabSelected              = NULL,
+    topLeftCell              = NULL,
+    view                     = NULL,
+    windowProtection         = NULL,
+    workbookViewId           = NULL,
+    zoomScale                = NULL,
+    zoomScaleNormal          = NULL,
+    zoomScalePageLayoutView  = NULL,
+    zoomScaleSheetLayoutView = NULL
+) {
+  assert_workbook(wb)
+  wb$clone()$set_sheetview(
+    sheet                    = sheet,
+    colorId                  = colorId,
+    defaultGridColor         = defaultGridColor,
+    rightToLeft              = rightToLeft,
+    showFormulas             = showFormulas,
+    showGridLines            = showGridLines,
+    showOutlineSymbols       = showOutlineSymbols,
+    showRowColHeaders        = showRowColHeaders,
+    showRuler                = showRuler,
+    showWhiteSpace           = showWhiteSpace,
+    showZeros                = showZeros,
+    tabSelected              = tabSelected,
+    topLeftCell              = topLeftCell,
+    view                     = view,
+    windowProtection         = windowProtection,
+    workbookViewId           = workbookViewId,
+    zoomScale                = zoomScale,
+    zoomScaleNormal          = zoomScaleNormal,
+    zoomScalePageLayoutView  = zoomScalePageLayoutView,
+    zoomScaleSheetLayoutView = zoomScaleSheetLayoutView
+  )
 }

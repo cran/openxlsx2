@@ -14,23 +14,23 @@ knitr::include_graphics("img/worksheet_styling.jpg")
 set.seed(123)
 mat <- matrix(rnorm(28 * 28, mean = 44444, sd = 555), ncol = 28)
 colnames(mat) <- make.names(seq_len(ncol(mat)))
-border_col <- wb_color(theme = "1")
+border_col <- wb_color(theme = 1)
 border_sty <- "thin"
 
 # prepare workbook with data and formated first row
 wb <- wb_workbook() %>%
   wb_add_worksheet("test") %>%
-  wb_add_data("test", mat) %>%
-  wb_add_border("test", "A1:AB1",
+  wb_add_data(x = mat) %>%
+  wb_add_border(dims = "A1:AB1",
     top_color = border_col, top_border = border_sty,
     bottom_color = border_col, bottom_border = border_sty,
     left_color = border_col, left_border = border_sty,
     right_color = border_col, right_border = border_sty,
     inner_hcolor = border_col, inner_hgrid = border_sty
   ) %>%
-  wb_add_fill("test", "A1:AB1", color = wb_color(hex = "FF334E6F")) %>%
-  wb_add_font("test", "A1:AB1", name = "Arial", bold = "1", color = wb_color(hex = "FFFFFFFF"), size = "20") %>%
-  wb_add_cell_style("test", "A1:AB1", horizontal = "center", textRotation = "45")
+  wb_add_fill(dims = "A1:AB1", color = wb_color(hex = "FF334E6F")) %>%
+  wb_add_font(dims = "A1:AB1", name = "Arial", bold = TRUE, color = wb_color(hex = "FFFFFFFF"), size = 20) %>%
+  wb_add_cell_style(dims = "A1:AB1", horizontal = "center", textRotation = 45)
 
 # create various number formats
 x <- c(
@@ -41,24 +41,23 @@ x <- c(
 # apply the styles
 for (i in seq_along(x)) {
   cell <- sprintf("%s2:%s29", int2col(i), int2col(i))
-  wb <- wb_add_numfmt(wb, "test", cell, x[i])
+  wb <- wb %>% wb_add_numfmt(dims = cell, numfmt = x[i])
 }
 
 # wb$open()
 
 ## -----------------------------------------------------------------------------
 # create workbook
-wb <- wb_workbook()
-wb <- wb_add_worksheet(wb, "test")
+wb <- wb_workbook() %>% wb_add_worksheet("test")
 
 # add some dummy data to the worksheet
 set.seed(123)
 mat <- matrix(rnorm(28 * 28, mean = 44444, sd = 555), ncol = 28)
 colnames(mat) <- make.names(seq_len(ncol(mat)))
-wb$add_data("test", mat, colNames = TRUE)
+wb$add_data(x = mat, colNames = TRUE)
 
 # create a border style and assign it to the workbook
-black <- c(rgb = "FF000000")
+black <- wb_color(hex = "FF000000")
 new_border <- create_border(
   bottom = "thin", bottom_color = black,
   top = "thin", top_color = black,
@@ -73,14 +72,14 @@ new_fill <- create_fill(patternType = "solid", fgColor = wb_color(hex = "FF334E6
 wb$styles_mgr$add(new_fill, "new_fill")
 
 # create a font style and assign it to the workbook
-new_font <- create_font(sz = "20", name = "Arial", b = "1", color = wb_color(hex = "FFFFFFFF"))
+new_font <- create_font(sz = 20, name = "Arial", b = TRUE, color = wb_color(hex = "FFFFFFFF"))
 wb$styles_mgr$add(new_font, "new_font")
 
 # create a new cell style, that uses the fill, the font and the border style
 new_cellxfs <- create_cell_style(
-  numFmtId = "0",
+  numFmtId = 0,
   horizontal = "center",
-  textRotation = "45",
+  textRotation = 45,
   fillId = wb$styles_mgr$get_fill_id("new_fill"),
   fontId = wb$styles_mgr$get_font_id("new_font"),
   borderId = wb$styles_mgr$get_border_id("new_border")
@@ -90,14 +89,16 @@ wb$styles_mgr$add(new_cellxfs, "new_styles")
 
 # assign the new cell style to the header row of our data set
 cell <- sprintf("A1:%s1", int2col(nrow(mat)))
-wb_set_cell_style(wb, "test", cell, wb$styles_mgr$get_xf_id("new_styles"))
+wb <- wb %>% wb_set_cell_style(
+  dims = cell,
+  style = wb$styles_mgr$get_xf_id("new_styles")
+)
 
 ## style the cells with some builtin format codes (no new numFmt entry is needed)
 # add builtin style ids
 x <- c(
-  "0", "1", "2", "3", "4", "9", "10", "11", "12", "13", "14", "15", "16",
-  "17", "18", "19", "20", "21", "22", "37", "38", "39", "40", "45", "46",
-  "47", "48", "49"
+  1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+  37, 38, 39, 40, 45, 46, 47, 48, 49
 )
 
 # create styles
@@ -112,7 +113,7 @@ for (i in seq_along(x)) {
 new_styles <- wb$styles_mgr$get_xf()
 for (i in as.integer(new_styles$id[new_styles$name %in% paste0("new_style", seq_along(x))])) {
   cell <- sprintf("%s2:%s29", int2col(i), int2col(i))
-  wb_set_cell_style(wb, "test", cell, i)
+  wb <- wb %>% wb_set_cell_style(dims = cell, style = i)
 }
 
 # assign a custom tabColor
@@ -186,14 +187,12 @@ wb$add_data("test", df)
 options("openxlsx2.numFmt" = NULL)
 
 ## -----------------------------------------------------------------------------
-sheet <- "mtcars"
-wb <- wb_workbook()
-wb <- wb_add_worksheet(wb, sheet)
-wb$add_data(sheet, mtcars, rowNames = TRUE)
+wb <- wb_workbook() %>%
+  wb_add_worksheet() %>%
+  wb_add_data(x = mtcars, rowNames = TRUE)
 
 cols <- 1:12
-wb <- wb_set_col_widths(wb, sheet, cols = cols, widths = "auto")
-wb
+wb <- wb %>% wb_set_col_widths(cols = cols, widths = "auto")
 
 ## -----------------------------------------------------------------------------
 wb <- wb_workbook()
@@ -201,15 +200,15 @@ wb <- wb_workbook()
 wb$add_worksheet("S1", gridLines = FALSE)$add_data(x = mtcars)
 wb$add_border(
   dims = "A2:K33",
-  inner_hgrid = "thin", inner_hcolor = c(rgb = "FF808080"),
-  inner_vgrid = "thin", inner_vcolor = c(rgb = "FF808080")
+  inner_hgrid = "thin", inner_hcolor = wb_color(hex = "FF808080"),
+  inner_vgrid = "thin", inner_vcolor = wb_color(hex = "FF808080")
 )
 # only horizontal grid
 wb$add_worksheet("S2", gridLines = FALSE)$add_data(x = mtcars)
-wb$add_border(dims = "A2:K33", inner_hgrid = "thin", inner_hcolor = c(rgb = "FF808080"))
+wb$add_border(dims = "A2:K33", inner_hgrid = "thin", inner_hcolor = wb_color(hex = "FF808080"))
 # only vertical grid
 wb$add_worksheet("S3", gridLines = FALSE)$add_data(x = mtcars)
-wb$add_border(dims = "A2:K33", inner_vgrid = "thin", inner_vcolor = c(rgb = "FF808080"))
+wb$add_border(dims = "A2:K33", inner_vgrid = "thin", inner_vcolor = wb_color(hex = "FF808080"))
 # no inner grid
 wb$add_worksheet("S4", gridLines = FALSE)$add_data(x = mtcars)
 wb$add_border("S4", dims = "A2:K33")
@@ -230,15 +229,15 @@ wb <- wb_workbook() %>%
   # add border for first row
   wb_add_border(
     dims = "B2:C2",
-    bottom_color = c(theme = "1"), bottom_border = "thin",
-    top_color = c(theme = "1"), top_border = "double",
-    left_border = "", right_border = ""
+    bottom_color = wb_color(theme = 1), bottom_border = "thin",
+    top_color = wb_color(theme = 1), top_border = "double",
+    left_border = NULL, right_border = NULL
   ) %>%
   # add border for last row
   wb_add_border(
     dims = "B4:C4",
-    bottom_color = c(theme = "1"), bottom_border = "double",
-    top_border = "", left_border = "", right_border = ""
+    bottom_color = wb_color(theme = 1), bottom_border = "double",
+    top_border = NULL, left_border = NULL, right_border = NULL
   )
 
 ## -----------------------------------------------------------------------------
@@ -246,13 +245,12 @@ wb <- wb_workbook() %>%
 mat <- matrix(1:4, ncol = 2, nrow = 2)
 colnames(mat) <- make.names(seq_len(ncol(mat)))
 
-wb <- wb_workbook()
-wb <- wb_add_worksheet(wb, "test")
-
-wb$add_data("test", mat, colNames = TRUE, startCol = 2, startRow = 2)
+wb <- wb_workbook() %>%
+  wb_add_worksheet("test") %>%
+  wb_add_data(x = mat, startCol = 2, startRow = 2)
 
 # create a border style and assign it to the workbook
-black <- c(rgb = "FF000000")
+black <- wb_color(hex = "FF000000")
 top_border <- create_border(
   top = "double", top_color = black,
   bottom = "thin", bottom_color = black
@@ -265,12 +263,12 @@ wb$styles_mgr$add(bottom_border, "bottom_border")
 
 # create a new cell style, that uses the fill, the font and the border style
 top_cellxfs <- create_cell_style(
-  numFmtId = "0",
+  numFmtId = 0,
   horizontal = "center",
   borderId = wb$styles_mgr$get_border_id("top_border")
 )
 bottom_cellxfs <- create_cell_style(
-  numFmtId = "0",
+  numFmtId = 0,
   borderId = wb$styles_mgr$get_border_id("bottom_border")
 )
 
@@ -280,9 +278,9 @@ wb$styles_mgr$add(bottom_cellxfs, "bottom_styles")
 
 # assign the new cell style to the header row of our data set
 cell <- "B2:C2"
-wb_set_cell_style(wb, "test", cell, wb$styles_mgr$get_xf_id("top_styles"))
+wb <- wb %>% wb_set_cell_style(dims = cell, style = wb$styles_mgr$get_xf_id("top_styles"))
 cell <- "B4:C4"
-wb_set_cell_style(wb, "test", cell, wb$styles_mgr$get_xf_id("bottom_styles"))
+wb <- wb %>% wb_set_cell_style(dims = cell, style = wb$styles_mgr$get_xf_id("bottom_styles"))
 
 ## ----echo=FALSE, warning=FALSE, out.width="100%", fig.cap="Tint variations of the theme colors."----
 knitr::include_graphics("img/color_tint.jpg")
@@ -297,9 +295,9 @@ for (i in 0:9) {
     col <- paste0(int2col(i + 1), which(tints %in% tnt))
 
     if (tnt == 0) {
-      wb <- wb %>% wb_add_fill(dims = col, color = wb_color(theme = as.character(i)))
+      wb <- wb %>% wb_add_fill(dims = col, color = wb_color(theme = i))
     } else {
-      wb <- wb %>% wb_add_fill(dims = col, color = wb_color(theme = as.character(i), tint = tnt))
+      wb <- wb %>% wb_add_fill(dims = col, color = wb_color(theme = i, tint = tnt))
     }
   }
 }
@@ -308,4 +306,124 @@ for (i in 0:9) {
 wb <- wb_load(system.file("extdata", "oxlsx2_sheet.xlsx", package = "openxlsx2")) %>%
   wb_set_cell_style(1, "A30:G35", wb_get_cell_style(., 1, "A10:G15"))
 # wb_open(wb)
+
+## -----------------------------------------------------------------------------
+txt <- paste(
+  fmt_txt("Embracing the full potential of "),
+  fmt_txt("openxlsx2", bold = TRUE, size = 16),
+  fmt_txt(" with "),
+  fmt_txt("fmt_txt()", font = "Courier"),
+  fmt_txt(" !")
+)
+wb <- wb_workbook()$add_worksheet()$add_data(x = txt)
+
+## -----------------------------------------------------------------------------
+df <- mtcars
+df[df < 4] <- NA
+
+na_red <- fmt_txt("N/A", color = wb_color("red"), italic = TRUE, bold = TRUE)
+
+wb <- wb_workbook()$add_worksheet()$add_data(x = df, na.strings = na_red)
+
+## -----------------------------------------------------------------------------
+# a red table style
+dx0 <- create_dxfs_style(
+  border = TRUE,
+  left_color = wb_color("red"),
+  right_color = NULL, right_style = NULL,
+  top_color = NULL, top_style = NULL,
+  bottom_color = NULL, bottom_style = NULL
+)
+
+dx1 <- create_dxfs_style(
+  border = TRUE,
+  left_color = wb_color("red"),
+  right_color = NULL, right_style = NULL,
+  top_color = NULL, top_style = NULL,
+  bottom_color = NULL, bottom_style = NULL
+)
+
+dx2 <- create_dxfs_style(
+  border = TRUE,
+  top_color = wb_color("red"),
+  left_color = NULL, left_style = NULL,
+  right_color = NULL, right_style = NULL,
+  bottom_color = NULL, bottom_style = NULL
+)
+
+dx3 <- create_dxfs_style(
+  border = TRUE,
+  top_color = wb_color("red"),
+  left_color = NULL, left_style = NULL,
+  right_color = NULL, right_style = NULL,
+  bottom_color = NULL, bottom_style = NULL
+)
+
+dx4 <- create_dxfs_style(
+  text_bold = TRUE
+)
+
+dx5 <- create_dxfs_style(
+  text_bold = TRUE
+)
+
+dx6 <- create_dxfs_style(
+  font_color = wb_color("red"),
+  text_bold = TRUE,
+  border = TRUE,
+  top_style = "double",
+  left_color = NULL, left_style = NULL,
+  right_color = NULL, right_style = NULL,
+  bottom_color = NULL, bottom_style = NULL
+)
+
+dx7 <- create_dxfs_style(
+  font_color = wb_color("white"),
+  text_bold = TRUE,
+  bgFill = wb_color("red"),
+  fgColor = wb_color("red")
+)
+
+dx8 <- create_dxfs_style(
+  border = TRUE,
+  left_color = wb_color("red"),
+  top_color = wb_color("red"),
+  right_color = wb_color("red"),
+  bottom_color = wb_color("red")
+)
+
+
+wb <- wb_workbook() %>%
+  wb_add_worksheet(gridLines = FALSE)
+
+wb$add_style(dx0)
+wb$add_style(dx1)
+wb$add_style(dx2)
+wb$add_style(dx3)
+wb$add_style(dx4)
+wb$add_style(dx5)
+wb$add_style(dx6)
+wb$add_style(dx7)
+wb$add_style(dx8)
+
+# finally create the table
+xml <- create_tablestyle(
+  name               = "red_table",
+  wholeTable         = wb$styles_mgr$get_dxf_id("dx8"),
+  headerRow          = wb$styles_mgr$get_dxf_id("dx7"),
+  totalRow           = wb$styles_mgr$get_dxf_id("dx6"),
+  firstColumn        = wb$styles_mgr$get_dxf_id("dx5"),
+  lastColumn         = wb$styles_mgr$get_dxf_id("dx4"),
+  firstRowStripe     = wb$styles_mgr$get_dxf_id("dx3"),
+  secondRowStripe    = wb$styles_mgr$get_dxf_id("dx2"),
+  firstColumnStripe  = wb$styles_mgr$get_dxf_id("dx1"),
+  secondColumnStripe = wb$styles_mgr$get_dxf_id("dx0")
+)
+
+
+wb$add_style(xml)
+
+# create a table and apply the custom style
+wb <- wb %>%
+  wb_add_data_table(x = mtcars, tableStyle = "red_table")
 

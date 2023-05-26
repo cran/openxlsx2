@@ -64,9 +64,9 @@ test_that("test add_border()", {
 
   # check borders
   exp <- c("<border><left/><right/><top/><bottom/><diagonal/></border>",
-           "<border><left><color rgb=\"FF000000\"/></left><right/><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom><diagonal/></border>",
-           "<border><left/><right><color rgb=\"FF000000\"/></right><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom><diagonal/></border>",
-           "<border><left/><right/><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom><diagonal/></border>"
+           "<border><left><color rgb=\"FF000000\"/></left><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>",
+           "<border><right><color rgb=\"FF000000\"/></right><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>",
+           "<border><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>"
   )
   got <- wb$styles_mgr$styles$borders
 
@@ -528,5 +528,26 @@ test_that("logical and numeric work too", {
     wb2$styles_mgr$styles$fonts,
     wb3$styles_mgr$styles$fonts
   )
+
+})
+
+test_that("create_tablestyle() works", {
+
+  exp <- "<tableStyle name=\"red_table\" pivot=\"0\" count=\"9\" xr9:uid=\"{CE23B8CA-E823-724F-9713-ASEVX1JWJGYG}\"><tableStyleElement type=\"wholeTable\" dxfId=\"8\"/><tableStyleElement type=\"headerRow\" dxfId=\"7\"/><tableStyleElement type=\"totalRow\" dxfId=\"6\"/><tableStyleElement type=\"firstColumn\" dxfId=\"5\"/><tableStyleElement type=\"lastColumn\" dxfId=\"4\"/><tableStyleElement type=\"firstRowStripe\" dxfId=\"3\"/><tableStyleElement type=\"secondRowStripe\" dxfId=\"2\"/><tableStyleElement type=\"firstColumnStripe\" dxfId=\"1\"/><tableStyleElement type=\"secondColumnStripe\" dxfId=\"0\"/></tableStyle>"
+  set.seed(123)
+  options("openxlsx2_seed" = NULL)
+  got <- create_tablestyle(
+    name               = "red_table",
+    wholeTable         = 8,
+    headerRow          = 7,
+    totalRow           = 6,
+    firstColumn        = 5,
+    lastColumn         = 4,
+    firstRowStripe     = 3,
+    secondRowStripe    = 2,
+    firstColumnStripe  = 1,
+    secondColumnStripe = 0
+  )
+  expect_equal(exp, got)
 
 })

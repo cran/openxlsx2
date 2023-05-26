@@ -345,6 +345,11 @@ test_that("wb_add_formula() is a wrapper", {
   expect_wrapper("add_formula",    wb = wb, params = list(sheet = 1, x = "=TODAY()"))
 })
 
+test_that("wb_update_table() is a wrapper", {
+  wb <- wb_workbook()$add_worksheet()$add_data_table(x = iris[1:10, ])
+  expect_wrapper("update_table", wb = wb, params = list(sheet = 1, tabname = "Table1", dims = "A1:D4"))
+})
+
 test_that("wb_copy_cells() is a wrapper", {
   wb <- wb_workbook()$add_worksheet(1)$add_data(x = "1")
   dat <- wb_data(wb, 1, dims = "A1", colNames = FALSE)
@@ -511,6 +516,18 @@ test_that("wb_add_sparklines() is a wrapper", {
 })
 
 
+# wb_set_sheetview() ------------------------------------------------------
+
+test_that("wb_set_sheetview() is a wrapper", {
+  wb <- wb_workbook()$add_worksheet()
+  expect_wrapper(
+    "set_sheetview",
+    wb = wb,
+    params = list(rightToLeft = TRUE)
+  )
+})
+
+
 # wb_add_style() ----------------------------------------------------------
 
 test_that("wb_add_style() is a wrapper", {
@@ -601,13 +618,24 @@ test_that("wb_add_mschart() is a wrapper", {
 
   wb <- wb_workbook()$add_worksheet()
 
-  # get style from b1 to assign it to a1
-  numfmt <- wb$get_cell_style(dims = "B1")
-
   expect_wrapper(
     "add_mschart",
     wb = wb,
     params = list(dims = "F4:L20", graph = scatter)
+  )
+
+})
+
+# wb_add_ignore_error() ---------------------------------------------------
+
+test_that("add_ignore_error is a wrapper", {
+
+  wb <- wb_workbook()$add_worksheet()
+
+  expect_wrapper(
+    "add_ignore_error",
+    wb = wb,
+    params = list(dims = "F4:L20", formula = TRUE)
   )
 
 })

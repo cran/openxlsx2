@@ -1,3 +1,33 @@
+# openxlsx2 (0.7)
+
+## New features
+
+* The `dims` argument of `wb_add_formula()` can be used to create a array references. A new `cm` argument was added which might be useful, if formulas previously created addition `@` in spreadsheet software. Examples how to use formulas were added to a new vignette. [593](https://github.com/JanMarvin/openxlsx2/pull/593)
+
+* Allow using custom data table styles. This fixes a few minor style inconsistencies. [594](https://github.com/JanMarvin/openxlsx2/pull/594)
+
+* Allow reading and writing `hms` columns. [601](https://github.com/JanMarvin/openxlsx2/pull/601)
+
+* Import `tableStyles` with `wb_load()` and improve `dxf` style creation. [603](https://github.com/JanMarvin/openxlsx2/pull/603)
+
+* Add `fmt_txt()` to style character strings. [607](https://github.com/JanMarvin/openxlsx2/pull/607)
+
+* Add new wrapper to ignore worksheet errors `wb_add_ignore_error()`. [617](https://github.com/JanMarvin/openxlsx2/pull/617)
+
+* Add new wrapper to update table references `wb_update_table()`. [606](https://github.com/JanMarvin/openxlsx2/pull/606)
+
+## Fixes
+
+* Improve handling of non standard `OutDec` options. [611](https://github.com/JanMarvin/openxlsx2/pull/611)
+
+* `openxlsx2` now does a better job of trying to return `character` values from classes that are foreign to it. This has been going on for quite some time, although previously we had a bug that treated such classes as `numeric`, resulting in corrupted xlsx files. [615](https://github.com/JanMarvin/openxlsx2/pull/615)
+
+* We now return a few additional xml arguments from worksheets. [617](https://github.com/JanMarvin/openxlsx2/pull/617)
+
+
+***************************************************************************
+
+
 # openxlsx2 (0.6.1)
 
 ## New features

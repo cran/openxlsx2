@@ -144,7 +144,13 @@ wb_load <- function(
 
   ## core
   if (length(appXML)) {
-    wb$app <- read_xml(appXML, pointer = FALSE)
+    app_xml <- read_xml(appXML)
+    nodes <- xml_node_name(app_xml, "Properties")
+    app_list <- lapply(
+      nodes,
+      FUN = function(x) xml_node(app_xml, "Properties", x)
+    )
+    names(app_list) <- nodes
   }
 
   if (length(coreXML) == 1) {
@@ -645,7 +651,15 @@ wb_load <- function(
       chartsheet_xml <- read_xml(sheets$target[i])
       wb$worksheets[[i]]$sheetPr <- xml_node(chartsheet_xml, "chartsheet", "sheetPr")
       wb$worksheets[[i]]$sheetViews    <- xml_node(chartsheet_xml, "chartsheet", "sheetViews")
+      wb$worksheets[[i]]$sheetProtection    <- xml_node(chartsheet_xml, "chartsheet", "sheetProtection")
+      wb$worksheets[[i]]$customSheetViews    <- xml_node(chartsheet_xml, "chartsheet", "customSheetViews")
       wb$worksheets[[i]]$pageMargins <- xml_node(chartsheet_xml, "chartsheet", "pageMargins")
+      wb$worksheets[[i]]$pageSetup <- xml_node(chartsheet_xml, "chartsheet", "pageSetup")
+      wb$worksheets[[i]]$headerFooter <- xml_node(chartsheet_xml, "chartsheet", "headerFooter")
+      wb$worksheets[[i]]$drawing <- xml_node(chartsheet_xml, "chartsheet", "drawing")
+      wb$worksheets[[i]]$drawingHF <- xml_node(chartsheet_xml, "chartsheet", "drawingHF")
+      wb$worksheets[[i]]$picture <- xml_node(chartsheet_xml, "chartsheet", "picture")
+      wb$worksheets[[i]]$webPublishItems <- xml_node(chartsheet_xml, "chartsheet", "webPublishItems")
     } else {
       worksheet_xml <- read_xml(sheets$target[i])
       if (!data_only) {
@@ -1144,7 +1158,8 @@ wb_load <- function(
   ## convert hyperliks to hyperlink objects
   if (!data_only)
     for (i in seq_len(nSheets)) {
-      wb$worksheets[[i]]$hyperlinks <- xml_to_hyperlink(wb$worksheets[[i]]$hyperlinks)
+      if (!wb$is_chartsheet[i])
+        wb$worksheets[[i]]$hyperlinks <- xml_to_hyperlink(wb$worksheets[[i]]$hyperlinks)
     }
 
   ## queryTables
