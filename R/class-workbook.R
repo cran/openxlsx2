@@ -177,13 +177,15 @@ wbWorkbook <- R6::R6Class(
     #' @param datetimeCreated The datetime (as `POSIXt`) the workbook is
     #'   created.  Defaults to the current `Sys.time()` when the workbook object
     #'   is created, not when the Excel files are saved.
+    #' @param theme Optional theme identified by string or number
     #' @return a `wbWorkbook` object
     initialize = function(
       creator         = NULL,
       title           = NULL,
       subject         = NULL,
       category        = NULL,
-      datetimeCreated = Sys.time()
+      datetimeCreated = Sys.time(),
+      theme           = NULL
     ) {
       self$app <- genBaseApp()
       self$charts <- list()
@@ -239,8 +241,40 @@ wbWorkbook <- R6::R6Class(
 
       self$tables <- NULL
       self$tables.xml.rels <- NULL
-      self$theme <- NULL
+      if (is.null(theme)) {
+        self$theme <- NULL
+      } else {
+        # read predefined themes
+        thm_rds <- system.file("extdata", "themes.rds", package = "openxlsx2")
+        themes <- readRDS(thm_rds)
 
+        if (is.character(theme)) {
+          sel <- match(theme, names(themes))
+          err <- is.na(sel)
+        } else {
+          sel <- theme
+          err <- sel > length(themes)
+        }
+
+        if (err) {
+          message("theme ", theme, " not found falling back to default theme")
+        } else {
+          self$theme <- stringi::stri_unescape_unicode(themes[[sel]])
+
+          # create the default font for the style
+          font_scheme <- xml_node(self$theme, "a:theme", "a:themeElements", "a:fontScheme")
+          minor_font <- xml_attr(font_scheme, "a:fontScheme", "a:minorFont", "a:latin")[[1]][["typeface"]]
+
+          self$styles_mgr$styles$fonts <- create_font(
+            sz = 11,
+            color = wb_color(theme = 1),
+            name = minor_font,
+            family = "2",
+            scheme = "minor"
+          )
+
+        }
+      }
 
       self$vbaProject <- NULL
       self$vml <- NULL
@@ -910,7 +944,7 @@ wbWorkbook <- R6::R6Class(
       }
 
       if (length(cmt_id)) {
-        self$append("comments", self$comments[[cmt_id]])
+        self$append("comments", self$comments[cmt_id])
         self$worksheets[[old]]$relships$comments <- length(self$comments)
       }
 
@@ -1192,16 +1226,34 @@ wbWorkbook <- R6::R6Class(
         self$add_worksheet()
       }
 
+      numfmts <- NULL
+      if (!is.null(numfmt <- params$numfmt)) {
+        if (length(numfmt) != length(data))
+          stop("length of numfmt and data does not match")
+
+        for (i in seq_along(numfmt)) {
+          if (names(numfmt)[i] == "formatCode") {
+            numfmt_i <- self$styles_mgr$next_numfmt_id()
+            sty_i <- create_numfmt(numfmt_i, formatCode = numfmt[i])
+            self$add_style(sty_i, sty_i)
+            numfmts <- c(numfmts, self$styles_mgr$get_numfmt_id(sty_i))
+          } else {
+            numfmts <- c(numfmts, as_xml_attr(numfmt[[i]]))
+          }
+        }
+      }
+
       pivot_table <- create_pivot_table(
-        x      = x,
-        dims   = dims,
-        filter = filter,
-        rows   = rows,
-        cols   = cols,
-        data   = data,
-        n      = length(self$pivotTables) + 1L,
-        fun    = fun,
-        params = params
+        x       = x,
+        dims    = dims,
+        filter  = filter,
+        rows    = rows,
+        cols    = cols,
+        data    = data,
+        n       = length(self$pivotTables) + 1L,
+        fun     = fun,
+        params  = params,
+        numfmts = numfmts
       )
 
       if (missing(filter)) filter <- ""
@@ -1352,6 +1404,7 @@ wbWorkbook <- R6::R6Class(
     #' @param na.strings A character vector of strings which are to be interpreted as NA. Blank cells will be returned as NA.
     #' @param na.numbers A numeric vector of digits which are to be interpreted as NA. Blank cells will be returned as NA.
     #' @param fillMergedCells If TRUE, the value in a merged cell is given to all cells within the merge.
+    #' @param keep_attributes If TRUE additional attributes are returned. (These are used internally to define a cell type.)
     #' @return a data frame
     to_df = function(
       sheet,
@@ -1373,7 +1426,8 @@ wbWorkbook <- R6::R6Class(
       showFormula     = FALSE,
       convert         = TRUE,
       types,
-      named_region
+      named_region,
+      keep_attributes = FALSE
     ) {
 
       if (missing(sheet)) sheet <- substitute()
@@ -1422,13 +1476,14 @@ wbWorkbook <- R6::R6Class(
     ) {
       if (missing(file)) file <- substitute()
       if (missing(sheet)) sheet <- substitute()
-      wb_load(
+      self <- wb_load(
         file       = file,
         xlsxFile   = xlsxFile,
         sheet      = sheet,
         data_only  = data_only,
         calc_chain = calc_chain
-        )
+      )
+      invisible(self)
     },
 
     # TODO wb_save can be shortened a lot by some formatting and by using a
@@ -2629,11 +2684,15 @@ wbWorkbook <- R6::R6Class(
 
         ## rename defined names
         if (length(self$workbook$definedNames)) {
-          ind <- wb_get_named_regions(self)$sheets == old
+          ind <- wb_get_named_regions(self)
+          # TODO why is the order switched?
+          ind <- ind[order(as.integer(rownames(ind))), ]
+          ind <- ind$sheets == old
+
           if (any(ind)) {
             nn <- sprintf("'%s'", new_name[i])
             nn <- stringi::stri_replace_all_fixed(self$workbook$definedName[ind], old, nn)
-            nn <- stringi::stri_replace_all(nn, "'+", "'")
+            nn <- stringi::stri_replace_all(nn, regex = "'+", replacement = "'")
             self$workbook$definedNames[ind] <- nn
           }
         }
@@ -2666,7 +2725,8 @@ wbWorkbook <- R6::R6Class(
       private$do_cell_init(sheet, dims)
 
       row_attr <- self$worksheets[[sheet]]$sheet_data$row_attr
-      sel <- match(rows, row_attr$r)
+      sel <- match(as.character(rows), row_attr$r)
+      sel <- sel[!is.na(sel)]
 
       if (!is.null(heights)) {
         if (length(rows) > length(heights)) {
@@ -2711,7 +2771,8 @@ wbWorkbook <- R6::R6Class(
         return(invisible(self))
       }
 
-      sel <- match(rows, row_attr$r)
+      sel <- match(as.character(rows), row_attr$r)
+      sel <- sel[!is.na(sel)]
       row_attr[sel, "ht"] <- ""
       row_attr[sel, "customHeight"] <- ""
 
@@ -3630,6 +3691,7 @@ wbWorkbook <- R6::R6Class(
 
     #' @description Add conditional formatting
     #' @param sheet sheet
+    #' @param dims dims
     #' @param cols cols
     #' @param rows rows
     #' @param rule rule
@@ -3638,20 +3700,23 @@ wbWorkbook <- R6::R6Class(
     #' @param params Additional parameters
     #' @returns The `wbWorkbook` object
     add_conditional_formatting = function(
-        sheet = current_sheet(),
-        cols,
-        rows,
-        rule  = NULL,
-        style = NULL,
+        sheet  = current_sheet(),
+        dims   = NULL,
+        cols   = NULL,
+        rows   = NULL,
+        rule   = NULL,
+        style  = NULL,
         # TODO add vector of possible values
-        type = c("expression", "colorScale",
-                 "dataBar", "iconSet",
-                 "duplicatedValues", "uniqueValues",
-                 "containsErrors", "notContainsErrors",
-                 "containsBlanks", "notContainsBlanks",
-                 "containsText", "notContainsText",
-                 "beginsWith", "endsWith",
-                 "between", "topN", "bottomN"),
+        type   = c(
+          "expression", "colorScale",
+          "dataBar", "iconSet",
+          "duplicatedValues", "uniqueValues",
+          "containsErrors", "notContainsErrors",
+          "containsBlanks", "notContainsBlanks",
+          "containsText", "notContainsText",
+          "beginsWith", "endsWith",
+          "between", "topN", "bottomN"
+        ),
         params = list(
           showValue = TRUE,
           gradient  = TRUE,
@@ -3667,12 +3732,20 @@ wbWorkbook <- R6::R6Class(
 
       type <- match.arg(type)
 
-      ## rows and cols
-      if (!is.numeric(cols)) {
-        cols <- col2int(cols)
-      }
+      if (length(cols) > 2)
+        warning("cols > 2, will create range from min to max.")
 
-      rows <- as.integer(rows)
+      ## rows and cols
+      if (!is.null(cols) && !is.null(rows)) {
+        if (!is.numeric(cols)) {
+          cols <- col2int(cols)
+        }
+        rows <- as.integer(rows)
+      } else if (!is.null(dims)) {
+        rowcol <- dims_to_rowcol(dims, as_integer = TRUE)
+        rows <- rowcol[[2]]
+        cols <- rowcol[[1]]
+      }
 
       ## check valid rule
       dxfId <- NULL
@@ -4754,11 +4827,19 @@ wbWorkbook <- R6::R6Class(
 
       if (!is.null(properties)) {
         # ensure only valid properties are listed
-        properties <- match.arg(properties, all_props, several.ok = TRUE)
+        if (is.null(names(properties))) {
+          properties <- match.arg(properties, all_props, several.ok = TRUE)
+          properties <- as_xml_attr(all_props %in% properties)
+          names(properties) <- all_props
+          properties <- properties[properties != "0"]
+        } else {
+          keep <- match.arg(names(properties), all_props, several.ok = TRUE)
+          properties <- properties[keep]
+          nms <- names(properties)
+          properties <- as_xml_attr(properties)
+          names(properties) <- nms
+        }
       }
-
-      properties <- as.character(as.numeric(all_props %in% properties))
-      names(properties) <- all_props
 
       if (!is.null(password))
         properties <- c(properties, password = hashPassword(password))
@@ -4767,7 +4848,7 @@ wbWorkbook <- R6::R6Class(
         "sheetProtection",
         xml_attributes = c(
           sheet = "1",
-          properties[properties != "0"]
+          properties
         )
       )
 
@@ -6251,6 +6332,106 @@ wbWorkbook <- R6::R6Class(
       invisible(self)
     },
 
+    #' @description set sheet style
+    #' @param sheet sheet
+    #' @param dims dims
+    #' @param name name
+    #' @param font_name,font_size optional else the default of the theme
+    #' @return The `wbWorkbook`, invisibly
+    add_named_style = function(
+      sheet = current_sheet(),
+      dims = "A1",
+      name = "Normal",
+      font_name = NULL,
+      font_size = NULL
+    ) {
+
+      if (is.null(font_name)) font_name <- self$get_base_font()$name$val
+      if (is.null(font_size)) font_size <- self$get_base_font()$size$val
+
+      # if required initialize the cell style
+      self$styles_mgr$init_named_style(name, font_name, font_size)
+
+      ids <- self$styles_mgr$getstyle_ids(name)
+
+      border_id <- ids[["borderId"]]
+      fill_id   <- ids[["fillId"]]
+      font_id   <- ids[["fontId"]]
+      numfmt_id <- ids[["numFmtId"]]
+      title_id  <- ids[["titleId"]]
+
+      self$add_cell_style(
+        dims     = dims,
+        borderId = border_id,
+        fillId   = fill_id,
+        fontId   = font_id,
+        numFmtId = numfmt_id,
+        xfId     = title_id
+      )
+      invisible(self)
+    },
+
+    #' @description create dxfs style
+    #' These styles are used with conditional formatting and custom table styles
+    #' @param name the style name
+    #' @param font_name the font name
+    #' @param font_size the font size
+    #' @param font_color the font color (a `wb_color()` object)
+    #' @param numFmt the number format
+    #' @param border logical if borders are applied
+    #' @param border_color the border color
+    #' @param border_style the border style
+    #' @param bgFill any background fill
+    #' @param gradientFill any gradient fill
+    #' @param text_bold logical if text is bold
+    #' @param text_italic logical if text is italic
+    #' @param text_underline logical if text is underlined
+    #' @param ... additional arguments passed to `create_dxfs_style()`
+    #' @return The `wbWorksheetObject`, invisibly
+    #' @export
+    add_dxfs_style = function(
+      name,
+      font_name      = NULL,
+      font_size      = NULL,
+      font_color     = NULL,
+      numFmt         = NULL,
+      border         = NULL,
+      border_color   = wb_color(getOption("openxlsx2.borderColor", "black")),
+      border_style   = getOption("openxlsx2.borderStyle", "thin"),
+      bgFill         = NULL,
+      gradientFill   = NULL,
+      text_bold      = NULL,
+      text_italic    = NULL,
+      text_underline = NULL,
+      ...
+    ) {
+
+      xml_style <- create_dxfs_style(
+        font_name      = font_name,
+        font_size      = font_size,
+        font_color     = font_color,
+        numFmt         = numFmt,
+        border         = border,
+        border_color   = border_color,
+        border_style   = border_style,
+        bgFill         = bgFill,
+        gradientFill   = gradientFill,
+        text_bold      = text_bold,
+        text_italic    = text_italic,
+        text_underline = text_underline,
+        ...            = ...
+      )
+
+      got <- self$styles_mgr$get_dxf_id(name)
+
+      if (!is.null(got) && !is.na(got))
+        warning("dxfs style names should be unique")
+
+      self$add_style(xml_style, name)
+
+      invisible(self)
+    },
+
     #' @description clone style from one sheet to another
     #' @param from the worksheet you are cloning
     #' @param to the worksheet the style is applied to
@@ -6870,24 +7051,14 @@ wbWorkbook <- R6::R6Class(
             ws$sheet_data$cc_out <- NULL
           }
 
-          # row_attr <- ws$sheet_data$row_attr
-          # nam_at <- names(row_attr)
-          # wanted <- as.character(seq(min(as.numeric(nam_at)),
-          #                            max(as.numeric(nam_at))))
-          # empty_row_attr <- wanted[!wanted %in% nam_at]
-          # # add empty list
-          # if (!identical(empty_row_attr, character()))
-          #   row_attr[[empty_row_attr]] <- list()
-          # # restore order
-          # ws$sheet_data$row_attr <- row_attr[wanted]
-
           # create entire sheet prior to writing it
           sheet_xml <- write_worksheet(
             prior = prior,
             post = post,
             sheet_data = ws$sheet_data
           )
-          write_xmlPtr(doc = sheet_xml, fl = file.path(xlworksheetsDir, sprintf("sheet%s.xml", i)))
+          ws_file <- file.path(xlworksheetsDir, sprintf("sheet%s.xml", i))
+          write_xmlPtr(doc = sheet_xml, fl = ws_file)
 
           ## write worksheet rels
           if (length(self$worksheets_rels[[i]]) || hasHL) {

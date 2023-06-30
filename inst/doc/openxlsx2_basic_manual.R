@@ -7,7 +7,7 @@ knitr::opts_chunk$set(
 )
 
 ## -----------------------------------------------------------------------------
-xlsxFile <- system.file("extdata", "readTest.xlsx", package = "openxlsx2")
+xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 
 ## -----------------------------------------------------------------------------
 # import workbook
@@ -31,11 +31,11 @@ wb_to_df(xlsxFile, dims = "A2:C5", colNames = FALSE)
 
 ## -----------------------------------------------------------------------------
 # read selected cols
-wb_to_df(xlsxFile, cols = c(1:2, 7))
+wb_to_df(xlsxFile, cols = c("A:B", "G"))
 
 ## -----------------------------------------------------------------------------
 # read selected rows
-wb_to_df(xlsxFile, rows = c(1, 4, 6))
+wb_to_df(xlsxFile, rows = c(2, 4, 6))
 
 ## -----------------------------------------------------------------------------
 # convert characters to numerics and date (logical too?)
@@ -43,7 +43,7 @@ wb_to_df(xlsxFile, convert = FALSE)
 
 ## -----------------------------------------------------------------------------
 # erase empty Rows from dataset
-wb_to_df(xlsxFile, sheet = 3, skipEmptyRows = TRUE) |> head()
+wb_to_df(xlsxFile, sheet = 1, skipEmptyRows = TRUE) |> tail()
 
 ## -----------------------------------------------------------------------------
 # erase empty Cols from dataset
@@ -51,11 +51,11 @@ wb_to_df(xlsxFile, skipEmptyCols = TRUE)
 
 ## -----------------------------------------------------------------------------
 # convert first row to rownames
-wb_to_df(xlsxFile, sheet = 3, dims = "C6:G9", rowNames = TRUE)
+wb_to_df(xlsxFile, sheet = 2, dims = "C6:G9", rowNames = TRUE)
 
 ## -----------------------------------------------------------------------------
 # define type of the data.frame
-wb_to_df(xlsxFile, cols = c(1, 4), types = c("Var1" = 0, "Var3" = 1))
+wb_to_df(xlsxFile, cols = c(2, 5), types = c("Var1" = 0, "Var3" = 1))
 
 ## -----------------------------------------------------------------------------
 # start in row 5
@@ -67,7 +67,7 @@ wb_to_df(xlsxFile, na.strings = "")
 
 ## -----------------------------------------------------------------------------
 # the file we are going to load
-xlsxFile <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 # loading the file into the workbook
 wb <- wb_load(file = xlsxFile)
 

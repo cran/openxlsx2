@@ -355,24 +355,24 @@ still function arguments that use camel-case).</p>
 <p>The basic read function changed from <code>read.xlsx</code> to
 <code>read_xlsx</code>. Using a default xlsx file included in the
 package:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>xlsxFile <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;readTest.xlsx&quot;</span>, <span class="at">package =</span> <span class="st">&quot;openxlsx2&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>xlsxFile <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;openxlsx2_example.xlsx&quot;</span>, <span class="at">package =</span> <span class="st">&quot;openxlsx2&quot;</span>)</span></code></pre></div>
 <p>The old syntax looked like this:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># read in openxlsx</span></span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>openxlsx<span class="sc">::</span><span class="fu">read.xlsx</span>(xlsxFile)</span></code></pre></div>
 <p>This has changed to this:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># read in openxlsx2</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>openxlsx2<span class="sc">::</span><span class="fu">read_xlsx</span>(xlsxFile)</span></code></pre></div>
-<pre><code>##     Var1 Var2 NA  Var3  Var4       Var5         Var6    Var7
-## 2   TRUE    1 NA     1     a 2015-02-07 3209324 This #DIV/0!
-## 3   TRUE   NA NA #NUM!     b 2015-02-06         &lt;NA&gt;    &lt;NA&gt;
-## 4   TRUE    2 NA  1.34     c 2015-02-05         &lt;NA&gt;   #NUM!
-## 5  FALSE    2 NA  &lt;NA&gt; #NUM!       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;
-## 6  FALSE    3 NA  1.56     e       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;
-## 7  FALSE    1 NA   1.7     f 2015-02-02         &lt;NA&gt;    &lt;NA&gt;
-## 8     NA   NA NA  &lt;NA&gt;  &lt;NA&gt; 2015-02-01         &lt;NA&gt;    &lt;NA&gt;
-## 9  FALSE    2 NA    23     h 2015-01-31         &lt;NA&gt;    &lt;NA&gt;
-## 10 FALSE    3 NA  67.3     i 2015-01-30         &lt;NA&gt;    &lt;NA&gt;
-## 11    NA    1 NA   123  &lt;NA&gt; 2015-01-29         &lt;NA&gt;    &lt;NA&gt;</code></pre>
+<pre><code>##     Var1 Var2 NA  Var3  Var4       Var5         Var6    Var7     Var8
+## 3   TRUE    1 NA     1     a 2023-05-29 3209324 This #DIV/0! 01:27:15
+## 4   TRUE   NA NA #NUM!     b 2023-05-23         &lt;NA&gt;       0 14:02:57
+## 5   TRUE    2 NA  1.34     c 2023-02-01         &lt;NA&gt; #VALUE! 23:01:02
+## 6  FALSE    2 NA  &lt;NA&gt; #NUM!       &lt;NA&gt;         &lt;NA&gt;       2 17:24:53
+## 7  FALSE    3 NA  1.56     e       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;
+## 8  FALSE    1 NA   1.7     f 2023-03-02         &lt;NA&gt;     2.7 08:45:58
+## 9     NA   NA NA  &lt;NA&gt;  &lt;NA&gt;       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;
+## 10 FALSE    2 NA    23     h 2023-12-24         &lt;NA&gt;      25     &lt;NA&gt;
+## 11 FALSE    3 NA  67.3     i 2023-12-25         &lt;NA&gt;       3     &lt;NA&gt;
+## 12    NA    1 NA   123  &lt;NA&gt; 2023-07-31         &lt;NA&gt;     122     &lt;NA&gt;</code></pre>
 <p>As you can see, we return the spreadsheet return codes (e.g.,
 <code>#NUM</code>) in openxlsx2. Another thing to see above, we return
 the cell row as rowname for the data frame returned.

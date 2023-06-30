@@ -3,7 +3,7 @@
 library(openxlsx2)
 
 ## ----read---------------------------------------------------------------------
-xlsxFile <- system.file("extdata", "readTest.xlsx", package = "openxlsx2")
+xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 
 ## ----old_read, eval = FALSE---------------------------------------------------
 #  # read in openxlsx

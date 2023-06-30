@@ -55,7 +55,7 @@
 #'   startRow = 4,
 #'   x = create_hyperlink(
 #'     sheet = "testing", row = 3, col = 10,
-#'     file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+#'     file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 #'   )
 #' )
 #'
@@ -65,7 +65,7 @@
 #'   startRow = 3,
 #'   x = create_hyperlink(
 #'     sheet = "testing", row = 3, col = 10,
-#'     file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"),
+#'     file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2"),
 #'     text = "Link to File."
 #'   )
 #' )
@@ -190,6 +190,7 @@ write_comment_xml <- function(comment_list, file_name) {
 
     ## Comment can have optional authors. Style and text is mandatory
     for (j in seq_along(comment_list[[i]]$comment)) {
+
       # write styles and comments
       if (is_xml(comment_list[[i]]$comment[[j]])) {
         comment <- comment_list[[i]]$comment[[j]]
@@ -197,9 +198,17 @@ write_comment_xml <- function(comment_list, file_name) {
         comment <- sprintf('<t xml:space="preserve">%s</t>', comment_list[[i]]$comment[[j]])
       }
 
-      xml <- c(xml, sprintf('<r>%s%s</r>',
-                            comment_list[[i]]$style[[j]],
-                            comment))
+      is_fmt_txt <- FALSE
+      if (is_xml(comment))
+      is_fmt_txt <- all(xml_node_name(comment) == "r")
+
+      if (is_fmt_txt) {
+        xml <- c(xml, comment)
+      } else {
+        xml <- c(xml, sprintf('<r>%s%s</r>',
+                              comment_list[[i]]$style[[j]],
+                              comment))
+      }
     }
 
     xml <- c(xml, "</text></comment>")
@@ -533,7 +542,7 @@ cacheFields <- function(wbdata, filter, rows, cols, data) {
             } else {
 
               if (is_char) {
-                xml_node_create("s", xml_attributes = c(v = uni))
+                xml_node_create("s", xml_attributes = c(v = uni), escapes = TRUE)
               } else if (is_date) {
                 xml_node_create("d", xml_attributes = c(v = uni))
               } else {
@@ -697,7 +706,8 @@ create_pivot_table <- function(
     data,
     n,
     fun,
-    params
+    params,
+    numfmts
   ) {
 
   if (missing(filter)) {
@@ -745,13 +755,59 @@ create_pivot_table <- function(
 
     dataField <- NULL
     axis <- NULL
+    sort <- NULL
+    autoSortScope <- NULL
+
     if (i %in% data_pos)    dataField <- c(dataField = "1")
+
     if (i %in% filter_pos)  axis <- c(axis = "axisPage")
-    if (i %in% rows_pos)    axis <- c(axis = "axisRow")
-    if (i %in% cols_pos)    axis <- c(axis = "axisCol")
 
-    attrs <- c(axis, dataField, showAll = "0")
+    if (i %in% rows_pos) {
+      axis <- c(axis = "axisRow")
+      sort <- params$sort_row
 
+      if (!is.null(sort) && !is.character(sort)) {
+        if (!abs(sort) %in% seq_along(rows_pos))
+          warning("invalid sort position found")
+
+       if (!abs(sort) == match(i, rows_pos))
+        sort <- NULL
+      }
+    }
+
+    if (i %in% cols_pos) {
+      axis <- c(axis = "axisCol")
+      sort <- params$sort_col
+
+      if (!is.null(sort) && !is.character(sort)) {
+        if (!abs(sort) %in% seq_along(cols_pos))
+          warning("invalid sort position found")
+
+       if (!abs(sort) == match(i, cols_pos))
+        sort <- NULL
+      }
+    }
+
+    if (!is.null(sort) && !is.character(sort)) {
+
+      autoSortScope <- read_xml(sprintf('
+        <autoSortScope>
+          <pivotArea dataOnly="0" outline="0" fieldPosition="0">
+            <references count="1">
+            <reference field="4294967294" count="1" selected="0">
+              <x v="%s" />
+            </reference>
+            </references>
+          </pivotArea>
+        </autoSortScope>
+        ',
+        abs(sort) - 1L), pointer = FALSE)
+
+      if (sign(sort) == -1) sort <- "descending"
+      else                  sort <- "ascending"
+    }
+
+    attrs <- c(axis, dataField, showAll = "0", sortType = sort)
 
     tmp <- xml_node_create(
       "pivotField",
@@ -761,7 +817,7 @@ create_pivot_table <- function(
       tmp <- xml_node_create(
         "pivotField",
         xml_attributes = attrs,
-        xml_children = paste0(get_items(x, i), collapse = ""))
+        xml_children = paste0(paste0(get_items(x, i), collapse = ""), autoSortScope))
     }
 
     pivotField <- c(pivotField, tmp)
@@ -825,7 +881,8 @@ create_pivot_table <- function(
             fld       = sprintf("%s", data_pos[i] - 1L),
             subtotal  = fun[i],
             baseField = "0",
-            baseItem  = "0"
+            baseItem  = "0",
+            numFmtId  = numfmts[i]
           )
         )
       )
@@ -969,7 +1026,7 @@ create_pivot_table <- function(
       applyPatternFormats     = applyPatternFormats,
       applyAlignmentFormats   = applyAlignmentFormats,
       applyWidthHeightFormats = applyWidthHeightFormats,
-      asteriskTotals          = params$asterixTotals,
+      asteriskTotals          = params$asteriskTotals,
       autoFormatId            = params$autoFormatId,
       chartFormat             = params$chartFormat,
       dataCaption             = dataCaption,
@@ -1007,7 +1064,7 @@ create_pivot_table <- function(
       pageStyle               = params$pageStyle,
       pageWrap                = params$pageWrap,
       # pivotTableStyle
-      preserveFormattinn      = params$preserveFormattin,
+      preserveFormatting      = params$preserveFormatting,
       printDrill              = params$printDrill,
       published               = params$published,
       rowGrandTotals          = params$rowGrandTotals,
@@ -1112,4 +1169,19 @@ write_workbook.xml.rels <- function(x, rm_sheet = NULL) {
 
   if (is.null(wxr[["TargetMode"]])) wxr$TargetMode <- ""
   df_to_xml("Relationship", df_col = wxr[c("Id", "Type", "Target", "TargetMode")])
+}
+
+#' convert objects with attribute labels into strings
+#' @param x an object to convert
+#' @keywords internal
+#' @noRd
+to_string <- function(x) {
+  lbls <- attr(x, "labels")
+  chr <- as.character(x)
+  if (!is.null(lbls)) {
+    lbls <- lbls[lbls %in% x]
+    sel_l <- match(lbls, x)
+    if (length(sel_l)) chr[sel_l] <- names(lbls)
+  }
+  chr
 }

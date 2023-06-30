@@ -43,6 +43,7 @@
 read_xml <- function(xml, pointer = TRUE, escapes = FALSE, declaration = FALSE, whitespace = TRUE, empty_tags = FALSE, skip_control = TRUE) {
 
   z <- NULL
+  xml <- unclass(xml)
 
   isvml <- grepl("^.vml$", xml)
 
@@ -237,7 +238,7 @@ print.pugi_xml <- function(x, indent = " ", raw = FALSE, attr_indent = FALSE, ..
 #' @param ... additional arguments passed to `read_xml()`
 #' @examples
 #' tmp_xlsx <- tempfile()
-#' xlsxFile <- system.file("extdata", "readTest.xlsx", package = "openxlsx2")
+#' xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 #' unzip(xlsxFile, exdir = tmp_xlsx)
 #'
 #' wb <- wb_load(xlsxFile)
@@ -267,6 +268,12 @@ as_xml <- function(x, ...) {
 #' @export
 # TODO needs a unit test
 write_file <- function(head = "", body = "", tail = "", fl = "", escapes = FALSE) {
+  if (getOption("openxlsx2.force_utf8_encoding", default = FALSE)) {
+      from_enc <- getOption("openxlsx2.native_encoding")
+      head <- stringi::stri_encode(head, from = from_enc, to = "UTF-8")
+      body <- stringi::stri_encode(body, from = from_enc, to = "UTF-8")
+      tail <- stringi::stri_encode(tail, from = from_enc, to = "UTF-8")
+  }
   xml_content <- stringi::stri_join(head, body, tail, collapse = "")
   xml_content <- write_xml_file(xml_content = xml_content, escapes = escapes)
   write_xmlPtr(xml_content, fl)

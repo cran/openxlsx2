@@ -8,10 +8,18 @@
 #' @param subject Workbook properties subject
 #' @param category Workbook properties category
 #' @param datetimeCreated The time of the workbook is created
+#' @param theme Optional theme identified by string or number
 #' @return A [wbWorkbook] object
 #'
 #' @export
 #' @family workbook wrappers
+#'
+#' @details
+#' "Atlas", "Badge", "Berlin", "Celestial", "Crop", "Depth", "Droplet",
+#' "Facet", "Feathered", "Gallery", "Headlines", "Integral", "Ion",
+#' "Ion Boardroom", "Madison", "Main Event", "Mesh", "Office Theme",
+#' "Old Office Theme", "Organic", "Parallax", "Parcel", "Retrospect",
+#' "Savon", "Slice", "Vapor Trail", "View", "Wisp", "Wood Type"
 #'
 #' @examples
 #' ## Create a new workbook
@@ -29,14 +37,16 @@ wb_workbook <- function(
   title           = NULL,
   subject         = NULL,
   category        = NULL,
-  datetimeCreated = Sys.time()
+  datetimeCreated = Sys.time(),
+  theme           = NULL
 ) {
   wbWorkbook$new(
     creator         = creator,
     title           = title,
     subject         = subject,
     category        = category,
-    datetimeCreated = datetimeCreated
+    datetimeCreated = datetimeCreated,
+    theme           = theme
   )
 }
 
@@ -623,6 +633,11 @@ wb_add_worksheet <- function(
 #'
 #' Clone a worksheet to a Workbook object
 #'
+#' @details
+#' Cloning is possible only to a limited extent. References to sheet names in
+#' formulas, charts, pivot tables, etc. may not be updated. Some elements like
+#' named ranges and slicers cannot be cloned yet.
+#'
 #' @param wb A [wbWorkbook] object
 #' @param old Name of existing worksheet to copy
 #' @param new Name of New worksheet to create
@@ -788,7 +803,7 @@ wb_set_col_widths <- function(wb, sheet = current_sheet(), cols, widths = 8.43, 
 #' @export
 #' @examples
 #' ## Create a new workbook
-#' wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+#' wb <- wb_load(file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2"))
 #'
 #' ## remove column widths in columns 1 to 20
 #' wb_remove_col_widths(wb, 1, cols = 1:20)
@@ -810,7 +825,7 @@ wb_remove_col_widths <- function(wb, sheet = current_sheet(), cols) {
 #' @export
 #' @examples
 #' ## Create a new workbook
-#' wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+#' wb <- wb_load(file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2"))
 #'
 #' ## remove any custom row heights in rows 1 to 10
 #' wb$remove_row_heights(1, rows = 1:10)
@@ -952,7 +967,7 @@ wb_add_drawing <- function(
 #' @export
 #' @examples
 #' ## load a workbook
-#' wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+#' wb <- wb_load(file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2"))
 #'
 #' ## Remove sheet 2
 #' wb <- wb_remove_worksheet(wb, 2)
@@ -1344,10 +1359,19 @@ wb_page_setup <- function(
 #' wb <- wb_workbook()
 #' wb$add_worksheet("S1")
 #' wb$add_data_table(1, x = iris[1:30, ])
-#' # Formatting cells / columns is allowed , but inserting / deleting columns is protected:
-#' wb$protect_worksheet("S1",
+#'
+#' wb$protect_worksheet(
+#'   "S1",
 #'   protect = TRUE,
 #'   properties = c("formatCells", "formatColumns", "insertColumns", "deleteColumns")
+#' )
+#'
+#' # Formatting cells / columns is allowed , but inserting / deleting columns is protected:
+#' wb$protect_worksheet(
+#'   "S1",
+#'   protect = TRUE,
+#'    c(formatCells = FALSE, formatColumns = FALSE,
+#'                  insertColumns = TRUE, deleteColumns = TRUE)
 #' )
 #'
 #' # Remove the protection
@@ -1455,10 +1479,10 @@ wb_protect <- function(
 #' @param print A logical. If `FALSE`, grid lines are not printed.
 #' @export
 #' @examples
-#' wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+#' wb <- wb_workbook()$add_worksheet()$add_worksheet()
 #' wb$get_sheet_names() ## list worksheets in workbook
 #' wb$grid_lines(1, show = FALSE)
-#' wb$grid_lines("testing", show = FALSE)
+#' wb$grid_lines("Sheet 2", show = FALSE)
 wb_grid_lines <- function(wb, sheet = current_sheet(), show = FALSE, print = show) {
   assert_workbook(wb)
   wb$clone()$grid_lines(sheet = sheet, show = show, print = print)
@@ -2093,7 +2117,11 @@ wb_get_creators <- function(wb) {
 
 #' Set worksheet names for a workbook
 #'
-#' Sets the worksheet names for a [wbWorkbook] object
+#' Sets the worksheet names for a [wbWorkbook] object.
+#'
+#' @details This only changes the sheet name as shown in spreadsheet software
+#' and will not alter it anywhere else. Not in formulas, chart references,
+#' named regions, pivot tables or anywhere else.
 #'
 #' @param wb A [wbWorkbook] object
 #' @param old The name (or index) of the old sheet name. If `NULL` will assume
@@ -2654,6 +2682,98 @@ wb_add_cell_style <- function(
   )
 }
 
+#' add named style for cell region
+#' @param wb wbWorkbook
+#' @param sheet sheet
+#' @param dims dims
+#' @param name name
+#' @param font_name,font_size optional else the default of the theme
+#' @return The `wbWorkbook`, invisibly
+#' @export
+wb_add_named_style <- function(
+    wb,
+    sheet = current_sheet(),
+    dims = "A1",
+    name = "Normal",
+    font_name = NULL,
+    font_size = NULL
+) {
+  assert_workbook(wb)
+  assert_class(name, "character")
+  wb$clone()$add_named_style(
+    sheet = sheet,
+    dims = dims,
+    name = name,
+    font_name = font_name,
+    font_size = font_size
+  )
+}
+
+#' add dxfs style
+#' These styles are used with conditional formatting and custom table styles
+#' @param wb wbWorkbook
+#' @param name the style name
+#' @param font_name the font name
+#' @param font_size the font size
+#' @param font_color the font color (a `wb_color()` object)
+#' @param numFmt the number format
+#' @param border logical if borders are applied
+#' @param border_color the border color
+#' @param border_style the border style
+#' @param bgFill any background fill
+#' @param gradientFill any gradient fill
+#' @param text_bold logical if text is bold
+#' @param text_italic logical if text is italic
+#' @param text_underline logical if text is underlined
+#' @param ... additional arguments passed to `create_dxfs_style()`
+#' @return The `wbWorkbookObject`, invisibly
+#' @examples
+#' wb <- wb_workbook() %>%
+#'   wb_add_worksheet() %>%
+#'   wb_add_dxfs_style(
+#'    name = "nay",
+#'    font_color = wb_color(hex = "FF9C0006"),
+#'    bgFill = wb_color(hex = "FFFFC7CE")
+#'   )
+#' @export
+wb_add_dxfs_style <- function(
+  wb,
+  name,
+  font_name      = NULL,
+  font_size      = NULL,
+  font_color     = NULL,
+  numFmt         = NULL,
+  border         = NULL,
+  border_color   = wb_color(getOption("openxlsx2.borderColor", "black")),
+  border_style   = getOption("openxlsx2.borderStyle", "thin"),
+  bgFill         = NULL,
+  gradientFill   = NULL,
+  text_bold      = NULL,
+  text_italic    = NULL,
+  text_underline = NULL,
+  ...
+) {
+
+  assert_workbook(wb)
+  wb$clone()$add_dxfs_style(
+    name           = name,
+    font_name      = font_name,
+    font_size      = font_size,
+    font_color     = font_color,
+    numFmt         = numFmt,
+    border         = border,
+    border_color   = border_color,
+    border_style   = border_style,
+    bgFill         = bgFill,
+    gradientFill   = gradientFill,
+    text_bold      = text_bold,
+    text_italic    = text_italic,
+    text_underline = text_underline,
+    ...            = ...
+  )
+
+}
+
 #' Add comment to worksheet
 #' @param wb A workbook object
 #' @param sheet A worksheet of the workbook
@@ -2758,6 +2878,7 @@ wb_add_form_control <- function(
 #' Add conditional formatting to cells
 #' @param wb A workbook object
 #' @param sheet A name or index of a worksheet
+#' @param dims A cell or cell range like "A1" or "A1:B2"
 #' @param cols Columns to apply conditional formatting to
 #' @param rows Rows to apply conditional formatting to
 #' @param rule The condition under which to apply the formatting. See examples.
@@ -2822,23 +2943,26 @@ wb_add_form_control <- function(
 #' wb <- wb_workbook()
 #' wb$add_worksheet("a")
 #' wb$add_data("a", 1:4, colNames = FALSE)
-#' wb$add_conditional_formatting("a", 1, 1:4, ">2")
+#' wb$add_conditional_formatting("a", cols = 1, rows = 1:4, rule = ">2")
 #' @export
 wb_add_conditional_formatting <- function(
     wb,
-    sheet = current_sheet(),
-    cols,
-    rows,
-    rule = NULL,
-    style = NULL,
-    type = c("expression", "colorScale",
-             "dataBar", "iconSet",
-             "duplicatedValues", "uniqueValues",
-             "containsErrors", "notContainsErrors",
-             "containsBlanks", "notContainsBlanks",
-             "containsText", "notContainsText",
-             "beginsWith", "endsWith",
-             "between", "topN", "bottomN"),
+    sheet  = current_sheet(),
+    dims   = NULL,
+    cols   = NULL,
+    rows   = NULL,
+    rule   = NULL,
+    style  = NULL,
+    type   = c(
+      "expression", "colorScale",
+      "dataBar", "iconSet",
+      "duplicatedValues", "uniqueValues",
+      "containsErrors", "notContainsErrors",
+      "containsBlanks", "notContainsBlanks",
+      "containsText", "notContainsText",
+      "beginsWith", "endsWith",
+      "between", "topN", "bottomN"
+    ),
     params = list(
       showValue = TRUE,
       gradient  = TRUE,
@@ -2850,6 +2974,7 @@ wb_add_conditional_formatting <- function(
   assert_workbook(wb)
   wb$clone()$add_conditional_formatting(
     sheet = sheet,
+    dims  = dims,
     cols  = cols,
     rows  = rows,
     rule  = rule,
@@ -2949,7 +3074,7 @@ wb_add_ignore_error <- function(
 #' @param topLeftCell Cell: the cell shown in the top left corner / or top right with rightToLeft
 #' @param view View: "normal", "pageBreakPreview" or "pageLayout"
 #' @param windowProtection Logical: if TRUE the panes are protected
-#' @param workbookViewId Interger: Pointing to some other view inside the workbook
+#' @param workbookViewId integer: Pointing to some other view inside the workbook
 #' @param zoomScale,zoomScaleNormal,zoomScalePageLayoutView,zoomScaleSheetLayoutView Integer: the zoom scale should be between 10 and 400. These are values for current, normal etc.
 #' @examples
 #' wb <- wb_workbook()$add_worksheet()

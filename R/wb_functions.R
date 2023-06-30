@@ -290,13 +290,14 @@ style_is_hms <- function(cellXfs, numfmt_date) {
 #' @param na.strings A character vector of strings which are to be interpreted as NA. Blank cells will be returned as NA.
 #' @param na.numbers A numeric vector of digits which are to be interpreted as NA. Blank cells will be returned as NA.
 #' @param fillMergedCells If TRUE, the value in a merged cell is given to all cells within the merge.
+#' @param keep_attributes If TRUE additional attributes are returned. (These are used internally to define a cell type.)
 #' @details
 #' Depending if the R package `hms` is loaded, `wb_to_df()` returns `hms` variables or string variables in the `hh:mm:ss` format.
 #' @examples
 #'
 #'   ###########################################################################
 #'   # numerics, dates, missings, bool and string
-#'   xlsxFile <- system.file("extdata", "readTest.xlsx", package = "openxlsx2")
+#'   xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 #'   wb1 <- wb_load(xlsxFile)
 #'
 #'   # import workbook
@@ -315,53 +316,42 @@ style_is_hms <- function(cellXfs, numfmt_date) {
 #'   wb_to_df(wb1, dims = "A2:C5", colNames = FALSE)
 #'
 #'   # read selected cols
-#'   wb_to_df(wb1, cols = c(1:2, 7))
+#'   wb_to_df(wb1, cols = c("A:B", "G"))
 #'
 #'   # read selected rows
-#'   wb_to_df(wb1, rows = c(1, 4, 6))
+#'   wb_to_df(wb1, rows = c(2, 4, 6))
 #'
 #'   # convert characters to numerics and date (logical too?)
 #'   wb_to_df(wb1, convert = FALSE)
 #'
 #'   # erase empty rows from dataset
-#'   wb_to_df(wb1, sheet = 3, skipEmptyRows = TRUE)
+#'   wb_to_df(wb1, skipEmptyRows = TRUE)
 #'
 #'   # erase empty columns from dataset
 #'   wb_to_df(wb1, skipEmptyCols = TRUE)
 #'
 #'   # convert first row to rownames
-#'   wb_to_df(wb1, sheet = 3, dims = "C6:G9", rowNames = TRUE)
+#'   wb_to_df(wb1, sheet = 2, dims = "C6:G9", rowNames = TRUE)
 #'
 #'   # define type of the data.frame
-#'   wb_to_df(wb1, cols = c(1, 4), types = c("Var1" = 0, "Var3" = 1))
+#'   wb_to_df(wb1, cols = c(2, 5), types = c("Var1" = 0, "Var3" = 1))
 #'
 #'   # start in row 5
 #'   wb_to_df(wb1, startRow = 5, colNames = FALSE)
 #'
 #'   # na string
-#'   wb_to_df(wb1, na.strings = "")
-#'
-#'   # read_xlsx(wb1)
-#'
-#'   ###########################################################################
-#'   # inlinestr
-#'   xlsxFile <- system.file("extdata", "inline_str.xlsx", package = "openxlsx2")
-#'   wb2 <- wb_load(xlsxFile)
-#'
-#'   # read dataset with inlinestr
-#'   wb_to_df(wb2)
-#'   # read_xlsx(wb2)
+#'   wb_to_df(wb1, na.strings = "a")
 #'
 #'   ###########################################################################
 #'   # named_region // namedRegion
 #'   xlsxFile <- system.file("extdata", "namedRegions3.xlsx", package = "openxlsx2")
-#'   wb3 <- wb_load(xlsxFile)
+#'   wb2 <- wb_load(xlsxFile)
 #'
 #'   # read dataset with named_region (returns global first)
-#'   wb_to_df(wb3, named_region = "MyRange", colNames = FALSE)
+#'   wb_to_df(wb2, named_region = "MyRange", colNames = FALSE)
 #'
 #'   # read named_region from sheet
-#'   wb_to_df(wb3, named_region = "MyRange", sheet = 4, colNames = FALSE)
+#'   wb_to_df(wb2, named_region = "MyRange", sheet = 4, colNames = FALSE)
 #'
 #' @export
 wb_to_df <- function(
@@ -385,7 +375,8 @@ wb_to_df <- function(
     showFormula     = FALSE,
     convert         = TRUE,
     types,
-    named_region
+    named_region,
+    keep_attributes = FALSE
 ) {
 
   # .mc <- match.call() # not (yet) used?
@@ -526,14 +517,12 @@ wb_to_df <- function(
       z[keep_col]  <- NA_character_
       tt[keep_col] <- NA_character_
 
-      # return expected order of columns
       z  <- z[keep_cols]
       tt <- tt[keep_cols]
     }
 
-
-    z  <- z[, colnames(z) %in% keep_cols, drop = FALSE]
-    tt <- tt[, colnames(tt) %in% keep_cols, drop = FALSE]
+    z  <- z[, match(keep_cols, colnames(z)), drop = FALSE]
+    tt <- tt[, match(keep_cols, colnames(tt)), drop = FALSE]
   }
 
   if (!is.null(cols)) {
@@ -546,8 +535,8 @@ wb_to_df <- function(
       tt[keep_col] <- NA_character_
     }
 
-    z  <- z[, colnames(z) %in% keep_cols, drop = FALSE]
-    tt <- tt[, colnames(tt) %in% keep_cols, drop = FALSE]
+    z  <- z[, match(keep_cols, colnames(z)), drop = FALSE]
+    tt <- tt[, match(keep_cols, colnames(tt)), drop = FALSE]
   }
 
   keep_rows <- keep_rows[keep_rows %in% rnams]
@@ -692,14 +681,15 @@ wb_to_df <- function(
           # TODO there probably is a better way in not reducing cc above, so
           # that we do not have to go through large xlsx files multiple times
           z_fill <- wb_to_df(
-            dims = filler,
-            xlsxFile = xlsxFile,
+            xlsxFile = wb,
             sheet = sheet,
+            dims = filler,
             na.strings = na.strings,
             convert = FALSE,
             colNames = FALSE,
             detectDates = detectDates,
-            showFormula = showFormula
+            showFormula = showFormula,
+            keep_attributes = TRUE
           )
 
           tt_fill <- attr(z_fill, "tt")
@@ -826,10 +816,12 @@ wb_to_df <- function(
     names(tt) <- xlsx_cols_names
   }
 
-  attr(z, "tt") <- tt
-  attr(z, "types") <- types
-  # attr(z, "sd") <- sd
-  if (!missing(named_region)) attr(z, "dn") <- nr
+  if (keep_attributes) {
+    attr(z, "tt") <- tt
+    attr(z, "types") <- types
+    # attr(z, "sd") <- sd
+    if (!missing(named_region)) attr(z, "dn") <- nr
+  }
   z
 }
 
@@ -884,19 +876,19 @@ wb_ws <- wb_get_worksheet
 #' @returns a data frame with tabSelected and names
 #' @export
 #' @examples
-#'   wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+#'   wb <- wb_load(file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2"))
 #'   # testing is the selected sheet
 #'   wb_get_selected(wb)
-#'   # change the selected sheet to IrisSample
-#'   wb <- wb_set_selected(wb, "IrisSample")
+#'   # change the selected sheet to Sheet2
+#'   wb <- wb_set_selected(wb, "Sheet2")
 #'   # get the active sheet
 #'   wb_get_active_sheet(wb)
-#'   # change the selected sheet to IrisSample
-#'   wb <- wb_set_active_sheet(wb, sheet = "IrisSample")
+#'   # change the selected sheet to Sheet2
+#'   wb <- wb_set_active_sheet(wb, sheet = "Sheet2")
 #' @name select_active_sheet
 wb_get_active_sheet <- function(wb) {
   assert_workbook(wb)
-  at <- rbindlist(xml_attr(wb$workbook$bookViews, "bookViews", "workbookView"))["activeTab"]
+  at <- rbindlist(xml_attr(wb$workbook$bookViews, "bookViews", "workbookView"))$activeTab
   # return c index as R index
   as.numeric(at) + 1
 }

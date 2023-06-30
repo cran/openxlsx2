@@ -58,7 +58,7 @@ test_that("comments", {
 
 test_that("load comments", {
 
-  fl <- system.file("extdata", "pivot_notes.xlsx", package = "openxlsx2")
+  fl <- testfile_path("pivot_notes.xlsx")
   wb <- wb_load(fl)
 
   temp <- temp_xlsx()
@@ -146,5 +146,25 @@ test_that("removing comment sheet works", {
     remove_worksheet(1)
 
   expect_silent(wb$save(temp))
+
+})
+
+test_that("fmt_txt in comment", {
+
+  tmp <- temp_xlsx()
+  txt <- fmt_txt("Hello ", bold = TRUE) + fmt_txt("World")
+  c1 <- create_comment(text = txt, author = "bla")
+
+  wb <- wb_workbook()$add_worksheet()$add_comment(dims = "B10", comment = c1)
+  expect_silent(wb$save(tmp))
+
+  wb <- wb$load(tmp)
+
+  exp <- c(
+    "<t xml:space=\"preserve\">bla:</t>", "<t xml:space=\"preserve\">\n</t>",
+    "<t xml:space=\"preserve\">Hello </t>", "<t>World</t>"
+  )
+  got <- wb$comments[[1]][[1]]$comment
+  expect_equal(exp, got)
 
 })

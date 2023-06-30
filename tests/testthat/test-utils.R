@@ -88,7 +88,7 @@ test_that("temp_dir works", {
 
 test_that("relship", {
 
-  wb <- wb_load(system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+  wb <- wb_load(testfile_path("loadExample.xlsx"))
 
   exp <- "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing3.xml\"/>"
   got <- relship_no(obj = wb$worksheets_rels[[3]], x = "table")
@@ -155,6 +155,39 @@ test_that("outdec = \",\" works", {
 
   exp <- "[1] 1,1"
   got <- capture.output(print(1.1))
+  expect_equal(exp, got)
+
+})
+
+test_that("fmt_txt works", {
+
+  exp <- structure(
+    "<r><rPr><b/></rPr><t xml:space=\"preserve\">Foo </t></r>",
+    class = c("character", "fmt_txt")
+  )
+  got <- fmt_txt("Foo ", bold = TRUE)
+  expect_equal(exp, got)
+
+  exp <- structure(
+    "<r><rPr><b/></rPr><t xml:space=\"preserve\">Hello </t></r><r><rPr/><t xml:space=\"preserve\">World </t></r>",
+    class = c("character", "fmt_txt")
+  )
+  got <- fmt_txt("Hello ", bold = TRUE) + fmt_txt("World ")
+  expect_equal(exp, got)
+
+  expect_message(got <- capture.output(print(got)), "fmt_txt string:")
+  exp <- "[1] \"Hello World \""
+  expect_equal(exp, got)
+
+  ## watch out!
+  txt <- fmt_txt("Sum ", bold = TRUE) + 2 + 2
+  exp <- "Sum 22"
+  got <- as.character(txt)
+  expect_equal(exp, got)
+
+  txt <- fmt_txt("Sum ", bold = TRUE) + (2 + 2)
+  exp <- "Sum 4"
+  got <- as.character(txt)
   expect_equal(exp, got)
 
 })

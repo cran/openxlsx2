@@ -1,4 +1,42 @@
-# openxlsx2 (0.7)
+# openxlsx2 0.7.1
+
+## New features
+
+* It is now possible to apply a specific theme to a workbook. [630](https://github.com/JanMarvin/openxlsx2/pull/630)
+
+* Removed a few of the former example files and updated the code to use a new default example. This changes internal testing to only run locally if online and external files are required. This reduces the package footprint a little, because 1MB of xlsx files are now excluded. [632](https://github.com/JanMarvin/openxlsx2/pull/632)
+
+* The handling of `fmt_txt()` objects has been improved. It now creates objects of class `fmt_txt` with their own `print()`, `+`, and `as.character()` methods. Such objects can now also be used as `text` in `create_comment()`. [636](https://github.com/JanMarvin/openxlsx2/pull/636)
+
+* Improve support for inputs with `labels` attribute. If e.g. a `factor` label is numeric, we now try to write the label as number. This should impact the way other partially labeled variables are written. [639](https://github.com/JanMarvin/openxlsx2/pull/639)
+
+* Added new wrapper function `wb_add_named_style()` this supports pre-defined theme aware cell styles like `Title` or `Note`. In addition loading of cell styles was improved and additional custom cell styles should be available as well. [628](https://github.com/JanMarvin/openxlsx2/pull/628)
+
+* Provide additional options to write special characters in non-unicode environments. [641](https://github.com/JanMarvin/openxlsx2/pull/641)
+
+* Add `wb_add_dxfs_style()` as single line wrapper to create dxf styles used in conditional formatting and custom table styles. [665](https://github.com/JanMarvin/openxlsx2/pull/665)
+
+## Fixes
+
+* On load `app.xml` is now assigned to `wb$app`. Previously it was loaded but not assigned. [629](https://github.com/JanMarvin/openxlsx2/pull/629)
+
+* Previously if `wb_to_df()` was used with argument `cols`, columns that were missing were created at the end of the output frame. Now columns are returned ordered. [631](https://github.com/JanMarvin/openxlsx2/pull/631)
+
+* Fix a bug in `wb_load()` that was modifying the cell range of conditional formatting. [647](https://github.com/JanMarvin/openxlsx2/pull/647)
+
+## Breaking changes
+
+* Order of arguments in `wb_add_conditional_formatting()` changed, because previously overlooked `dims` argument was added. [642](https://github.com/JanMarvin/openxlsx2/pull/642)
+
+* New argument `gradientFill` was added to `create_dxfs_style()`. [651](https://github.com/JanMarvin/openxlsx2/pull/651)
+
+* Special characters are now escaped in conditional formatting. Hence, previously manually escaped conditional formatting needs updates. [666](https://github.com/JanMarvin/openxlsx2/pull/666)
+
+
+***************************************************************************
+
+
+# openxlsx2 0.7
 
 ## New features
 
@@ -28,7 +66,7 @@
 ***************************************************************************
 
 
-# openxlsx2 (0.6.1)
+# openxlsx2 0.6.1
 
 ## New features
 
@@ -48,7 +86,7 @@
 ***************************************************************************
 
 
-# openxlsx2 (0.6)
+# openxlsx2 0.6
 
 ## New features
 
@@ -72,12 +110,12 @@
     * `get_cell_style()`
     * `set_cell_style()`
     * `wb_conditional_formatting()`
-  
+
   * remove deprecated arguments
     * `xy` argument for `write_data_table()` interacting functions
     * `file` from `xl_open()`
     * `definedName` from `wb_to_df()` interacting functions
-  
+
   * deprecating function
     * `get_named_regions()` for `wb_get_named_regions()`
 
@@ -85,7 +123,7 @@
 ***************************************************************************
 
 
-# openxlsx2 (0.5.1)
+# openxlsx2 0.5.1
 
 ## New features
 
@@ -113,7 +151,7 @@
 ***************************************************************************
 
 
-# openxlsx2 (0.5)
+# openxlsx2 0.5
 
 ## New features
 
@@ -154,10 +192,11 @@
 
 * Only documentation: `openxlsx2` defaults to American English 'color' from now on. Though, we fully support the previous 'colour'. Users will not have to adjust their code. Our documentation only lists `color`, but you can pass `colour` just the same way you used to. [501](https://github.com/JanMarvin/openxlsx2/pull/501) [502](https://github.com/JanMarvin/openxlsx2/pull/502)
 
+
 ***************************************************************************
 
 
-# openxlsx2  0.4.1
+# openxlsx2 0.4.1
 
 ## New features
 

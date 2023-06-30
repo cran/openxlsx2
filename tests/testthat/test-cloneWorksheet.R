@@ -1,10 +1,11 @@
 test_that("clone Worksheet with data", {
+
   wb <- wb_workbook()
   wb$add_worksheet("Sheet 1")
   wb$add_data("Sheet 1", 1)
   wb$clone_worksheet("Sheet 1", "Sheet 2")
 
-  file_name <- system.file("extdata", "cloneWorksheetExample.xlsx", package = "openxlsx2")
+  file_name <- testfile_path("cloneWorksheetExample.xlsx")
   refwb <- wb_load(file = file_name)
 
   expect_equal(wb$get_sheet_names(), refwb$get_sheet_names())
@@ -13,11 +14,12 @@ test_that("clone Worksheet with data", {
 
 
 test_that("clone empty Worksheet", {
+
   wb <- wb_workbook()
   wb$add_worksheet("Sheet 1")
   wb$clone_worksheet("Sheet 1", "Sheet 2")
 
-  file_name <- system.file("extdata", "cloneEmptyWorksheetExample.xlsx", package = "openxlsx2")
+  file_name <- testfile_path("cloneEmptyWorksheetExample.xlsx")
   refwb <- wb_load(file = file_name)
 
   expect_equal(wb$get_sheet_names(), refwb$get_sheet_names())
@@ -100,5 +102,19 @@ test_that("copy cells", {
 
   got <- wb_data(wb, sheet = 6, dims = "A20:D23", colNames = FALSE)
   expect_equal(unlist(t(dat)), unlist(got), ignore_attr = TRUE)
+
+})
+
+test_that("cloning comments works", {
+
+  tmp <- temp_xlsx()
+
+  c1 <- create_comment(text = "this is a comment",  author = "")
+
+  # cloning comments from loaded worksheet did not work
+  wb <- wb_workbook()$add_worksheet()$add_comment(dims = "A1", comment = c1)$save(tmp)
+  wb <- wb_load(tmp)$clone_worksheet()
+
+  expect_equal(wb$comments[[1]][[1]]$ref, wb$comments[[2]][[1]]$ref)
 
 })

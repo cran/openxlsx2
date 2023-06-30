@@ -21,10 +21,8 @@ library(openxlsx2)
 
 ```{r}
 wb <- wb_workbook()
-negStyle <- create_dxfs_style(font_color = wb_color(hex = "FF9C0006"), bgFill = wb_color(hex = "FFFFC7CE"))
-posStyle <- create_dxfs_style(font_color = wb_color(hex = "FF006100"), bgFill = wb_color(hex = "FFC6EFCE"))
-wb$styles_mgr$add(negStyle, "negStyle")
-wb$styles_mgr$add(posStyle, "posStyle")
+wb$add_dxfs_style(name = "negStyle", font_color = wb_color(hex = "FF9C0006"), bgFill = wb_color(hex = "FFFFC7CE"))
+wb$add_dxfs_style(name = "posStyle", font_color = wb_color(hex = "FF006100"), bgFill = wb_color(hex = "FFC6EFCE"))
 ```
 
 ## Rule applies to all each cell in range
@@ -251,7 +249,7 @@ knitr::include_graphics("img/cf_color_scale.jpg")
 ```
 
 ```{r}
-df <- read_xlsx(system.file("extdata", "readTest.xlsx", package = "openxlsx2"), sheet = 5)
+df <- read_xlsx("https://github.com/JanMarvin/openxlsx-data/raw/main/readTest.xlsx", sheet = 5)
 wb$add_worksheet("colorScale", zoom = 30)
 wb$add_data("colorScale", df, colNames = FALSE) ## write data.frame
 ```
@@ -262,7 +260,7 @@ If rule is `NULL`, min and max of cells is used. Rule must be the same length as
 ```{r}
 wb$add_conditional_formatting(
   "colorScale",
-  cols = seq_along(df),
+  cols = c(1, ncol(df)),
   rows = seq_len(nrow(df)),
   style = c("black", "white"),
   rule = c(0, 255),

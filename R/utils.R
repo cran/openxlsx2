@@ -172,10 +172,15 @@ random_string <- function(n = 1, length = 16, pattern = "[A-Za-z0-9]", keep_seed
   return(res)
 }
 
-#' row and col to dims
+#' dims helpers
+#' @description Internal helpers to (de)construct a dims argument from/to a row
+#'  and column vector. Exported for user convenience.
+#' @name dims_helper
 #' @param x a dimension object "A1" or "A1:A1"
-#' @param as_integer optional if the output should be returned as interger
-#' @noRd
+#' @param as_integer optional if the output should be returned as integer
+#' @examples
+#' dims_to_rowcol("A1:J10")
+#' @export
 dims_to_rowcol <- function(x, as_integer = FALSE) {
 
   dims <- x
@@ -230,10 +235,12 @@ rowcol_to_dim <- function(row, col) {
   stringi::stri_join(min_col, min_row)
 }
 
-#' row and col to dims
+#' @rdname dims_helper
 #' @param row a numeric vector of rows
 #' @param col a numeric or character vector of cols
-#' @noRd
+#' @examples
+#' rowcol_to_dims(1:10, 1:10)
+#' @export
 rowcol_to_dims <- function(row, col) {
 
   # no assert for col. will output character anyways
@@ -294,6 +301,23 @@ read_xml_files <- function(x) {
          USE.NAMES = FALSE)
 }
 
+#' unlist modifies names
+#' @param x a cf list
+#' @keywords internal
+#' @noRd
+un_list <- function(x) {
+
+  names <- vapply(x, length, NA_integer_)
+  nams <- NULL
+  for (i in seq_along(names)) {
+    nam <- rep(names(names[i]), names[i])
+    nams <- c(nams, nam)
+  }
+  x <- unlist(x, use.names = FALSE)
+  names(x) <- nams
+  x
+}
+
 #' format strings independent of the cell style.
 #' @details
 #' The result is an xml string. It is possible to paste multiple `fmt_txt()`
@@ -333,6 +357,7 @@ read_xml_files <- function(x) {
 #'  |"255"   | "OEM_CHARSET"        |
 #' @examples
 #' fmt_txt("bar", underline = TRUE)
+#' @name fmt_txt
 #' @export
 fmt_txt <- function(
     x,
@@ -409,11 +434,53 @@ fmt_txt <- function(
     )
   )
 
-  xml_node_create(
+  out <- xml_node_create(
     "r",
     xml_children = c(
       xml_rpr,
       xml_t
     )
   )
+  class(out) <- c("character", "fmt_txt")
+  out
+}
+
+#' @rdname fmt_txt
+#' @method + fmt_txt
+#' @param x an openxlsx2 fmt_txt string
+#' @param y an openxlsx2 fmt_txt string
+#' @details You can join additional objects into fmt_txt() objects using "+". Though be aware that `fmt_txt("sum:") + (2 + 2)` is different to `fmt_txt("sum:") + 2 + 2`.
+#' @examples
+#' fmt_txt("foo ", bold = TRUE) + fmt_txt("bar")
+#' @export
+"+.fmt_txt" <- function(x, y) {
+
+  if (!inherits(y, "character") || !inherits(y, "fmt_txt")) {
+    y <- fmt_txt(y)
+  }
+
+  z <- paste0(x, y)
+  class(z) <- c("character", "fmt_txt")
+  z
+}
+
+#' @rdname fmt_txt
+#' @method as.character fmt_txt
+#' @param x an openxlsx2 fmt_txt string
+#' @param ... unused
+#' @examples
+#' as.character(fmt_txt(2))
+#' @export
+as.character.fmt_txt <- function(x, ...) {
+  si_to_txt(xml_node_create("si", xml_children = x))
+}
+
+#' @rdname fmt_txt
+#' @method print fmt_txt
+#' @param x an openxlsx2 fmt_txt string
+#' @param ... additional arguments for default print
+#' @export
+print.fmt_txt <- function(x, ...) {
+  message("fmt_txt string: ")
+  print(as.character(x), ...)
 }

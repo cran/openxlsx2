@@ -2,7 +2,7 @@ test_that("wb_to_df", {
 
   ###########################################################################
   # numerics, dates, missings, bool and string
-  xlsxFile <- system.file("extdata", "readTest.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("readTest.xlsx")
   expect_silent(wb1 <- wb_load(xlsxFile))
 
   # import workbook
@@ -96,7 +96,7 @@ test_that("wb_to_df", {
 
   ###########################################################################
   # inlinestr
-  xlsxFile <- system.file("extdata", "inline_str.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("inline_str.xlsx")
   expect_silent(wb2 <- wb_load(xlsxFile))
 
   exp <- data.frame(
@@ -134,7 +134,7 @@ test_that("wb_to_df", {
 
 test_that("select_active_sheet", {
 
-  wb <- wb_load(file = system.file("extdata", "loadExample.xlsx", package = "openxlsx2"))
+  wb <- wb_load(file = testfile_path("loadExample.xlsx"))
 
   exp <- structure(
     list(tabSelected = c("", "1", "", ""),
@@ -280,6 +280,25 @@ test_that("skip hidden columns and rows works", {
 
   exp <- c("cyl", "disp", "drat", "vs", "gear", "carb")
   got <- names(dat)
+  expect_equal(exp, got)
+
+})
+
+test_that("cols return order is correct", {
+
+  wb <- wb_workbook()$add_worksheet()$add_data(dims = "B2", x = head(iris))
+
+  exp <- structure(
+    list(
+      c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_, NA_real_),
+      c(5.1, 4.9, 4.7, 4.6, 5, 5.4),
+      c(3.5, 3, 3.2, 3.1, 3.6, 3.9)
+    ),
+    names = c(NA, "Sepal.Length", "Sepal.Width"),
+    row.names = 3:8,
+    class = "data.frame"
+  )
+  got <- wb_to_df(wb, cols = c(1:3))
   expect_equal(exp, got)
 
 })

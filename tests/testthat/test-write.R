@@ -105,17 +105,6 @@ test_that("update_cells", {
   got <- unique(wb$worksheets[[1]]$sheet_data$cc$is)
   expect_equal(exp, got)
 
-  ### write logical
-  xlsxFile <- system.file("extdata", "readTest.xlsx", package = "openxlsx2")
-  wb1 <- wb_load(xlsxFile)
-
-  data <- head(wb_to_df(wb1, sheet = 3))
-  wb <- wb_workbook()$add_worksheet()$add_data(x = data)$add_data(x = data)
-
-  exp <- c("inlineStr", "", "b", "e")
-  got <- unique(wb$worksheets[[1]]$sheet_data$cc$c_t)
-  expect_equal(exp, got)
-
 
   set.seed(123)
   df <- data.frame(C = rnorm(10), D = rnorm(10))
@@ -139,6 +128,17 @@ test_that("update_cells", {
          f_t = c("array", "", "")),
     row.names = c("23", "110", "111"), class = "data.frame")
   got <- wb$worksheets[[1]]$sheet_data$cc[c(5, 8, 11), c("c_t", "f", "f_t")]
+  expect_equal(exp, got)
+
+  ### write logical
+  xlsxFile <- testfile_path("readTest.xlsx")
+  wb1 <- wb_load(xlsxFile)
+
+  data <- head(wb_to_df(wb1, sheet = 3))
+  wb <- wb_workbook()$add_worksheet()$add_data(x = data)$add_data(x = data)
+
+  exp <- c("inlineStr", "", "b", "e")
+  got <- unique(wb$worksheets[[1]]$sheet_data$cc$c_t)
   expect_equal(exp, got)
 
 })
@@ -167,7 +167,7 @@ test_that("write dims", {
 
 test_that("update cell(s)", {
 
-  xlsxFile <- system.file("extdata", "update_test.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("update_test.xlsx")
   wb <- wb_load(xlsxFile)
 
   # update Cells D4:D6 with 1:3
@@ -246,7 +246,7 @@ test_that("write_rownames", {
       class = "data.frame"),
     types = c(A = 0, B = 0)
   )
-  got <- wb_to_df(wb, 1, dims = "A1:B2", colNames = FALSE)
+  got <- wb_to_df(wb, 1, dims = "A1:B2", colNames = FALSE, keep_attributes = TRUE)
   expect_equal(exp, got)
 
   exp <- structure(
@@ -259,7 +259,7 @@ test_that("write_rownames", {
       class = "data.frame"),
     types = c(A = 0, B = 0)
   )
-  got <- wb_to_df(wb, 2, dims = "A1:B2", colNames = FALSE)
+  got <- wb_to_df(wb, 2, dims = "A1:B2", colNames = FALSE, keep_attributes = TRUE)
   expect_equal(exp, got)
 
 })
@@ -465,6 +465,25 @@ test_that("writing pivot tables works", {
 
 })
 
+test_that("writing pivot with escaped characters works", {
+
+  example_df <- data.frame(
+    location = c("London", "NYC", "NYC", "Berlin", "Madrid", "London", "Austin & Dallas"),
+    amount = c(7, 5, 3, 2.5, 6, 1, 17)
+  )
+
+  wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = example_df)
+  df <- wb_data(wb)
+  wb <- wb %>% wb_add_pivot_table(df, dims = "A3", rows = "location", data = "amount")
+
+  cf <- xml_node(wb$pivotDefinitions, "pivotCacheDefinition", "cacheFields", "cacheField")[1]
+
+  exp <- "<s v=\"Austin &amp; Dallas\"/>"
+  got <- xml_node(cf, "cacheField", "sharedItems", "s")[5]
+  expect_equal(exp, got)
+
+})
+
 test_that("writing na.strings = NULL works", {
 
   # write na.strings = na_strings()
@@ -535,5 +554,77 @@ test_that("write tibble class", {
   tmp <- temp_xlsx()
   expect_silent(write_xlsx(tbl, tmp))
   expect_equal(tbl, read_xlsx(tmp), ignore_attr = TRUE)
+
+})
+
+
+test_that("writing labeled variables works", {
+
+  x <- c(1, 2, 1, -99, -97)
+  attr(x, "labels") <- c("N/A" = -97, "NaN" = -98, "NA" = -99)
+
+  exp <- c("1", "2", "1", "NA", "N/A")
+  got <- to_string(x)
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = x)
+
+  exp <- c("1", "2", "1",
+           "<is><t>x</t></is>", "<is><t>NA</t></is>", "<is><t>N/A</t></is>")
+  cc <- wb$worksheets[[1]]$sheet_data$cc[c("v", "is")]
+  cc[cc$v == "", "v"] <- NA
+  cc[cc$is == "", "is"] <- NA
+  got <- unlist(cc[!is.na(cc)])
+  expect_equal(exp, got)
+
+  x <- factor(x = c("M", "F"), levels = c("M", "F"), labels = c(1L, 2L))
+  exp <- c("1", "2")
+  got <- to_string(x)
+  expect_equal(exp, got)
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = x)
+  exp <- c(1, 2)
+  got <- wb_to_df(wb, colNames = FALSE)$A
+  expect_equal(exp, got)
+
+})
+
+test_that("writing in specific encoding works", {
+
+  skip_on_cran()
+
+  loc <- Sys.getlocale("LC_CTYPE")
+  Sys.setlocale("LC_CTYPE", "")
+
+  options("openxlsx2.force_utf8_encoding" = TRUE)
+  options("openxlsx2.native_encoding" = "CP1251")
+
+  # a cyrillic string: https://github.com/JanMarvin/openxlsx2/issues/640
+  enc_str <- as.raw(c(0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2, 0xd0, 0xb3, 0xd0,
+                      0xb4))
+  enc_str <- rawToChar(enc_str)
+  Encoding(enc_str) <- "UTF-8"
+
+  loc_str <- stringi::stri_encode(enc_str, from = "UTF-8", to = "CP1251")
+
+  tmp <- temp_xlsx()
+  wb <- wb_workbook()$add_worksheet("sheet")$add_data("sheet", x = loc_str)
+  wb$save(tmp)
+  expect_silent(wb2 <- wb_load(tmp))
+
+  # exp <- wb$worksheets[[1]]$sheet_data$cc$is[1]
+  # got <- wb2$worksheets[[1]]$sheet_data$cc$is[1]
+  # expect_equal(exp, got)
+
+  # got <- stringi::stri_encode(wb_to_df(wb, colNames = FALSE)$A, from = "UTF-8", to = "CP1251")
+  # expect_equal(enc_str, got)
+
+  tmp <- tempfile()
+  write_file(head = "<a>", body = loc_str, tail = "</a>", fl = tmp)
+  # got <- xml_value(tmp, "a")
+  exp <- loc_str
+  got <- stringi::stri_encode(xml_value(tmp, "a"), from = "UTF-8", to = "CP1251")
+  expect_equal(exp, got)
+
+  Sys.setlocale("LC_CTYPE", loc)
 
 })

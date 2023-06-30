@@ -551,3 +551,252 @@ test_that("create_tablestyle() works", {
   expect_equal(exp, got)
 
 })
+
+test_that("wb_add_cell_style works with logical and numeric", {
+
+  wb <- wb_workbook()$add_worksheet()
+
+  wb$add_cell_style(wrapText = TRUE, textRotation = 45)
+
+  exp <- "<xf borderId=\"0\" fillId=\"0\" fontId=\"0\" numFmtId=\"0\" xfId=\"0\"><alignment textRotation=\"45\" wrapText=\"1\"/></xf>"
+  got <- wb$styles_mgr$styles$cellXfs[2]
+  expect_equal(exp, got)
+
+})
+
+test_that("wb_add_named_style() works", {
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_named_style(dims = "A1", name = "Title")$
+    add_data(dims = "A1", x = "Title")
+
+  exp <- "<cellStyle name=\"Title\" xfId=\"1\" builtinId=\"15\"/>"
+  got <- wb$styles_mgr$styles$cellStyles[2]
+  expect_equal(exp, got)
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_named_style(dims = "A1", name = "Good")$
+    add_data(dims = "A1", x = "Title")$
+    add_named_style(dims = "A1", name = "Good")
+
+  exp <- 2
+  got <- length(wb$styles_mgr$styles$cellStyles)
+  expect_equal(exp, got)
+
+
+  ### run all named styles for coverage
+  wb <- wb_workbook()$add_worksheet()
+
+  name <- "Normal"
+  dims <- "A1"
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Bad"
+  dims <- "B1"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Good"
+  dims <- "C1"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Neutral"
+  dims <- "D1"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Calculation"
+  dims <- "A2"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Check Cell"
+  dims <- "B2"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Explanatory Text"
+  dims <- "C2"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Input"
+  dims <- "D2"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Linked Cell"
+  dims <- "E2"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Note"
+  dims <- "F2"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Output"
+  dims <- "G2"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Warning Text"
+  dims <- "H2"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Heading 1"
+  dims <- "A3"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Heading 2"
+  dims <- "B3"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Heading 3"
+  dims <- "C3"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Heading 4"
+  dims <- "D3"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Title"
+  dims <- "E3"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Total"
+  dims <- "F3"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  for (i in seq_len(6)) {
+
+    name <- paste0("20% - Accent", i)
+    dims <- paste0(int2col(i), "4")
+    wb <- wb_add_named_style(wb, dims = dims, name = name)
+    wb$add_data(dims = dims, x = name)
+
+    name <- paste0("40% - Accent", i)
+    dims <- paste0(int2col(i), "5")
+    wb <- wb_add_named_style(wb, dims = dims, name = name)
+    wb$add_data(dims = dims, x = name)
+
+    name <- paste0("60% - Accent", i)
+    dims <- paste0(int2col(i), "6")
+    wb <- wb_add_named_style(wb, dims = dims, name = name)
+    wb$add_data(dims = dims, x = name)
+
+    name <- paste0("Accent", i)
+    dims <- paste0(int2col(i), "7")
+    wb <- wb_add_named_style(wb, dims = dims, name = name)
+    wb$add_data(dims = dims, x = name)
+
+  }
+
+  name <- "Comma"
+  dims <- "A8"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Comma [0]"
+  dims <- "B8"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Currency"
+  dims <- "C8"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Currency [0]"
+  dims <- "D8"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  name <- "Per cent"
+  dims <- "E8"
+  wb <- wb_add_named_style(wb, dims = dims, name = name)
+  wb$add_data(dims = dims, x = name)
+
+  exp <- c(
+    "Bad", "Good", "Neutral", "Calculation", "Check Cell", "Explanatory Text",
+    "Input", "Linked Cell", "Note", "Output", "Warning Text", "Heading 1",
+    "Heading 2", "Heading 3", "Heading 4", "Title", "Total", "20% - Accent1",
+    "40% - Accent1", "60% - Accent1", "Accent1", "20% - Accent2",
+    "40% - Accent2", "60% - Accent2", "Accent2", "20% - Accent3",
+    "40% - Accent3", "60% - Accent3", "Accent3", "20% - Accent4",
+    "40% - Accent4", "60% - Accent4", "Accent4", "20% - Accent5",
+    "40% - Accent5", "60% - Accent5", "Accent5", "20% - Accent6",
+    "40% - Accent6", "60% - Accent6", "Accent6", "Comma", "Comma [0]",
+    "Currency", "Currency [0]", "Per cent"
+  )
+  got <- wb$styles_mgr$cellStyle$name
+  expect_equal(exp, got)
+
+})
+
+test_that("wb_add_dxfs_style() works", {
+  wb <- wb_workbook() %>%
+    wb_add_worksheet() %>%
+    wb_add_dxfs_style(
+      name = "nay",
+      font_color = wb_color(hex = "FF9C0006"),
+      bgFill = wb_color(hex = "FFFFC7CE")
+    ) %>%
+    wb_add_dxfs_style(
+      name = "yay",
+      font_color = wb_color(hex = "FF006100"),
+      bgFill = wb_color(hex = "FFC6EFCE")
+    ) %>%
+    wb_add_data(x = -5:5) %>%
+    wb_add_data(x = LETTERS[1:11], startCol = 2) %>%
+    wb_add_conditional_formatting(
+      cols = 1,
+      rows = 1:11,
+      rule = "!=0",
+      style = "nay"
+    ) %>%
+    wb_add_conditional_formatting(
+      cols = 1,
+      rows = 1:11,
+      rule = "==0",
+      style = "yay"
+    )
+
+  exp <- c(
+    `A1:A11` = "<cfRule type=\"expression\" dxfId=\"0\" priority=\"2\"><formula>A1&lt;&gt;0</formula></cfRule>",
+    `A1:A11` = "<cfRule type=\"expression\" dxfId=\"1\" priority=\"1\"><formula>A1=0</formula></cfRule>"
+  )
+  got <- wb$worksheets[[1]]$conditionalFormatting
+  expect_equal(exp, got)
+
+  exp <- c("nay", "yay")
+  got <- wb$styles_mgr$dxf$name
+  expect_equal(exp, got)
+
+  expect_warning(
+    wb_workbook() %>%
+    wb_add_worksheet() %>%
+    wb_add_dxfs_style(
+      name = "nay",
+      font_color = wb_color(hex = "FF9C0006"),
+      bgFill = wb_color(hex = "FFFFC7CE")
+    ) %>%
+    wb_add_dxfs_style(
+      name = "nay",
+      font_color = wb_color(hex = "FF006100"),
+      bgFill = wb_color(hex = "FFC6EFCE")
+    ),
+    "dxfs style names should be unique"
+  )
+
+})

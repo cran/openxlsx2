@@ -224,8 +224,8 @@ write_data2 <- function(
   if (any(dc == openxlsx2_celltype[["factor"]])) {
     is_factor <- dc == openxlsx2_celltype[["factor"]]
     fcts <- names(dc[is_factor])
-    data[fcts] <- lapply(data[fcts], as.character)
-    dc <- openxlsx2_type(data)
+    data[fcts] <- lapply(data[fcts], to_string)
+    # dc <- openxlsx2_type(data)
   }
 
   hconvert_date1904 <- grepl('date1904="1"|date1904="true"',
@@ -348,9 +348,14 @@ write_data2 <- function(
     }
   }
 
-  sel <- which(dc == openxlsx2_celltype[["character"]]) # character
+  sel <- which(dc == openxlsx2_celltype[["character"]] | dc == openxlsx2_celltype[["factor"]]) # character
   if (length(sel)) {
     data[sel][is.na(data[sel])] <- "_openxlsx_NA"
+
+    if (getOption("openxlsx2.force_utf8_encoding", default = FALSE)) {
+      from_enc <- getOption("openxlsx2.native_encoding")
+      data[sel] <- lapply(data[sel], stringi::stri_encode, from = from_enc, to = "UTF-8")
+    }
   }
 
   string_nums <- getOption("openxlsx2.string_nums", default = 0)
@@ -1003,12 +1008,11 @@ write_data_table <- function(
 #'
 #' ###########################################################################
 #' # update cell range and add mtcars
-#' xlsxFile <- system.file("extdata", "inline_str.xlsx", package = "openxlsx2")
+#' xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 #' wb2 <- wb_load(xlsxFile)
 #'
 #' # read dataset with inlinestr
 #' wb_to_df(wb2)
-#' # read_xlsx(wb2)
 #' write_data(wb2, 1, mtcars, startCol = 4, startRow = 4)
 #' wb_to_df(wb2)
 write_data <- function(

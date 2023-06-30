@@ -1,9 +1,9 @@
 test_that("xf", {
 
-  xlsxFile <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("loadExample.xlsx")
   wb <- wb_load(xlsxFile)
 
-  xlsxFile <- system.file("extdata", "readTest.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("readTest.xlsx")
   wb1 <- wb_load(xlsxFile)
 
   # likely not ordered entirely correct
@@ -36,7 +36,7 @@ test_that("xf", {
 
 test_that("border", {
 
-  xlsxFile <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("loadExample.xlsx")
   wb <- wb_load(xlsxFile)
 
   # likely not ordered entirely correct
@@ -64,17 +64,17 @@ test_that("border", {
 
 test_that("cellStyle", {
 
-  xlsxFile <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("loadExample.xlsx")
   wb <- wb_load(xlsxFile)
 
   # likely not ordered entirely correct
-  exp <- c("name", "xfId", "builtinId", "customBuiltin", "extLst", "hidden", "iLevel")
+  exp <- c("name", "xfId", "xr:uid", "builtinId", "customBuiltin", "extLst", "hidden", "iLevel")
 
   input <- wb$styles_mgr$styles$cellStyles
   got <- read_cellStyle(as_xml(input))
   expect_equal(sort(exp), sort(names(got)))
 
-  exp_dim <- c(2, 7)
+  exp_dim <- c(2, 8)
   expect_equal(exp_dim, dim(got))
 
   expect_equal(input,
@@ -89,8 +89,9 @@ test_that("cellStyle", {
 
 test_that("tableStyle", {
 
+
   # tableStyle elements exist only with custom tableStyles
-  xlsxFile <- system.file("extdata", "tableStyles.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("tableStyles.xlsx")
   wb <- wb_load(xlsxFile)
 
   # likely not ordered entirely correct
@@ -115,7 +116,7 @@ test_that("tableStyle", {
 
 test_that("dxf", {
 
-  xlsxFile <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("loadExample.xlsx")
   wb <- wb_load(xlsxFile)
 
   # likely not ordered entirely correct
@@ -141,7 +142,7 @@ test_that("dxf", {
 
 test_that("colors", {
 
-  xlsxFile <- system.file("extdata", "oxlsx2_sheet.xlsx", package = "openxlsx2")
+  xlsxFile <- testfile_path("oxlsx2_sheet.xlsx")
   wb <- wb_load(xlsxFile)
 
   # likely not ordered entirely correct

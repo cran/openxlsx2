@@ -318,7 +318,7 @@ test_that("clone worksheet", {
   ## Dummy tests - not sure how to test these from R ##
 
   # # clone chartsheet ----------------------------------------------------
-  fl <- system.file("extdata", "mtcars_chart.xlsx", package = "openxlsx2")
+  fl <- testfile_path("mtcars_chart.xlsx")
   wb <- wb_load(fl)
   # wb$get_sheet_names() # chartsheet has no named name?
   expect_silent(wb$clone_worksheet(1, "Clone 1"))
@@ -326,7 +326,7 @@ test_that("clone worksheet", {
   # wb$open()
 
   # clone pivot table and drawing -----------------------------------------
-  fl <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+  fl <- testfile_path("loadExample.xlsx")
   wb <- wb_load(fl)
   expect_silent(wb$clone_worksheet(4, "Clone 1"))
 
@@ -341,7 +341,6 @@ test_that("clone worksheet", {
   # wb$open()
 
   # clone drawing ---------------------------------------------------------
-  fl <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
   wb <- wb_load(fl)
   expect_silent(wb$clone_worksheet("testing", "Clone1"))
 
@@ -349,7 +348,7 @@ test_that("clone worksheet", {
   # wb$open()
 
   # clone sheet with table ------------------------------------------------
-  fl <- system.file("extdata", "tableStyles.xlsx", package = "openxlsx2")
+  fl <- testfile_path("tableStyles.xlsx")
   wb <- wb_load(fl)
   expect_silent(wb$clone_worksheet(1, "clone"))
 
@@ -357,7 +356,7 @@ test_that("clone worksheet", {
   # wb$open()
 
   # clone sheet with chart ------------------------------------------------
-  fl <- system.file("extdata", "mtcars_chart.xlsx", package = "openxlsx2")
+  fl <- testfile_path("mtcars_chart.xlsx")
   wb <- wb_load(fl)
   wb$clone_worksheet(2, "Clone 1")
 
@@ -366,7 +365,7 @@ test_that("clone worksheet", {
   # wb$open()
 
   # clone slicer ----------------------------------------------------------
-  fl <- system.file("extdata", "loadExample.xlsx", package = "openxlsx2")
+  fl <- testfile_path("loadExample.xlsx")
   wb <- wb_load(fl)
   expect_warning(wb$clone_worksheet("IrisSample", "Clone1"),
                  "Cloning slicers is not yet supported. It will not appear on the sheet.")
@@ -498,19 +497,6 @@ test_that("add_drawing works", {
     ),
     row.names = 3:6,
     class = c("data.frame", "wb_data"),
-    tt = structure(
-      list(
-        name = c("s", "s", "s", "s"),
-        mpg = c("n", "n", "n", "n"),
-        cyl = c("n", "n", "n", "n"),
-        disp = c("n", "n", "n", "n"),
-        hp = c("n", "n", "n", "n"),
-        drat = c("n", "n", "n", "n"),
-        wt = c("n", "n", "n", "n")
-      ),
-      row.names = 3:6,
-      class = "data.frame"),
-    types = c(A = 0, B = 1, C = 1, D = 1, E = 1, F = 1, G = 1),
     dims = structure(
       list(
         A = c("A2", "A3", "A4", "A5", "A6"),
@@ -709,5 +695,148 @@ test_that("various image functions work as expected", {
     wb$add_worksheet()$add_image(file = img, width = 6, height = 5, dims = NULL, startRow = 2, startCol = 2),
     "dims is NULL, startRow/startCol will have no impact"
   )
+
+})
+
+test_that("workbook themes work", {
+
+  wb <- wb_workbook()$add_worksheet()
+  exp <- "Calibri"
+  got <- wb$get_base_font()$name$val
+  expect_equal(exp, got)
+
+  wb <- wb_workbook(theme = "Old Office Theme")$add_worksheet()
+  exp <- "Calibri"
+  got <- wb$get_base_font()$name$val
+  expect_equal(exp, got)
+
+  wb <- wb_workbook(theme = 1)$add_worksheet()
+  exp <- "Rockwell"
+  got <- wb$get_base_font()$name$val
+  expect_equal(exp, got)
+
+  expect_message(
+    wb <- wb_workbook(theme = "Foo")$add_worksheet(),
+    "theme Foo not found falling back to default theme"
+  )
+  exp <- "Calibri"
+  got <- wb$get_base_font()$name$val
+  expect_equal(exp, got)
+
+})
+
+test_that("changing sheet names works with named regions", {
+
+  filename <- testfile_path("namedRegions2.xlsx")
+  wb <- wb_load(filename)
+
+  wb$set_sheet_names("Sheet1", "new name")
+  wb$set_sheet_names("Sheet with space", "Sheet_without_space")
+
+  exp <- c(
+    "<definedName name=\"barref\" localSheetId=\"0\">'Sheet_without_space'!$B$4</definedName>",
+    "<definedName name=\"barref\" localSheetId=\"1\">'new name'!$B$4</definedName>"
+  )
+  got <- wb$workbook$definedNames[seq_len(2)]
+  expect_equal(exp, got)
+
+})
+
+test_that("numfmt in pivot tables works", {
+
+  ## example code
+  df <- data.frame(
+    Plant = c("A", "C", "C", "B", "B", "C", "C", "C", "A", "C"),
+    Location = c("E", "F", "E", "E", "F", "E", "E", "G", "E", "F"),
+    Status = c("good", "good", "good", "good", "good", "good", "good", "good", "good", "bad"),
+    Units = c(0.95, 0.95, 0.95, 0.95, 0.89, 0.89, 0.94, 0.94, 0.9, 0.9),
+    stringsAsFactors = FALSE
+  )
+
+  ## Create the workbook and the pivot table
+  wb <- wb_workbook()$
+    add_worksheet("Data")$
+    add_data(x = df, startCol = 1, startRow = 2)
+
+  df <- wb_data(wb, 1, dims = "A2:D10")
+  wb$
+    add_pivot_table(df, dims = "A3", rows = "Plant",
+                    filter = c("Location", "Status"), data = "Units")$
+    add_pivot_table(df, dims = "A3", rows = "Plant",
+                    filter = c("Location", "Status"), data = "Units",
+                    param = list(numfmts = c(formatCode = "#,###0"), sort_row = "ascending"))$
+    add_pivot_table(df, dims = "A3", rows = "Plant",
+                    filter = c("Location", "Status"), data = "Units",
+                    param = list(numfmts = c(numfmt = 10), sort_row = "descending"))
+
+  exp <- c(
+    "<dataField name=\"Sum of Units\" fld=\"3\" baseField=\"0\" baseItem=\"0\"/>",
+    "<dataField name=\"Sum of Units\" fld=\"3\" baseField=\"0\" baseItem=\"0\" numFmtId=\"165\"/>",
+    "<dataField name=\"Sum of Units\" fld=\"3\" baseField=\"0\" baseItem=\"0\" numFmtId=\"10\"/>"
+  )
+  got <- xml_node(wb$pivotTables, "pivotTableDefinition", "dataFields", "dataField")
+  expect_equal(exp, got)
+
+  ## sort by column and row
+  df <- mtcars
+
+  ## Create the workbook and the pivot table
+  wb <- wb_workbook()$
+    add_worksheet("Data")$
+    add_data(x = df, startCol = 1, startRow = 2)
+
+  df <- wb_data(wb)
+  wb$add_pivot_table(df, dims = "A3", rows = "cyl", cols = "gear",
+                     data = c("vs", "am"), param = list(sort_row = 1, sort_col = -2))
+
+  wb$add_pivot_table(df, dims = "A3", rows = "gear",
+                     filter = c("cyl"), data = c("vs", "am"),
+                     param = list(sort_row = "descending"))
+
+
+  exp <- c(
+    "<pivotField axis=\"axisRow\" showAll=\"0\" sortType=\"ascending\"><items count=\"4\"><item x=\"1\"/><item x=\"0\"/><item x=\"2\"/><item t=\"default\"/></items><autoSortScope><pivotArea dataOnly=\"0\" outline=\"0\" fieldPosition=\"0\"><references count=\"1\"><reference field=\"4294967294\" count=\"1\" selected=\"0\"><x v=\"0\"/></reference></references></pivotArea></autoSortScope></pivotField>",
+    "<pivotField axis=\"axisCol\" showAll=\"0\" sortType=\"descending\"><items count=\"4\"><item x=\"1\"/><item x=\"0\"/><item x=\"2\"/><item t=\"default\"/></items><autoSortScope><pivotArea dataOnly=\"0\" outline=\"0\" fieldPosition=\"0\"><references count=\"1\"><reference field=\"4294967294\" count=\"1\" selected=\"0\"><x v=\"1\"/></reference></references></pivotArea></autoSortScope></pivotField>"
+  )
+  got <- xml_node(wb$pivotTables[1], "pivotTableDefinition", "pivotFields", "pivotField")[c(2, 10)]
+  expect_equal(exp, got)
+
+  expect_warning(
+    wb$add_pivot_table(df, dims = "A3", rows = "cyl", cols = "gear",
+                       data = c("vs", "am"), param = list(sort_row = 1, sort_col = -7)),
+    "invalid sort position found"
+  )
+
+  expect_error(
+    wb$add_pivot_table(df, dims = "A3", rows = "cyl", cols = "gear",
+                       data = c("vs", "am"),
+                       param = list(numfmts = c(numfmt = 10))),
+    "length of numfmt and data does not match"
+  )
+
+  ### add sortType only to those pivot fields that are sorted
+
+  ## sort by column and row
+  df <- mtcars
+
+  ## Create the workbook and the pivot table
+  wb <- wb_workbook()$
+    add_worksheet("Data")$
+    add_data(x = df, startCol = 1, startRow = 2)
+
+  df <- wb_data(wb)
+  wb$add_pivot_table(
+    df,
+    dims = "A3",
+    rows = c("cyl", "am"),
+    cols = c("gear", "carb"),
+    data = c("disp", "mpg"),
+    param = list(sort_row = 1,
+                 sort_col = -2)
+  )
+
+  exp <- c("", "ascending", "", "", "", "", "", "", "", "descending", "")
+  got <- rbindlist(xml_attr(wb$pivotTables, "pivotTableDefinition", "pivotFields", "pivotField"))$sortType
+  expect_equal(exp, got)
 
 })

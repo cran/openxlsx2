@@ -215,18 +215,18 @@ test_that("writing NA, NaN and Inf", {
   wb$add_worksheet("Test3")$add_data(x = x, na.strings = "N/A")$save(tmp)
 
   exp <- c(NA, "s", "s", "s")
-  got <- unname(unlist(attr(wb_to_df(tmp, "Test1"), "tt")))
+  got <- unname(unlist(attr(wb_to_df(tmp, "Test1", keep_attributes = TRUE), "tt")))
   expect_equal(exp, got)
 
   exp <- c("N/A", "#NUM!", "#NUM!", "#VALUE!")
-  got <- unname(unlist(wb_to_df(tmp, "Test2")))
+  got <- unname(unlist(wb_to_df(tmp, "Test2", keep_attributes = TRUE)))
   expect_equal(exp, got)
 
   wb$clone_worksheet("Test1", "Clone1")$add_data(x = x, na.strings = NULL)$save(tmp)
   wb$clone_worksheet("Test3", "Clone3")$add_data(x = x, na.strings = "N/A")$save(tmp)
 
   exp <- c(NA, "s", "s", "s")
-  got <- unname(unlist(attr(wb_to_df(tmp, "Test1"), "tt")))
+  got <- unname(unlist(attr(wb_to_df(tmp, "Test1", keep_attributes = TRUE), "tt")))
   expect_equal(exp, got)
 
   exp <- c("N/A", "#NUM!", "#NUM!", "#VALUE!")
@@ -313,7 +313,7 @@ test_that("write_xlsx with na.strings", {
 
 test_that("write & load file with chartsheet", {
 
-  fl <- system.file("extdata", "mtcars_chart.xlsx", package = "openxlsx2")
+  fl <- testfile_path("mtcars_chart.xlsx")
   wb <- wb_load(fl)
 
   wb$worksheets[[1]]$sheetPr <- xml_node_create(

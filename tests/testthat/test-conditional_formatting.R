@@ -253,16 +253,17 @@ test_that("type = 'endsWith' works", {
 })
 
 test_that("type = 'colorScale' works", {
+
   wb <- my_workbook()
   wb$add_worksheet("colourScale", zoom = 30)
   ## colourscale colours cells based on cell value
-  df <- read_xlsx(system.file("extdata", "readTest.xlsx", package = "openxlsx2"), sheet = 4)
+  df <- read_xlsx(testfile_path("readTest.xlsx"), sheet = 4)
   wb$add_data("colourScale", df, colNames = FALSE) ## write data.frame
   ## rule is a vector or colours of length 2 or 3 (any hex colour or any of colours())
   ## If rule is NULL, min and max of cells is used. Rule must be the same length as style or NULL.
   wb$add_conditional_formatting(
     "colourScale",
-    cols = seq_along(df),
+    cols = c(1, ncol(df)),
     rows = seq_len(nrow(df)),
     style = c("black", "white"),
     rule = c(0, 255),
@@ -399,13 +400,13 @@ test_that("colorScale", {
   ### two colors
   wb$add_worksheet("colourScale1", zoom = 30)
   ## colourscale colours cells based on cell value
-  df <- read_xlsx(system.file("extdata", "readTest.xlsx", package = "openxlsx2"), sheet = 5)
+  df <- read_xlsx(testfile_path("readTest.xlsx"), sheet = 5)
   wb$add_data("colourScale1", df, colNames = FALSE) ## write data.frame
   ## rule is a vector or colours of length 2 or 3 (any hex colour or any of colours())
   ## If rule is NULL, min and max of cells is used. Rule must be the same length as style or NULL.
   wb$add_conditional_formatting(
     "colourScale1",
-    cols = seq_along(df),
+    cols = c(1, ncol(df)),
     rows = seq_len(nrow(df)),
     style = c("black", "white"),
     type = "colorScale"
@@ -423,7 +424,7 @@ test_that("colorScale", {
   ## If rule is NULL, min and max of cells is used. Rule must be the same length as style or NULL.
   wb$add_conditional_formatting(
     "colourScale2",
-    cols = seq_along(df),
+    cols = c(1, ncol(df)),
     rows = seq_len(nrow(df)),
     style = c("blue", "red"),
     rule = c(1, 255),
@@ -442,7 +443,7 @@ test_that("colorScale", {
   ## If rule is NULL, min and max of cells is used. Rule must be the same length as style or NULL.
   wb$add_conditional_formatting(
     "colourScale3",
-    cols = seq_along(df),
+    cols = c(1, ncol(df)),
     rows = seq_len(nrow(df)),
     style = c("red", "green", "blue"),
     type = "colorScale"
@@ -463,7 +464,7 @@ test_that("colorScale", {
   ## If rule is NULL, min and max of cells is used. Rule must be the same length as style or NULL.
   wb$add_conditional_formatting(
     "colourScale4",
-    cols = seq_along(df),
+    cols = c(1, ncol(df)),
     rows = seq_len(nrow(df)),
     style = c("red", "green", "blue"),
     rule = c(1, 155, 255),
@@ -705,5 +706,165 @@ test_that("containsBlanks works", {
   )
   got <- as.character(wb$worksheets[[1]]$conditionalFormatting)
   expect_equal(exp, got)
+
+})
+
+test_that("warning on cols > 2 and dims", {
+  wb <- wb_workbook()$add_worksheet()$add_data(x = mtcars)
+  expect_warning(
+    wb$add_conditional_formatting(
+      rows = seq_len(nrow(mtcars)),
+      cols = c(2, 4, 6),
+      type = 'between',
+      rule = c(2, 4)
+    ),
+    "cols > 2, will create range from min to max."
+  )
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = mtcars)
+  wb$add_conditional_formatting(
+    dims = "B2:F5",
+    type = 'between',
+    rule = c(2, 4)
+  )
+
+  exp <- "B2:F5"
+  got <- names(wb$worksheets[[1]]$conditionalFormatting)
+  expect_equal(exp, got)
+
+})
+
+test_that("un_list works", {
+
+  tmp <- temp_xlsx()
+
+  dat <- matrix(sample(0:2, 10L, TRUE), 5, 2)
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = dat, colNames = FALSE)
+
+  negStyle <- create_dxfs_style(font_color = wb_color(hex = "FF9C0006"), bgFill = wb_color(hex = "FFFFC7CE"))
+  neuStyle <- create_dxfs_style(font_color = wb_color("red"), bgFill = wb_color("orange"))
+  posStyle <- create_dxfs_style(font_color = wb_color(hex = "FF006100"), bgFill = wb_color(hex = "FFC6EFCE"))
+  wb$styles_mgr$add(negStyle, "negStyle")
+  wb$styles_mgr$add(neuStyle, "neuStyle")
+  wb$styles_mgr$add(posStyle, "posStyle")
+
+  wb$add_conditional_formatting(cols = 1:2, rows = 1:5, rule = "==2", style = "negStyle")
+  wb$add_conditional_formatting(cols = 1:2, rows = 1:5, rule = "==1", style = "neuStyle")
+  wb$add_conditional_formatting(cols = 1:2, rows = 1:5, rule = "==0", style = "posStyle")
+
+  wb$add_conditional_formatting(cols = 5:6, rows = 1:5, rule = "==2", style = "negStyle")
+  wb$add_conditional_formatting(cols = 5:6, rows = 1:5, rule = "==1", style = "neuStyle")
+  wb$add_conditional_formatting(cols = 5:6, rows = 1:5, rule = "==0", style = "posStyle")
+
+  pre_save <- wb$worksheets[[1]]$conditionalFormatting
+
+  wb$save(tmp)
+  wb <- wb_load(tmp)
+
+  post_save <- wb$worksheets[[1]]$conditionalFormatting
+
+  expect_equal(pre_save, post_save)
+
+})
+
+test_that("conditional formatting with gradientFill works", {
+
+  gf <- read_xml(
+    "<gradientFill degree=\"45\">
+      <stop position=\"0\"><color rgb=\"FFFFC000\"/></stop>
+      <stop position=\"1\"><color rgb=\"FF00B0F0\"/></stop>
+   </gradientFill>",
+    pointer = FALSE)
+
+  gf_style <- create_dxfs_style(gradientFill = gf)
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = 1)$
+    add_conditional_formatting(cols = 1, rows = 1, rule = "==1", style = "gf_style")$
+    add_style(gf_style)
+
+  exp <- "<dxf><fill><gradientFill degree=\"45\"><stop position=\"0\"><color rgb=\"FFFFC000\"/></stop><stop position=\"1\"><color rgb=\"FF00B0F0\"/></stop></gradientFill></fill></dxf>"
+  got <- wb$styles_mgr$styles$dxfs
+  expect_equal(exp, got)
+
+  # check that the wrapper handles dims as well
+  expect_silent(
+    wb_workbook() %>%
+    wb_add_worksheet() %>%
+    wb_add_conditional_formatting(dims = "A1:B5",
+                                  type = "between",
+                                  rule = c(2, 4))
+  )
+
+})
+
+test_that("escaping conditional formatting works", {
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = "A & B")$
+    add_conditional_formatting(
+      cols = 1,
+      rows = 1:10,
+      type = "containsText",
+      rule = "A & B"
+    )$
+    add_worksheet()$
+    add_data(x = "A == B")$
+    add_conditional_formatting(
+      cols = 1,
+      rows = 1:10,
+      type = "containsText",
+      rule = "A == B"
+    )$
+    add_worksheet()$
+    add_data(x = "A <> B")$
+    add_conditional_formatting(
+      cols = 1,
+      rows = 1:10,
+      type = "containsText",
+      rule = "A <> B"
+    )$
+    add_worksheet()$
+    add_data(x = "A != B")$
+    add_conditional_formatting(
+      cols = 1,
+      rows = 1:10,
+      type = "notContainsText",
+      rule = "A <> B"
+    )
+
+  exp <- c(`A1:A10` = "<cfRule type=\"containsText\" dxfId=\"0\" priority=\"1\" operator=\"containsText\" text=\"A &amp; B\"><formula>NOT(ISERROR(SEARCH(\"A &amp; B\", A1)))</formula></cfRule>")
+  got <- wb$worksheets[[1]]$conditionalFormatting
+  expect_equal(exp, got)
+
+  exp <- c(`A1:A10` = "<cfRule type=\"containsText\" dxfId=\"1\" priority=\"1\" operator=\"containsText\" text=\"A == B\"><formula>NOT(ISERROR(SEARCH(\"A == B\", A1)))</formula></cfRule>")
+  got <- wb$worksheets[[2]]$conditionalFormatting
+  expect_equal(exp, got)
+
+  exp <- c(`A1:A10` = "<cfRule type=\"containsText\" dxfId=\"2\" priority=\"1\" operator=\"containsText\" text=\"A &lt;&gt; B\"><formula>NOT(ISERROR(SEARCH(\"A &lt;&gt; B\", A1)))</formula></cfRule>")
+  got <- wb$worksheets[[3]]$conditionalFormatting
+  expect_equal(exp, got)
+
+  ## imports quietly
+  wb$
+    add_worksheet()$
+    add_data(x = "A <> B")$
+    add_conditional_formatting(
+      cols = 1,
+      rows = 1:10,
+      type = "beginsWith",
+      rule = "A <"
+    )$
+    add_worksheet()$
+    add_data(x = "A <> B")$
+    add_conditional_formatting(
+      cols = 1,
+      rows = 1:10,
+      type = "endsWith",
+      rule = "> B"
+    )
 
 })
