@@ -8,13 +8,13 @@ create_dxfs_style(
   font_name = NULL,
   font_size = NULL,
   font_color = NULL,
-  numFmt = NULL,
+  num_fmt = NULL,
   border = NULL,
   border_color = wb_color(getOption("openxlsx2.borderColor", "black")),
   border_style = getOption("openxlsx2.borderStyle", "thin"),
-  bgFill = NULL,
-  fgColor = NULL,
-  gradientFill = NULL,
+  bg_fill = NULL,
+  fg_color = NULL,
+  gradient_fill = NULL,
   text_bold = NULL,
   text_strike = NULL,
   text_italic = NULL,
@@ -23,29 +23,29 @@ create_dxfs_style(
 )
 }
 \arguments{
-\item{font_name}{A name of a font. Note the font name is not validated. If fontName is NULL,
-the workbook base font is used. (Defaults to Calibri)}
+\item{font_name}{A name of a font. Note the font name is not validated.
+If \code{font_name} is \code{NULL}, the workbook \code{base_font} is used. (Defaults to Calibri), see \code{\link[=wb_get_base_font]{wb_get_base_font()}}}
 
 \item{font_size}{Font size. A numeric greater than 0.
-If fontSize is NULL, the workbook base font size is used. (Defaults to 11)}
+By default, the workbook base font size is used. (Defaults to 11)}
 
 \item{font_color}{Color of text in cell.  A valid hex color beginning with "#"
-or one of colors(). If fontColor is NULL, the workbook base font colors is used.
+or one of colors(). If \code{font_color} is NULL, the workbook base font colors is used.
 (Defaults to black)}
 
-\item{numFmt}{Cell formatting. Some custom openxml format}
+\item{num_fmt}{Cell formatting. Some custom openxml format}
 
-\item{border}{NULL or TRUE}
+\item{border}{\code{NULL} or \code{TRUE}}
 
 \item{border_color}{"black"}
 
 \item{border_style}{"thin"}
 
-\item{bgFill}{Cell background fill color.}
+\item{bg_fill}{Cell background fill color.}
 
-\item{fgColor}{Cell foreground fill color.}
+\item{fg_color}{Cell foreground fill color.}
 
-\item{gradientFill}{An xml string beginning with \verb{<gradientFill>} ...}
+\item{gradient_fill}{An xml string beginning with \verb{<gradientFill>} ...}
 
 \item{text_bold}{bold}
 
@@ -55,7 +55,7 @@ or one of colors(). If fontColor is NULL, the workbook base font colors is used.
 
 \item{text_underline}{underline 1, true, single or double}
 
-\item{...}{...}
+\item{...}{Additional arguments}
 }
 \value{
 A dxfs style node
@@ -68,7 +68,7 @@ assigned to a workbook to use them
 It is possible to override border_color and border_style with {left, right, top, bottom}_color, {left, right, top, bottom}_style.
 }
 \examples{
-# do not apply anthing
+# do not apply anything
 style1 <- create_dxfs_style()
 
 # change font color and background color

@@ -2,7 +2,7 @@
 #'
 #' A comment
 #'
-#' @export
+#' @noRd
 wbComment <- R6::R6Class(
   "wbComment",
 
@@ -84,16 +84,18 @@ wbComment <- R6::R6Class(
 # TODO write_comment() should leverage wbWorkbook$addComment() more
 # TODO remove_comment() should leverage wbWorkbook$remove_comment() more
 
-#' @name create_comment
-#' @title Create, write and remove comments
-#' @description The comment functions (create, write and remove) allow the
-#' modification of comments. In newer Excels they are called notes, while they
-#' are called comments in openxml. Modification of what Excel now calls comment
-#' (openxml calls them threadedComments) is not yet possible
+#' Create, write and remove comments
+#'
+#' The comment functions (create, write and remove) allow the
+#' modification of comments. In newer spreadsheet software they are called
+#' notes, while they are called comments in openxml. Modification of what
+#' newer spreadsheet software now calls comment is possible via
+#' [wb_add_thread()].
+#'
 #' @param text Comment text. Character vector.
-#' @param author Author of comment. Character vector of length 1
+#' @param author Author of comment. A string.
 #' @param style A Style object or list of style objects the same length as comment vector.
-#' @param visible TRUE or FALSE. Is comment visible.
+#' @param visible `TRUE` or `FALSE`. Is comment visible?
 #' @param width Textbox integer width in number of cells
 #' @param height Textbox integer height in number of cells
 #' @export
@@ -104,21 +106,21 @@ wbComment <- R6::R6Class(
 #'
 #' # write comment without author
 #' c1 <- create_comment(text = "this is a comment", author = "")
-#' write_comment(wb, 1, col = "B", row = 10, comment = c1)
+#' wb$add_comment(dims = "B10", comment = c1)
 #'
 #' # Write another comment with author information
 #' c2 <- create_comment(text = "this is another comment", author = "Marco Polo")
-#' write_comment(wb, 1, col = "C", row = 10, comment = c2)
+#' wb$add_comment(sheet = 1, dims = "C10", comment = c2)
 #'
 #' # write a styled comment with system author
 #' s1 <- create_font(b = "true", color = wb_color(hex = "FFFF0000"), sz = "12")
 #' s2 <- create_font(color = wb_color(hex = "FF000000"), sz = "9")
 #' c3 <- create_comment(text = c("This Part Bold red\n\n", "This part black"), style = c(s1, s2))
 #'
-#' write_comment(wb, 1, col = 6, row = 3, comment = c3)
+#' wb$add_comment(sheet = 1, dims = wb_dims(3, 6), comment = c3)
 #'
-#' # remove the first comment
-#' remove_comment(wb, 1, col = "B", row = 10)
+#' # remove the first comment c1
+#' wb$remove_comment(1, dims = "B10")
 create_comment <- function(text,
   author = Sys.info()[["user"]],
   style = NULL,
@@ -170,18 +172,20 @@ create_comment <- function(text,
   invisible(wbComment$new(text = text, author = author, style = style, visible = visible, width = width[1], height = height[1]))
 }
 
+#' Internal comment functions
+#'
+#' Users are advised to use [wb_add_comment()] and [wb_remove_comment()]
+#' @name comment_internal
+NULL
 
-#' @name write_comment
+#' @rdname comment_internal
 #' @param wb A workbook object
 #' @param sheet A vector of names or indices of worksheets
 #' @param col Column a column number of letter. For `remove_comment` this can be a range.
 #' @param row A row number. For `remove_comment` this can be a range.
 #' @param comment A Comment object. See [create_comment()].
-#' @param xy An alternative to specifying `col` and
-#' `row` individually.  A vector of the form
-#' `c(col, row)`.
 #' @param dims worksheet cell "A1"
-#' @rdname comment
+#' @keywords internal
 #' @export
 write_comment <- function(
     wb,
@@ -189,7 +193,6 @@ write_comment <- function(
     col     = NULL,
     row     = NULL,
     comment,
-    xy      = NULL,
     dims    = rowcol_to_dim(row, col)
   ) {
 
@@ -205,16 +208,6 @@ write_comment <- function(
 
   rPr <- gsub("font>", "rPr>", rPr)
   sheet <- wb_validate_sheet(wb, sheet)
-
-  ## All input conversions/validations
-  if (!is.null(xy)) {
-    .Deprecated("dims", old = "xy")
-    if (length(xy) != 2) {
-      stop("xy parameter must have length 2")
-    }
-    col <- xy[[1]]
-    row <- xy[[2]]
-  }
 
   if (!is.null(dims)) {
     ref <- dims
@@ -348,11 +341,10 @@ write_comment <- function(
   invisible(wb)
 }
 
-
-#' @name remove_comment
+#' @rdname comment_internal
 #' @param gridExpand If `TRUE`, all data in rectangle min(rows):max(rows) X min(cols):max(cols)
 #' will be removed.
-#' @rdname comment
+#' @keywords internal
 #' @export
 remove_comment <- function(
     wb,
@@ -392,9 +384,58 @@ remove_comment <- function(
 
   toKeep <- !sapply(wb$comments[[sheet]], "[[", "ref") %in% comb
 
+  # FIXME: if all comments are removed we should drop to wb$comments <- list()
   wb$comments[[sheet]] <- wb$comments[[sheet]][toKeep]
+
 }
 
 wb_comment <- function(text = character(), author = character(), style = character()) {
   wbComment$new(text = text, author = author, style = style)
+}
+
+as_fmt_txt <- function(x) {
+  vapply(x, function(y) {
+    ifelse(is_xml(y), si_to_txt(xml_node_create("si", xml_children = y)), y)
+  },
+  NA_character_
+  )
+}
+
+wb_get_comment <- function(wb, sheet = current_sheet(), dims = "A1") {
+  sheet_id <- wb$validate_sheet(sheet)
+  cmts <- list()
+  if (length(wb$comments) >= sheet_id) {
+    cmts <- as.data.frame(do.call("rbind", wb$comments[[sheet_id]]))
+    if (!is.null(dims)) cmts <- cmts[cmts$ref == dims, ]
+    # print(cmts)
+    cmts <- cmts[c("ref", "author", "comment")]
+    if (nrow(cmts)) {
+      cmts$comment <- as_fmt_txt(cmts$comment)
+      cmts$sheet_id <- sheet_id
+    }
+  }
+  cmts
+}
+
+wb_get_thread <- function(wb, sheet = current_sheet(), dims = "A1") {
+
+  sheet <- wb$validate_sheet(sheet)
+
+  tc <- cbind(
+    rbindlist(xml_attr(wb$threadComments[[sheet]], "threadedComment")),
+    text = xml_value(wb$threadComments[[sheet]], "threadedComment", "text")
+  )
+
+  if (!is.null(dims)) {
+    tc <- tc[tc$ref == dims, ]
+  }
+
+  persons <- wb$get_person()
+
+  tc <- merge(tc, persons, by.x = "personId", by.y = "id",
+              all.x = TRUE, all.y = FALSE)
+
+  tc$dT <- as.POSIXct(tc$dT, format = "%Y-%m-%dT%H:%M:%SZ")
+
+  tc[c("dT", "ref", "displayName", "text", "done")]
 }

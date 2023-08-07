@@ -52,7 +52,7 @@ test_that("wb_load() is a wrapper", {
 
 test_that("wb_save() is a wrapper", {
   # returns the file path instead
-  expect_wrapper("save", params = NULL, ignore = "path")
+  expect_wrapper("save", params = NULL, ignore = c("file", "path"))
 })
 
 # wb_merge_cells(), wb_unmerge_cells() ------------------------------------
@@ -133,7 +133,14 @@ test_that("wb_set_creators() is a wrapper", {
 
 test_that("wb_remove_creators() is a wrapper", {
   wb <- wb_workbook(creator = "myself")
-  expect_wrapper("remove_creators", params = list(creators = "myself"))
+  expect_wrapper("remove_creators", wb = wb, params = list(creators = "myself"))
+})
+
+# wb_set_last_modified_by() ---------------------------------------------------
+
+test_that("wb_set_last_modified_by() is a wrapper", {
+  wb <- wb_workbook()
+  expect_wrapper("set_last_modified_by", params = list(name = "myself"))
 })
 
 # wb_page_setup() -------------------------------------------------------------
@@ -253,10 +260,10 @@ test_that("wb_grid_lines() is a wrapper", {
 
 test_that("wb_add_named_region(), wb_remove_named_region() are wrappers", {
   wb <- wb_workbook()$add_worksheet("a")
-  params <- list(sheet = 1, cols = 1, rows = 1, name = "cool")
+  params <- list(sheet = 1, dims = "A1", name = "cool")
   expect_wrapper("add_named_region", wb = wb, params = params)
   # now add the named region so that we can remove it
-  wb$add_named_region(sheet = 1, cols = 1, rows = 1, name = "cool")
+  wb$add_named_region(sheet = 1, dims = "A1", name = "cool")
   expect_wrapper("remove_named_region", wb = wb, params = list(name = "cool"))
 })
 
@@ -279,7 +286,7 @@ test_that("wb_get_sheet_visibility(), wb_set_sheet_visibility() are wrappers", {
 
 test_that("wb_add_data_validation() is a wrapper", {
   wb <- wb_workbook()$add_worksheet("a")
-  params <- list(sheet = 1, cols = 1, rows = 1, type = "whole", operator = "between", value = c(0, 1))
+  params <- list(sheet = 1, dims = "A1", type = "whole", operator = "between", value = c(0, 1))
   expect_wrapper("add_data_validation", wb = wb, params = params)
 })
 
@@ -385,6 +392,37 @@ test_that("wb_remove_comment() is a wrapper", {
     "remove_comment",
     wb = wb,
     params = list(dims = "A1")
+  )
+
+})
+
+# wb_add_thread() ---------------------------------------------------------
+
+test_that("wb_add_thread() is a wrapper", {
+
+  wb <- wb_workbook()$add_worksheet()
+
+  expect_wrapper(
+    "add_person",
+    wb = wb,
+    params = list(name = "me")
+  )
+
+  wb <- wb_workbook()$add_worksheet()$add_person("me")
+
+  expect_wrapper(
+    "get_person",
+    wb = wb,
+    params = list(name = "me")
+  )
+
+  wb <- wb_workbook()$add_worksheet()$add_person("me")
+  me_id <- wb$get_person("me")$id
+
+  expect_wrapper(
+    "add_thread",
+    wb = wb,
+    params = list(comment = "test", person_id = me_id)
   )
 
 })

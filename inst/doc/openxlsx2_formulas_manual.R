@@ -10,34 +10,34 @@ library(openxlsx2)
 
 ## -----------------------------------------------------------------------------
 # Create artificial xlsx file
-wb <- wb_workbook()$add_worksheet()$add_data(x = t(c(1, 1)), colNames = FALSE)$
+wb <- wb_workbook()$add_worksheet()$add_data(x = t(c(1, 1)), col_names = FALSE)$
   add_formula(dims = "C1", x = "A1 + B1")
 # Users should never modify cc as shown here
 wb$worksheets[[1]]$sheet_data$cc$v[3] <- 2
 
 # we expect a value of 2
-wb_to_df(wb, colNames = FALSE)
+wb_to_df(wb, col_names = FALSE)
 
 ## -----------------------------------------------------------------------------
 wb$add_data(x = 2)
 
 # we expect 3
-wb_to_df(wb, colNames = FALSE)
+wb_to_df(wb, col_names = FALSE)
 
 ## -----------------------------------------------------------------------------
-wb_to_df(wb, colNames = FALSE, showFormula = TRUE)
+wb_to_df(wb, col_names = FALSE, show_formula = TRUE)
 
 ## -----------------------------------------------------------------------------
 wb <- wb_workbook()$add_worksheet()$
   add_data(x = head(cars))$
-  add_formula(dims = "D2", x = "SUM(A2, B2)")$
-  add_formula(dims = "D3", x = "A2 + B2")
+  add_formula(x = "SUM(A2, B2)", dims = "D2")$
+  add_formula(x = "A2 + B2", dims = "D3")
 # wb$open()
 
 ## -----------------------------------------------------------------------------
 wb <- wb_workbook()$add_worksheet()$
   add_data(x = head(cars))$
-  add_formula(dims = "C2:C7", x = "A2:A7 * B2:B7", array = TRUE)
+  add_formula(x = "A2:A7 * B2:B7", dims = "C2:C7", array = TRUE)
 # wb$open()
 
 ## -----------------------------------------------------------------------------
@@ -45,9 +45,9 @@ m1 <- matrix(1:6, ncol = 2)
 m2 <- matrix(7:12, nrow = 2)
 
 wb <- wb_workbook()$add_worksheet()$
-  add_data(x = m1, startCol = 1)$
-  add_data(x = m2, startCol = 4)$
-  add_formula(dims = "H2:J4", x = "MMULT(A2:B4, D2:F3)", array = TRUE)
+  add_data(x = m1)$
+  add_data(x = m2, dims = wb_dims(from_col = 4))$
+  add_formula(x = "MMULT(A2:B4, D2:F3)", dims = "H2:J4", array = TRUE)
 # wb$open()
 
 ## -----------------------------------------------------------------------------
@@ -55,32 +55,32 @@ wb <- wb_workbook()$add_worksheet()$
 coef(lm(head(cars)))
 wb <- wb_workbook()$add_worksheet()$
   add_data(x = head(cars))$
-  add_formula(dims = "D2:E2", x = "LINEST(A2:A7, B2:B7, TRUE)", array = TRUE)
+  add_formula(x = "LINEST(A2:A7, B2:B7, TRUE)", dims = "D2:E2", array = TRUE)
 # wb$open()
 
 ## -----------------------------------------------------------------------------
 wb <- wb_workbook()$add_worksheet()$
   add_data(x = head(cars))$
-  add_formula(dims = "D2", x = 'SUM(ABS(A2:A7))', cm = TRUE)
+  add_formula(x = "SUM(ABS(A2:A7))", dims = "D2", cm = TRUE)
 # wb$open()
 
 ## -----------------------------------------------------------------------------
 ## creating example data
-example_data <- data.frame(
-    SalesPrice = c(20, 30, 40),
+company_sales <- data.frame(
+    sales_price = c(20, 30, 40),
     COGS = c(5, 11, 13),
-    SalesQuantity = c(1, 2, 3)
+    sales_quantity = c(1, 2, 3)
 )
 
 ## write in the formula
-example_data$Total_Sales  <- paste(paste0("A", 1:3 + 1L), paste0("C", 1:3 + 1L), sep = " + ")
+company_sales$total_sales  <- paste(paste0("A", 1:3 + 1L), paste0("C", 1:3 + 1L), sep = " * ")
 ## add the formula class
-class(example_data$Total_Sales) <- c(class(example_data$Total_Sales), "formula")
+class(company_sales$total_sales) <- c(class(company_sales$total_sales), "formula")
 
 ## write a workbook
 wb <- wb_workbook()$
   add_worksheet("Total Sales")$
-  add_data_table(x = example_data)
+  add_data_table(x = company_sales)
 
 ## -----------------------------------------------------------------------------
 ## Because we want the `dataTable` formula to propagate down the entire column of the data
@@ -89,41 +89,41 @@ wb <- wb_workbook()$
 ## creating example data
 example_data <-
   data.frame(
-    SalesPrice = c(20, 30, 40),
+    sales_price = c(20, 30, 40),
     COGS = c(5, 11, 13),
-    SalesQuantity = c(1, 2, 3)
+    sales_quantity = c(1, 2, 3)
   )
 
 ## base R method
-example_data$GrossProfit       <- "daily_sales[[#This Row],[SalesPrice]] - daily_sales[[#This Row],[COGS]]"
-example_data$Total_COGS        <- "daily_sales[[#This Row],[COGS]] * daily_sales[[#This Row],[SalesQuantity]]"
-example_data$Total_Sales       <- "daily_sales[[#This Row],[SalesPrice]] * daily_sales[[#This Row],[SalesQuantity]]"
-example_data$Total_GrossProfit <- "daily_sales[[#This Row],[Total_Sales]] - daily_sales[[#This Row],[Total_COGS]]"
+example_data$gross_profit       <- "daily_sales[[#This Row],[sales_price]] - daily_sales[[#This Row],[COGS]]"
+example_data$total_COGS        <- "daily_sales[[#This Row],[COGS]] * daily_sales[[#This Row],[sales_quantity]]"
+example_data$total_sales       <- "daily_sales[[#This Row],[sales_price]] * daily_sales[[#This Row],[sales_quantity]]"
+example_data$total_gross_profit <- "daily_sales[[#This Row],[total_sales]] - daily_sales[[#This Row],[total_COGS]]"
 
-class(example_data$GrossProfit)       <- c(class(example_data$GrossProfit),       "formula")
-class(example_data$Total_COGS)        <- c(class(example_data$Total_COGS),        "formula")
-class(example_data$Total_Sales)       <- c(class(example_data$Total_Sales),       "formula")
-class(example_data$Total_GrossProfit) <- c(class(example_data$Total_GrossProfit), "formula")
+class(example_data$gross_profit)       <- c(class(example_data$gross_profit),       "formula")
+class(example_data$total_COGS)        <- c(class(example_data$total_COGS),          "formula")
+class(example_data$total_sales)       <- c(class(example_data$total_sales),         "formula")
+class(example_data$total_gross_profit) <- c(class(example_data$total_gross_profit), "formula")
 
 ## -----------------------------------------------------------------------------
 wb$
-  add_worksheet('Daily Sales')$
+  add_worksheet("Daily Sales")$
   add_data_table(
-    x          = example_data,
-    tableStyle = "TableStyleMedium2",
-    tableName  = 'daily_sales'
+    x           = example_data,
+    table_style = "TableStyleMedium2",
+    table_name  = "daily_sales"
   )
 
 ## -----------------------------------------------------------------------------
 #### sum dataTable examples
-wb$add_worksheet('sum_examples')
+wb$add_worksheet("sum_examples")
 
 ### Note: dataTable formula do not need to be used inside of dataTables. dataTable formula are for referencing the data within the dataTable.
 sum_examples <- data.frame(
-    description = c("sum_SalesPrice", "sum_product_Price_Quantity"),
+    description = c("sum_sales_price", "sum_product_Price_Quantity"),
     formula = c(
-      "sum(daily_sales[[#Data],[SalesPrice]])",
-      "sum(daily_sales[[#Data],[SalesPrice]] * daily_sales[[#Data],[SalesQuantity]])"
+      "sum(daily_sales[[#Data],[sales_price]])",
+      "sum(daily_sales[[#Data],[sales_price]] * daily_sales[[#Data],[sales_quantity]])"
     )
   )
 class(sum_examples$formula) <- c(class(sum_examples$formula), "formula")
@@ -131,17 +131,17 @@ class(sum_examples$formula) <- c(class(sum_examples$formula), "formula")
 wb$add_data(x = sum_examples)
 
 #### dataTable referencing
-wb$add_worksheet('dt_references')
+wb$add_worksheet("dt_references")
 
 ### Adding the headers by themselves.
 wb$add_formula(
-  x = "daily_sales[[#Headers],[SalesPrice]:[Total_GrossProfit]]",
+  x = "daily_sales[[#Headers],[sales_price]:[total_gross_profit]]",
 )
 
 ### Adding the raw data by reference and selecting them directly.
 wb$add_formula(
-  x = "daily_sales[[#Data],[SalesPrice]:[Total_GrossProfit]]",
-  startRow = 2
+  x = "daily_sales[[#Data],[sales_price]:[total_gross_profit]]",
+  start_row = 2
 )
 # wb$open()
 

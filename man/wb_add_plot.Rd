@@ -7,17 +7,15 @@
 wb_add_plot(
   wb,
   sheet = current_sheet(),
+  dims = "A1",
   width = 6,
   height = 4,
-  xy = NULL,
-  startRow = 1,
-  startCol = 1,
-  rowOffset = 0,
-  colOffset = 0,
-  fileType = "png",
+  row_offset = 0,
+  col_offset = 0,
+  file_type = "png",
   units = "in",
   dpi = 300,
-  dims = rowcol_to_dim(startRow, startCol)
+  ...
 )
 }
 \arguments{
@@ -25,30 +23,21 @@ wb_add_plot(
 
 \item{sheet}{A name or index of a worksheet}
 
-\item{width}{Width of figure. Defaults to \code{6}in.}
+\item{dims}{Worksheet dimension, single cell ("A1") or cell range ("A1:D4")}
 
-\item{height}{Height of figure . Defaults to \code{4}in.}
+\item{width}{Width of figure. Defaults to \code{6} in.}
 
-\item{xy}{Alternate way to specify \code{startRow} and \code{startCol.}  A vector of
-length \code{2} of form (\code{startcol}, \code{startRow})}
+\item{height}{Height of figure . Defaults to \code{4} in.}
 
-\item{startRow}{Row coordinate of upper left corner of figure. \code{xy[[2]]} when
-\code{xy} is given.}
+\item{row_offset, col_offset}{Offset for column and row}
 
-\item{startCol}{Column coordinate of upper left corner of figure. \code{xy[[1]]}
-when \code{xy} is given.}
-
-\item{rowOffset}{offset within cell (row)}
-
-\item{colOffset}{offset within cell (column)}
-
-\item{fileType}{File type of image}
+\item{file_type}{File type of image}
 
 \item{units}{Units of width and height. Can be \code{"in"}, \code{"cm"} or \code{"px"}}
 
 \item{dpi}{Image resolution}
 
-\item{dims}{Worksheet dimension, single cell ("A1") or cell range ("A1:D4")}
+\item{...}{additional arguments}
 }
 \description{
 The current plot is saved to a temporary image file using
@@ -61,26 +50,26 @@ if (requireNamespace("ggplot2") && interactive()) {
 wb <- wb_workbook()
 
 ## Add a worksheet
-wb$add_worksheet("Sheet 1", gridLines = FALSE)
+wb$add_worksheet("Sheet 1", grid_lines = FALSE)
 
 ## create plot objects
 require(ggplot2)
 p1 <- ggplot(mtcars, aes(x = mpg, fill = as.factor(gear))) +
   ggtitle("Distribution of Gas Mileage") +
-  geom_density(alpha = I(.5))
+  geom_density(alpha = 0.5)
 p2 <- ggplot(Orange, aes(x = age, y = circumference, color = Tree)) +
   geom_point() + geom_line()
 
 ## Insert currently displayed plot to sheet 1, row 1, column 1
 print(p1) # plot needs to be showing
-wb$add_plot(1, width = 5, height = 3.5, fileType = "png", units = "in")
+wb$add_plot(1, width = 5, height = 3.5, file_type = "png", units = "in")
 
 ## Insert plot 2
 print(p2)
-wb$add_plot(1, dims = "J2", width = 16, height = 10, fileType = "png", units = "cm")
+wb$add_plot(1, dims = "J2", width = 16, height = 10, file_type = "png", units = "cm")
 
 }
 }
 \seealso{
-\code{\link[=wb_add_image]{wb_add_image()}}
+\code{\link[=wb_add_chart_xml]{wb_add_chart_xml()}} \code{\link[=wb_add_drawing]{wb_add_drawing()}} \code{\link[=wb_add_image]{wb_add_image()}} \code{\link[=wb_add_mschart]{wb_add_mschart()}}
 }

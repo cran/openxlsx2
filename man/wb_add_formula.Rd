@@ -8,13 +8,14 @@ wb_add_formula(
   wb,
   sheet = current_sheet(),
   x,
-  startCol = 1,
-  startRow = 1,
-  dims = rowcol_to_dims(startRow, startCol),
+  dims = wb_dims(start_row, start_col),
+  start_col = 1,
+  start_row = 1,
   array = FALSE,
   cm = FALSE,
-  applyCellStyle = TRUE,
-  removeCellStyle = FALSE
+  apply_cell_style = TRUE,
+  remove_cell_style = FALSE,
+  ...
 )
 }
 \arguments{
@@ -24,19 +25,21 @@ wb_add_formula(
 
 \item{x}{A character vector.}
 
-\item{startCol}{A vector specifying the starting column to write to.}
-
-\item{startRow}{A vector specifying the starting row to write to.}
-
 \item{dims}{Spreadsheet dimensions that will determine startCol and startRow: "A1", "A1:B2", "A:B"}
+
+\item{start_col}{A vector specifying the starting column to write to.}
+
+\item{start_row}{A vector specifying the starting row to write to.}
 
 \item{array}{A bool if the function written is of type array}
 
 \item{cm}{A special kind of array function that hides the curly braces in the cell. Add this, if you see "@" inserted into your formulas}
 
-\item{applyCellStyle}{Should we write cell styles to the workbook}
+\item{apply_cell_style}{Should we write cell styles to the workbook}
 
-\item{removeCellStyle}{keep the cell style?}
+\item{remove_cell_style}{keep the cell style?,}
+
+\item{...}{additional arguments}
 }
 \description{
 Add a character vector containing Excel formula to a worksheet.
@@ -45,12 +48,11 @@ Add a character vector containing Excel formula to a worksheet.
 Currently only the English version of functions are supported. Please don't use the local translation.
 The examples below show a small list of possible formulas:
 \itemize{
-\item{SUM(B2:B4)}
-\item{AVERAGE(B2:B4)}
-\item{MIN(B2:B4)}
-\item{MAX(B2:B4)}
-\item{...}
-
+\item SUM(B2:B4)
+\item AVERAGE(B2:B4)
+\item MIN(B2:B4)
+\item MAX(B2:B4)
+\item ...
 }
 }
 \seealso{
@@ -60,17 +62,17 @@ Other workbook wrappers:
 \code{\link{wb_add_data}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_font}},
 \code{\link{wb_clone_worksheet}()},
+\code{\link{wb_col_widths}},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_creators}},
 \code{\link{wb_freeze_pane}()},
-\code{\link{wb_get_base_font}()},
+\code{\link{wb_grouping}},
+\code{\link{wb_merge_cells}()},
 \code{\link{wb_save}()},
-\code{\link{wb_set_col_widths}()},
 \code{\link{wb_set_last_modified_by}()},
 \code{\link{wb_set_row_heights}()},
-\code{\link{wb_workbook}()},
-\code{\link{workbook_grouping}},
-\code{\link{ws_cell_merge}}
+\code{\link{wb_workbook}()}
 }
 \concept{workbook wrappers}

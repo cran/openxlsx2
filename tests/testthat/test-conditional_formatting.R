@@ -607,17 +607,17 @@ test_that("create dxfs style without font family and size", {
   exp <- "<dxf><font><color rgb=\"FF9C0006\"/></font><fill><patternFill patternType=\"solid\"><bgColor rgb=\"FFFFC7CE\"/></patternFill></fill></dxf>"
   got <- create_dxfs_style(
     font_color = wb_colour(hex = "FF9C0006"),
-    bgFill = wb_colour(hex = "FFFFC7CE")
+    bg_fill =    wb_colour(hex = "FFFFC7CE")
   )
   expect_equal(exp, got)
 
   # the fully fletched old default dxfs style
   exp <- "<dxf><font><color rgb=\"FF9C0006\"/><name val=\"Calibri\"/><sz val=\"11\"/></font><fill><patternFill patternType=\"solid\"><bgColor rgb=\"FFFFC7CE\"/></patternFill></fill></dxf>"
   got <- create_dxfs_style(
-    font_name = "Calibri",
-    font_size = 11,
+    font_name  = "Calibri",
+    font_size  = 11,
     font_color = wb_colour(hex = "FF9C0006"),
-    bgFill = wb_colour(hex = "FFFFC7CE")
+    bg_fill   = wb_colour(hex = "FFFFC7CE")
   )
   expect_equal(exp, got)
 
@@ -680,7 +680,7 @@ test_that("containsErrors works", {
   wb$add_data(x = c(1, NaN), colNames = FALSE)
   wb$add_data(x = c(1, NaN), colNames = FALSE, startCol = 2)
   wb$add_conditional_formatting(cols = 1, rows = 1:3, type = "containsErrors")
-  wb$add_conditional_formatting(col = 2, rows = 1:3, type = "notContainsErrors")
+  wb$add_conditional_formatting(cols = 2, rows = 1:3, type = "notContainsErrors")
 
   exp <- c(
     "<cfRule type=\"containsErrors\" dxfId=\"0\" priority=\"2\"><formula>ISERROR(A1:A3)</formula></cfRule>",

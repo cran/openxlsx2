@@ -1,10 +1,11 @@
 
 # columns -----------------------------------------------------------------
 
-#' @name int2col
-#' @title Convert integer to Excel column
-#' @description Converts an integer to an Excel column label.
-#' @param x A numeric vector
+#' Convert integer to Excel column
+#'
+#' Converts an integer to an Excel column label.
+#'
+#' @param x A numeric vector.
 #' @export
 #' @examples
 #' int2col(1:10)
@@ -16,22 +17,25 @@ int2col <- function(x) {
   sapply(x, int_to_col)
 }
 
-#' @name col2int
-#' @title Convert Excel column to integer
-#' @description Converts an Excel column label to an integer.
+#' Convert Excel column to integer
+#'
+#' Converts an Excel column label to an integer.
+#'
 #' @param x A character vector
+#' @return An integer column label (or `NULL` if `x` is `NULL`)
 #' @export
 #' @examples
 #' col2int(LETTERS)
 col2int <- function(x) {
+  if (is.null(x)) return(NULL)
 
   if (is.numeric(x) || is.integer(x) || is.factor(x))
-    return(as.numeric(x))
+    return(as.integer(x))
 
   if (!is.character(x)) {
     stop("x must be character")
 
-    if (any(is.na(x)))
+    if (anyNA(x))
       stop("x must be a valid character")
   }
 
@@ -49,9 +53,8 @@ col2int <- function(x) {
 }
 
 
-#' @name get_cell_refs
-#' @title Return excel cell coordinates from (x,y) coordinates
-#' @description Return excel cell coordinates from (x,y) coordinates
+#' Return Excel cell coordinates from (x,y) coordinates
+#'
 #' @param cellCoords A data.frame with two columns coordinate pairs.
 #' @return Excel alphanumeric cell reference
 #' @examples
@@ -59,7 +62,7 @@ col2int <- function(x) {
 #' # "B1"
 #' get_cell_refs(data.frame(1:3, 2:4))
 #' # "B1" "C2" "D3"
-#' @export
+#' @noRd
 get_cell_refs <- function(cellCoords) {
   assert_class(cellCoords, "data.frame")
   stopifnot(ncol(cellCoords) == 2L)
@@ -78,7 +81,6 @@ get_cell_refs <- function(cellCoords) {
 #'
 #' @param base_font the base font name and fontsize
 #' @param col_width column width
-#' @keywords internal
 #' @examples
 #' base_font <- wb_get_base_font(wb)
 #' calc_col_width(base_font, col_width = 10)

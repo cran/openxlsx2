@@ -354,20 +354,20 @@ spreadsheet software as <code>A1 + B1 = 2</code>. Therefore if we read
 the cell, we see the value 2. Lets recreate this output in
 <code>openxlsx2</code></p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Create artificial xlsx file</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> <span class="fu">t</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>)), <span class="at">colNames =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> <span class="fu">t</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>)), <span class="at">col_names =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">dims =</span> <span class="st">&quot;C1&quot;</span>, <span class="at">x =</span> <span class="st">&quot;A1 + B1&quot;</span>)</span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># Users should never modify cc as shown here</span></span>
 <span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>wb<span class="sc">$</span>worksheets[[<span class="dv">1</span>]]<span class="sc">$</span>sheet_data<span class="sc">$</span>cc<span class="sc">$</span>v[<span class="dv">3</span>] <span class="ot">&lt;-</span> <span class="dv">2</span></span>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
 <span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># we expect a value of 2</span></span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="fu">wb_to_df</span>(wb, <span class="at">colNames =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="fu">wb_to_df</span>(wb, <span class="at">col_names =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt;   A B C</span></span>
 <span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt; 1 1 1 2</span></span></code></pre></div>
-<p>Now, lets assume we modify the data in cell <code>A1</code>.</p>
+<p>Now, lets assume we modify the data in cell <code>A1</code> to 2.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> <span class="dv">2</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co"># we expect 3</span></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="fu">wb_to_df</span>(wb, <span class="at">colNames =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="fu">wb_to_df</span>(wb, <span class="at">col_names =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt;   A B C</span></span>
 <span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; 1 2 1 2</span></span></code></pre></div>
 <p>What happened? Even though we see cells <code>A1</code> and
@@ -383,7 +383,7 @@ the cell looks something like this:</p>
 <p>And when we read from this cell, we always return the value of
 <code>v</code>. In this case it is obvious, but still wrong and it is a
 good idea to check if underlying fields contain formulas.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">wb_to_df</span>(wb, <span class="at">colNames =</span> <span class="cn">FALSE</span>, <span class="at">showFormula =</span> <span class="cn">TRUE</span>)</span>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">wb_to_df</span>(wb, <span class="at">col_names =</span> <span class="cn">FALSE</span>, <span class="at">show_formula =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt;   A B       C</span></span>
 <span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; 1 2 1 A1 + B1</span></span></code></pre></div>
 <p>If <code>openxlsx2</code> writes formulas, as shown in the examples
@@ -396,15 +396,15 @@ and similar, checking for similar things all the time.</p>
 <h1>Simple formulas</h1>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="fu">head</span>(cars))<span class="sc">$</span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">dims =</span> <span class="st">&quot;D2&quot;</span>, <span class="at">x =</span> <span class="st">&quot;SUM(A2, B2)&quot;</span>)<span class="sc">$</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">dims =</span> <span class="st">&quot;D3&quot;</span>, <span class="at">x =</span> <span class="st">&quot;A2 + B2&quot;</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;SUM(A2, B2)&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;D2&quot;</span>)<span class="sc">$</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;A2 + B2&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;D3&quot;</span>)</span>
 <span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
 </div>
 <div id="array-formulas" class="section level1">
 <h1>Array formulas</h1>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="fu">head</span>(cars))<span class="sc">$</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">dims =</span> <span class="st">&quot;C2:C7&quot;</span>, <span class="at">x =</span> <span class="st">&quot;A2:A7 * B2:B7&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;A2:A7 * B2:B7&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;C2:C7&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
 </div>
 <div id="array-formulas-creating-multiple-fields" class="section level1">
@@ -417,9 +417,9 @@ to.</p>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>m2 <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">7</span><span class="sc">:</span><span class="dv">12</span>, <span class="at">nrow =</span> <span class="dv">2</span>)</span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a></span>
 <span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> m1, <span class="at">startCol =</span> <span class="dv">1</span>)<span class="sc">$</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> m2, <span class="at">startCol =</span> <span class="dv">4</span>)<span class="sc">$</span></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">dims =</span> <span class="st">&quot;H2:J4&quot;</span>, <span class="at">x =</span> <span class="st">&quot;MMULT(A2:B4, D2:F3)&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> m1)<span class="sc">$</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> m2, <span class="at">dims =</span> <span class="fu">wb_dims</span>(<span class="at">from_col =</span> <span class="dv">4</span>))<span class="sc">$</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;MMULT(A2:B4, D2:F3)&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;H2:J4&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
 <p>Similar a the coefficients of a linear regression</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># we expect to find this in D1:E1</span></span>
@@ -428,17 +428,17 @@ to.</p>
 <span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt;   5.2692308   0.1153846</span></span>
 <span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
 <span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="fu">head</span>(cars))<span class="sc">$</span></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">dims =</span> <span class="st">&quot;D2:E2&quot;</span>, <span class="at">x =</span> <span class="st">&quot;LINEST(A2:A7, B2:B7, TRUE)&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;LINEST(A2:A7, B2:B7, TRUE)&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;D2:E2&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
 </div>
-<div id="cm-formulas" class="section level1">
-<h1>cm formulas</h1>
-<p>Similar to array formulas, these cell metadata formulas hide to the
-user that they are array formulas. Using these is implemented in
+<div id="cells-metadata-cm-formulas" class="section level1">
+<h1>cells metadata (cm) formulas</h1>
+<p>Similar to array formulas, these cell metadata (cm) formulas hide to
+the user that they are array formulas. Using these is implemented in
 <code>openxlsx2</code> &gt; 0.6.1:</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
 <span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="fu">head</span>(cars))<span class="sc">$</span></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">dims =</span> <span class="st">&quot;D2&quot;</span>, <span class="at">x =</span> <span class="st">&#39;SUM(ABS(A2:A7))&#39;</span>, <span class="at">cm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;SUM(ABS(A2:A7))&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;D2&quot;</span>, <span class="at">cm =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt; Warning in write_data2(wb = wb, sheet = sheet, data = x, name = name, colNames</span></span>
 <span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt; = colNames, : modifications with cm formulas are experimental. use at own risk</span></span>
 <span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
@@ -459,9 +459,9 @@ user that they are array formulas. Using these is implemented in
 <tbody>
 <tr class="odd">
 <td>1</td>
-<td>SalesPrice</td>
+<td>sales_price</td>
 <td>COGS</td>
-<td>SalesQuantity</td>
+<td>sales_quantity</td>
 </tr>
 <tr class="even">
 <td>2</td>
@@ -484,28 +484,28 @@ user that they are array formulas. Using these is implemented in
 </tbody>
 </table>
 <p>Given a basic table like the above, a similarly basic formula for
-“Total_Sales” would be “=A2 * C2” with the row value changing at each
-row.</p>
+<code>total_sales</code> would be “= A2 * C2” with the row value
+changing at each row.</p>
 <p>An implementation for this formula using
 <code>wb_add_formula()</code> would look this (taken from current
 documentation) lets say we’ve read in the data and assigned it to the
-table “company_sales”</p>
+table <code>company_sales</code></p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="do">## creating example data</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>example_data <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    <span class="at">SalesPrice =</span> <span class="fu">c</span>(<span class="dv">20</span>, <span class="dv">30</span>, <span class="dv">40</span>),</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>company_sales <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    <span class="at">sales_price =</span> <span class="fu">c</span>(<span class="dv">20</span>, <span class="dv">30</span>, <span class="dv">40</span>),</span>
 <span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    <span class="at">COGS =</span> <span class="fu">c</span>(<span class="dv">5</span>, <span class="dv">11</span>, <span class="dv">13</span>),</span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    <span class="at">SalesQuantity =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    <span class="at">sales_quantity =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span>
 <span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>)</span>
 <span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a></span>
 <span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="do">## write in the formula</span></span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>example_data<span class="sc">$</span>Total_Sales  <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">paste0</span>(<span class="st">&quot;A&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span> <span class="sc">+</span> 1L), <span class="fu">paste0</span>(<span class="st">&quot;C&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span> <span class="sc">+</span> 1L), <span class="at">sep =</span> <span class="st">&quot; + &quot;</span>)</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>company_sales<span class="sc">$</span>total_sales  <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">paste0</span>(<span class="st">&quot;A&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span> <span class="sc">+</span> <span class="dv">1</span><span class="dt">L</span>), <span class="fu">paste0</span>(<span class="st">&quot;C&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span> <span class="sc">+</span> <span class="dv">1</span><span class="dt">L</span>), <span class="at">sep =</span> <span class="st">&quot; * &quot;</span>)</span>
 <span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="do">## add the formula class</span></span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>Total_Sales) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>Total_Sales), <span class="st">&quot;formula&quot;</span>)</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="fu">class</span>(company_sales<span class="sc">$</span>total_sales) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(company_sales<span class="sc">$</span>total_sales), <span class="st">&quot;formula&quot;</span>)</span>
 <span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a></span>
 <span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="do">## write a workbook</span></span>
 <span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
 <span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Total Sales&quot;</span>)<span class="sc">$</span></span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  <span class="fu">add_data_table</span>(<span class="at">x =</span> example_data)</span></code></pre></div>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  <span class="fu">add_data_table</span>(<span class="at">x =</span> company_sales)</span></code></pre></div>
 <p>Then we create the workbook, worksheet, and use
 <code>wb_add_data_table()</code>.</p>
 <p>One of the advantages of the open xml <code>dataTable</code> syntax
@@ -515,50 +515,50 @@ and extending formulas to the new rows. These <code>dataTable</code>
 have named columns that we can use instead of letters. When writing the
 formulas within the <code>dataTable</code> we would use the following
 syntax <code>[@[column_name]]</code> to reference the current row. So
-the “Total_Sales” formula written in open xml in <code>dataTable</code>
+the “total_sales” formula written in open xml in <code>dataTable</code>
 would look like this;
-<code>=[@[SalesPrice]] * [@[SalesQuantity]]</code></p>
+<code>=[@[sales_price]] * [@[sales_quantity]]</code></p>
 <p>If we are writing the formula outside of the <code>dataTable</code>
 we have to reference the table name. In this case lets say the table
 name is ‘daily_sales’
-<code>=daily_sales[@[SalesPrice]] * daily_sales[@[SalesQuantity]]</code></p>
+<code>=daily_sales[@[sales_price]] * daily_sales[@[sales_quantity]]</code></p>
 <p>However, if we were to pass this as the text for the formula to be
 written it would cause an error because the syntax that open xml
 requires for selecting the current row is different.</p>
 <p>In open xml the <code>dataTable</code> formula looks like this:</p>
 <pre><code>&lt;calculatedColumnFormula&gt;
-  daily_sales[[#This Row],[SalesPrice]]*daily_sales[[#ThisRow],[SalesQuantity]]
+  daily_sales[[#This Row],[sales_price]]*daily_sales[[#ThisRow],[sales_quantity]]
 &lt;/calculatedColumnFormula&gt;</code></pre>
-<p>Now we can see that open xml replaces <code>[@[SalesPrice]]</code>
-with <code>daily_sales[[#This Row],[SalesPrice]]</code> We must then use
-this syntax when writing formulas for <code>dataTable</code></p>
+<p>Now we can see that open xml replaces <code>[@[sales_price]]</code>
+with <code>daily_sales[[#This Row],[sales_price]]</code> We must then
+use this syntax when writing formulas for <code>dataTable</code></p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="do">## Because we want the `dataTable` formula to propagate down the entire column of the data</span></span>
 <span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="do">## we can assign the formula by itself to any column and allow that single string to be repeated for each row.</span></span>
 <span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a></span>
 <span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="do">## creating example data</span></span>
 <span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>example_data <span class="ot">&lt;-</span></span>
 <span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  <span class="fu">data.frame</span>(</span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>    <span class="at">SalesPrice =</span> <span class="fu">c</span>(<span class="dv">20</span>, <span class="dv">30</span>, <span class="dv">40</span>),</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>    <span class="at">sales_price =</span> <span class="fu">c</span>(<span class="dv">20</span>, <span class="dv">30</span>, <span class="dv">40</span>),</span>
 <span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>    <span class="at">COGS =</span> <span class="fu">c</span>(<span class="dv">5</span>, <span class="dv">11</span>, <span class="dv">13</span>),</span>
-<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>    <span class="at">SalesQuantity =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>    <span class="at">sales_quantity =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span>
 <span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>  )</span>
 <span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a></span>
 <span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a><span class="do">## base R method</span></span>
-<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>example_data<span class="sc">$</span>GrossProfit       <span class="ot">&lt;-</span> <span class="st">&quot;daily_sales[[#This Row],[SalesPrice]] - daily_sales[[#This Row],[COGS]]&quot;</span></span>
-<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>example_data<span class="sc">$</span>Total_COGS        <span class="ot">&lt;-</span> <span class="st">&quot;daily_sales[[#This Row],[COGS]] * daily_sales[[#This Row],[SalesQuantity]]&quot;</span></span>
-<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>example_data<span class="sc">$</span>Total_Sales       <span class="ot">&lt;-</span> <span class="st">&quot;daily_sales[[#This Row],[SalesPrice]] * daily_sales[[#This Row],[SalesQuantity]]&quot;</span></span>
-<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a>example_data<span class="sc">$</span>Total_GrossProfit <span class="ot">&lt;-</span> <span class="st">&quot;daily_sales[[#This Row],[Total_Sales]] - daily_sales[[#This Row],[Total_COGS]]&quot;</span></span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>example_data<span class="sc">$</span>gross_profit       <span class="ot">&lt;-</span> <span class="st">&quot;daily_sales[[#This Row],[sales_price]] - daily_sales[[#This Row],[COGS]]&quot;</span></span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>example_data<span class="sc">$</span>total_COGS        <span class="ot">&lt;-</span> <span class="st">&quot;daily_sales[[#This Row],[COGS]] * daily_sales[[#This Row],[sales_quantity]]&quot;</span></span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a>example_data<span class="sc">$</span>total_sales       <span class="ot">&lt;-</span> <span class="st">&quot;daily_sales[[#This Row],[sales_price]] * daily_sales[[#This Row],[sales_quantity]]&quot;</span></span>
+<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a>example_data<span class="sc">$</span>total_gross_profit <span class="ot">&lt;-</span> <span class="st">&quot;daily_sales[[#This Row],[total_sales]] - daily_sales[[#This Row],[total_COGS]]&quot;</span></span>
 <span id="cb13-17"><a href="#cb13-17" tabindex="-1"></a></span>
-<span id="cb13-18"><a href="#cb13-18" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>GrossProfit)       <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>GrossProfit),       <span class="st">&quot;formula&quot;</span>)</span>
-<span id="cb13-19"><a href="#cb13-19" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>Total_COGS)        <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>Total_COGS),        <span class="st">&quot;formula&quot;</span>)</span>
-<span id="cb13-20"><a href="#cb13-20" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>Total_Sales)       <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>Total_Sales),       <span class="st">&quot;formula&quot;</span>)</span>
-<span id="cb13-21"><a href="#cb13-21" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>Total_GrossProfit) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>Total_GrossProfit), <span class="st">&quot;formula&quot;</span>)</span></code></pre></div>
+<span id="cb13-18"><a href="#cb13-18" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>gross_profit)       <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>gross_profit),       <span class="st">&quot;formula&quot;</span>)</span>
+<span id="cb13-19"><a href="#cb13-19" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>total_COGS)        <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>total_COGS),          <span class="st">&quot;formula&quot;</span>)</span>
+<span id="cb13-20"><a href="#cb13-20" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>total_sales)       <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>total_sales),         <span class="st">&quot;formula&quot;</span>)</span>
+<span id="cb13-21"><a href="#cb13-21" tabindex="-1"></a><span class="fu">class</span>(example_data<span class="sc">$</span>total_gross_profit) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(example_data<span class="sc">$</span>total_gross_profit), <span class="st">&quot;formula&quot;</span>)</span></code></pre></div>
 <div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>wb<span class="sc">$</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&#39;Daily Sales&#39;</span>)<span class="sc">$</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Daily Sales&quot;</span>)<span class="sc">$</span></span>
 <span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="fu">add_data_table</span>(</span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    <span class="at">x          =</span> example_data,</span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>    <span class="at">tableStyle =</span> <span class="st">&quot;TableStyleMedium2&quot;</span>,</span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>    <span class="at">tableName  =</span> <span class="st">&#39;daily_sales&#39;</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    <span class="at">x           =</span> example_data,</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>    <span class="at">table_style =</span> <span class="st">&quot;TableStyleMedium2&quot;</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>    <span class="at">table_name  =</span> <span class="st">&quot;daily_sales&quot;</span></span>
 <span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>  )</span></code></pre></div>
 <p>And if we open the workbook to view the table we created we can see
 that the formula has worked.</p>
@@ -588,13 +588,13 @@ that the formula has worked.</p>
 <tbody>
 <tr class="odd">
 <td>1</td>
-<td>SalesPrice</td>
+<td>sales_price</td>
 <td>COGS</td>
-<td>SalesQuantity</td>
-<td>GrossProfit</td>
-<td>Total_COGS</td>
-<td>Total_Sales</td>
-<td>Total_GrossProfit</td>
+<td>sales_quantity</td>
+<td>gross_profit</td>
+<td>total_COGS</td>
+<td>total_sales</td>
+<td>total_gross_profit</td>
 </tr>
 <tr class="even">
 <td>2</td>
@@ -656,43 +656,43 @@ that the formula has worked.</p>
 <tbody>
 <tr class="odd">
 <td>1</td>
-<td>SalesPrice</td>
+<td>sales_price</td>
 <td>COGS</td>
-<td>SalesQuantity</td>
-<td>GrossProfit</td>
-<td>Total_COGS</td>
-<td>Total_Sales</td>
-<td>Total_GrossProfit</td>
+<td>sales_quantity</td>
+<td>gross_profit</td>
+<td>total_COGS</td>
+<td>total_sales</td>
+<td>total_gross_profit</td>
 </tr>
 <tr class="even">
 <td>2</td>
 <td>20</td>
 <td>5</td>
 <td>1</td>
-<td>=<span class="citation">[@SalesPrice]</span> - <span class="citation">[@COGS]</span></td>
-<td>=<span class="citation">[@COGS]</span> * <span class="citation">[@SalesQuantity]</span></td>
-<td>=<span class="citation">[@SalesPrice]</span> * <span class="citation">[@SalesQuantity]</span></td>
-<td>=[@[Total_Sales]] - [@[Total_COGS]]</td>
+<td>=<span class="citation">[@sales_price]</span> - <span class="citation">[@COGS]</span></td>
+<td>=<span class="citation">[@COGS]</span> * <span class="citation">[@sales_quantity]</span></td>
+<td>=<span class="citation">[@sales_price]</span> * <span class="citation">[@sales_quantity]</span></td>
+<td>=[@[total_sales]] - [@[total_COGS]]</td>
 </tr>
 <tr class="odd">
 <td>3</td>
 <td>30</td>
 <td>11</td>
 <td>2</td>
-<td>=<span class="citation">[@SalesPrice]</span> - <span class="citation">[@COGS]</span></td>
-<td>=<span class="citation">[@COGS]</span> * <span class="citation">[@SalesQuantity]</span></td>
-<td>=<span class="citation">[@SalesPrice]</span> * <span class="citation">[@SalesQuantity]</span></td>
-<td>=[@[Total_Sales]] - [@[Total_COGS]]</td>
+<td>=<span class="citation">[@sales_price]</span> - <span class="citation">[@COGS]</span></td>
+<td>=<span class="citation">[@COGS]</span> * <span class="citation">[@sales_quantity]</span></td>
+<td>=<span class="citation">[@sales_price]</span> * <span class="citation">[@sales_quantity]</span></td>
+<td>=[@[total_sales]] - [@[total_COGS]]</td>
 </tr>
 <tr class="even">
 <td>4</td>
 <td>40</td>
 <td>13</td>
 <td>3</td>
-<td>=<span class="citation">[@SalesPrice]</span> - <span class="citation">[@COGS]</span></td>
-<td>=<span class="citation">[@COGS]</span> * <span class="citation">[@SalesQuantity]</span></td>
-<td>=<span class="citation">[@SalesPrice]</span> * <span class="citation">[@SalesQuantity]</span></td>
-<td>=[@[Total_Sales]] - [@[Total_COGS]]</td>
+<td>=<span class="citation">[@sales_price]</span> - <span class="citation">[@COGS]</span></td>
+<td>=<span class="citation">[@COGS]</span> * <span class="citation">[@sales_quantity]</span></td>
+<td>=<span class="citation">[@sales_price]</span> * <span class="citation">[@sales_quantity]</span></td>
+<td>=[@[total_sales]] - [@[total_COGS]]</td>
 </tr>
 </tbody>
 </table>
@@ -714,52 +714,52 @@ that the formula has worked.</p>
 </thead>
 <tbody>
 <tr class="odd">
-<td>GrossProfit</td>
-<td>Total_COGS</td>
-<td>Total_Sales</td>
-<td>Total_GrossProfit</td>
+<td>gross_profit</td>
+<td>total_COGS</td>
+<td>total_sales</td>
+<td>total_gross_profit</td>
 </tr>
 <tr class="even">
-<td>=grossprofit[[#This Row],[SalesPrice]] - grossprofit[[#This
+<td>=gross_profit[[#This Row],[sales_price]] - gross_profit[[#This
 Row],[COGS]]</td>
-<td>=grossprofit[[#This Row],[COGS]] * grossprofit[[#This
-Row],[SalesQuantity]]</td>
-<td>=grossprofit[[#This Row],[SalesPrice]] * grossprofit[[#This
-Row],[SalesQuantity]]</td>
-<td>=grossprofit[[#This Row],[Total_Sales]] - grossprofit[[#This
-Row],[Total_COGS]]</td>
+<td>=gross_profit[[#This Row],[COGS]] * gross_profit[[#This
+Row],[sales_quantity]]</td>
+<td>=gross_profit[[#This Row],[sales_price]] * gross_profit[[#This
+Row],[sales_quantity]]</td>
+<td>=gross_profit[[#This Row],[total_sales]] - gross_profit[[#This
+Row],[total_COGS]]</td>
 </tr>
 <tr class="odd">
-<td>=grossprofit[[#This Row],[SalesPrice]] - grossprofit[[#This
+<td>=gross_profit[[#This Row],[sales_price]] - gross_profit[[#This
 Row],[COGS]]</td>
-<td>=grossprofit[[#This Row],[COGS]] * grossprofit[[#This
-Row],[SalesQuantity]]</td>
-<td>=grossprofit[[#This Row],[SalesPrice]] * grossprofit[[#This
-Row],[SalesQuantity]]</td>
-<td>=grossprofit[[#This Row],[Total_Sales]] - grossprofit[[#This
-Row],[Total_COGS]]</td>
+<td>=gross_profit[[#This Row],[COGS]] * gross_profit[[#This
+Row],[sales_quantity]]</td>
+<td>=gross_profit[[#This Row],[sales_price]] * gross_profit[[#This
+Row],[sales_quantity]]</td>
+<td>=gross_profit[[#This Row],[total_sales]] - gross_profit[[#This
+Row],[total_COGS]]</td>
 </tr>
 <tr class="even">
-<td>=grossprofit[[#This Row],[SalesPrice]] - grossprofit[[#This
+<td>=gross_profit[[#This Row],[sales_price]] - gross_profit[[#This
 Row],[COGS]]</td>
-<td>=grossprofit[[#This Row],[COGS]] * grossprofit[[#This
-Row],[SalesQuantity]]</td>
-<td>=grossprofit[[#This Row],[SalesPrice]] * grossprofit[[#This
-Row],[SalesQuantity]]</td>
-<td>=grossprofit[[#This Row],[Total_Sales]] - grossprofit[[#This
-Row],[Total_COGS]]</td>
+<td>=gross_profit[[#This Row],[COGS]] * gross_profit[[#This
+Row],[sales_quantity]]</td>
+<td>=gross_profit[[#This Row],[sales_price]] * gross_profit[[#This
+Row],[sales_quantity]]</td>
+<td>=gross_profit[[#This Row],[total_sales]] - gross_profit[[#This
+Row],[total_COGS]]</td>
 </tr>
 </tbody>
 </table>
 <div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="do">#### sum dataTable examples</span></span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&#39;sum_examples&#39;</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&quot;sum_examples&quot;</span>)</span>
 <span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
 <span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="do">### Note: dataTable formula do not need to be used inside of dataTables. dataTable formula are for referencing the data within the dataTable.</span></span>
 <span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>sum_examples <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>    <span class="at">description =</span> <span class="fu">c</span>(<span class="st">&quot;sum_SalesPrice&quot;</span>, <span class="st">&quot;sum_product_Price_Quantity&quot;</span>),</span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>    <span class="at">description =</span> <span class="fu">c</span>(<span class="st">&quot;sum_sales_price&quot;</span>, <span class="st">&quot;sum_product_Price_Quantity&quot;</span>),</span>
 <span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>    <span class="at">formula =</span> <span class="fu">c</span>(</span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>      <span class="st">&quot;sum(daily_sales[[#Data],[SalesPrice]])&quot;</span>,</span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>      <span class="st">&quot;sum(daily_sales[[#Data],[SalesPrice]] * daily_sales[[#Data],[SalesQuantity]])&quot;</span></span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>      <span class="st">&quot;sum(daily_sales[[#Data],[sales_price]])&quot;</span>,</span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>      <span class="st">&quot;sum(daily_sales[[#Data],[sales_price]] * daily_sales[[#Data],[sales_quantity]])&quot;</span></span>
 <span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>    )</span>
 <span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>  )</span>
 <span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a><span class="fu">class</span>(sum_examples<span class="sc">$</span>formula) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(sum_examples<span class="sc">$</span>formula), <span class="st">&quot;formula&quot;</span>)</span>
@@ -767,17 +767,17 @@ Row],[Total_COGS]]</td>
 <span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> sum_examples)</span>
 <span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a></span>
 <span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="do">#### dataTable referencing</span></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&#39;dt_references&#39;</span>)</span>
+<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&quot;dt_references&quot;</span>)</span>
 <span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a></span>
 <span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="do">### Adding the headers by themselves.</span></span>
 <span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_formula</span>(</span>
-<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a>  <span class="at">x =</span> <span class="st">&quot;daily_sales[[#Headers],[SalesPrice]:[Total_GrossProfit]]&quot;</span>,</span>
+<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a>  <span class="at">x =</span> <span class="st">&quot;daily_sales[[#Headers],[sales_price]:[total_gross_profit]]&quot;</span>,</span>
 <span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a>)</span>
 <span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a></span>
 <span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a><span class="do">### Adding the raw data by reference and selecting them directly.</span></span>
 <span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_formula</span>(</span>
-<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a>  <span class="at">x =</span> <span class="st">&quot;daily_sales[[#Data],[SalesPrice]:[Total_GrossProfit]]&quot;</span>,</span>
-<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a>  <span class="at">startRow =</span> <span class="dv">2</span></span>
+<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a>  <span class="at">x =</span> <span class="st">&quot;daily_sales[[#Data],[sales_price]:[total_gross_profit]]&quot;</span>,</span>
+<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a>  <span class="at">start_row =</span> <span class="dv">2</span></span>
 <span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a>)</span>
 <span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
 </div>

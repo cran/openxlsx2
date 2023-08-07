@@ -7,7 +7,7 @@
 wb_add_chartsheet(
   wb,
   sheet = next_sheet(),
-  tabColor = NULL,
+  tab_color = NULL,
   zoom = 100,
   visible = c("true", "false", "hidden", "visible", "veryhidden"),
   ...
@@ -18,7 +18,7 @@ wb_add_chartsheet(
 
 \item{sheet}{A name for the new worksheet}
 
-\item{tabColor}{Color of the worksheet tab. A valid color (belonging to
+\item{tab_color}{Color of the worksheet tab. A valid color (belonging to
 colors()) or a valid hex color beginning with "#"}
 
 \item{zoom}{A numeric between 10 and 400. Worksheet zoom level as a
@@ -44,17 +44,17 @@ Other workbook wrappers:
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_font}},
 \code{\link{wb_clone_worksheet}()},
+\code{\link{wb_col_widths}},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_creators}},
 \code{\link{wb_freeze_pane}()},
-\code{\link{wb_get_base_font}()},
+\code{\link{wb_grouping}},
+\code{\link{wb_merge_cells}()},
 \code{\link{wb_save}()},
-\code{\link{wb_set_col_widths}()},
 \code{\link{wb_set_last_modified_by}()},
 \code{\link{wb_set_row_heights}()},
-\code{\link{wb_workbook}()},
-\code{\link{workbook_grouping}},
-\code{\link{ws_cell_merge}}
+\code{\link{wb_workbook}()}
 }
 \concept{workbook wrappers}

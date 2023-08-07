@@ -3,15 +3,15 @@
 library(openxlsx2)
 
 ## ----read---------------------------------------------------------------------
-xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
+file <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 
 ## ----old_read, eval = FALSE---------------------------------------------------
 #  # read in openxlsx
-#  openxlsx::read.xlsx(xlsxFile)
+#  openxlsx::read.xlsx(xlsxFile = file)
 
 ## ----new_read-----------------------------------------------------------------
 # read in openxlsx2
-openxlsx2::read_xlsx(xlsxFile)
+openxlsx2::read_xlsx(file = file)
 
 ## ----write--------------------------------------------------------------------
 output <- temp_xlsx()
@@ -22,17 +22,18 @@ output <- temp_xlsx()
 
 ## ----new_write----------------------------------------------------------------
 # write in openxlsx2
-openxlsx2::write_xlsx(iris, file = output, colNames = TRUE)
+openxlsx2::write_xlsx(iris, file = output, col_names = TRUE)
 
 ## ----old_workbook, eval = FALSE-----------------------------------------------
-#  wb <- loadWorkbook(xlsxFile)
+#  wb <- openxlsx::loadWorkbook(file = file)
 
 ## ----workbook-----------------------------------------------------------------
-wb <- wb_load(xlsxFile)
+wb <- wb_load(file = file)
 
 ## ----old_style, eval = FALSE--------------------------------------------------
+#  # openxlsx
 #  ## Create a new workbook
-#  wb <- createWorkbook("My name here")
+#  wb <- createWorkbook(creator = "My name here")
 #  addWorksheet(wb, "Expenditure", gridLines = FALSE)
 #  writeData(wb, sheet = 1, USPersonalExpenditure, rowNames = TRUE)
 #  
@@ -44,10 +45,11 @@ wb <- wb_load(xlsxFile)
 #  setColWidths(wb, 1, cols = 1, widths = 21)
 
 ## ----new_style----------------------------------------------------------------
-border_color <- wb_color(hex = "FF4F81BD")
-wb <- wb_workbook("My name here")$
-  add_worksheet("Expenditure", gridLines = FALSE)$
-  add_data(x = USPersonalExpenditure, rowNames = TRUE)$
+# openxlsx2 chained
+border_color <- wb_color(hex = "#4F81BD")
+wb <- wb_workbook(creator = "My name here")$
+  add_worksheet("Expenditure", grid_lines = FALSE)$
+  add_data(x = USPersonalExpenditure, row_names = TRUE)$
   add_border( # add the outer and inner border
     dims = "A1:F6",
     top_border = "thin", top_color = border_color,
@@ -57,15 +59,16 @@ wb <- wb_workbook("My name here")$
   )$
   set_col_widths( # set column width
     cols = 1:6,
-    widths = c("20", rep("10", 5))
+    widths = c(20, rep(10, 5))
   )$ # remove the value in A1
   add_data(dims = "A1", x = "")
 
 ## ----new_style_pipes----------------------------------------------------------
-border_color <- wb_color(hex = "FF4F81BD")
-wb <- wb_workbook("My name here") %>%
-  wb_add_worksheet("Expenditure", gridLines = FALSE) %>%
-  wb_add_data(x = USPersonalExpenditure, rowNames = TRUE) %>%
+# openxlsx2 with pipes
+border_color <- wb_color(hex = "4F81BD")
+wb <- wb_workbook(creator = "My name here") %>%
+  wb_add_worksheet(sheet = "Expenditure", grid_lines = FALSE) %>%
+  wb_add_data(x = USPersonalExpenditure, row_names = TRUE) %>%
   wb_add_border( # add the outer and inner border
     dims = "A1:F6",
     top_border = "thin", top_color = border_color,
@@ -75,11 +78,12 @@ wb <- wb_workbook("My name here") %>%
   ) %>%
   wb_set_col_widths( # set column width
     cols = 1:6,
-    widths = c("20", rep("10", 5))
+    widths = c(20, rep(10, 5))
   ) %>% # remove the value in A1
   wb_add_data(dims = "A1", x = "")
 
 ## ----pipe_chain---------------------------------------------------------------
+# openxlsx2
 wbp <- wb_workbook() %>% wb_add_worksheet()
 wbc <- wb_workbook()$add_worksheet()
 
@@ -88,19 +92,20 @@ wbp <- wbp %>% wb_add_data(x = iris)
 wbc$add_data(x = iris)
 
 ## ----new_cf-------------------------------------------------------------------
-# with chains
+# openxlsx2 with chains
 wb <- wb_workbook()$
   add_worksheet("a")$
-  add_data(x = 1:4, colNames = FALSE)$
-  add_conditional_formatting(cols = 1, rows = 1:4, rule = ">2")
+  add_data(x = 1:4, col_names = FALSE)$
+  add_conditional_formatting(dims = "A1:A4", rule = ">2")
 
-# with pipes
+# openxlsx2 with pipes
 wb <- wb_workbook() %>%
   wb_add_worksheet("a") %>%
-  wb_add_data(x = 1:4, colNames = FALSE) %>%
-  wb_add_conditional_formatting(cols = 1, rows = 1:4, rule = ">2")
+  wb_add_data(x = 1:4, col_names = FALSE) %>%
+  wb_add_conditional_formatting(dims = "A1:A4", rule = ">2")
 
 ## ----old_dv, eval = FALSE-----------------------------------------------------
+#  # openxlsx
 #  wb <- createWorkbook()
 #  addWorksheet(wb, "Sheet 1")
 #  writeDataTable(wb, 1, x = iris[1:30, ])
@@ -110,21 +115,27 @@ wb <- wb_workbook() %>%
 #  )
 
 ## ----new_dv-------------------------------------------------------------------
-# with chains
+# openxlsx2 with chains
 wb <- wb_workbook()$
   add_worksheet("Sheet 1")$
   add_data_table(1, x = iris[1:30, ])$
   add_data_validation(1,
-    col = 1:3, rows = 2:31, type = "whole",
-    operator = "between", value = c(1, 9)
+    dims = wb_dims(rows = 2:31, cols = 1:3),
+    # alternatively, dims can also be "A2:C31" if you know the span in your Excel workbook.
+    type = "whole",
+    operator = "between",
+    value = c(1, 9)
   )
 
-# with pipes
+# openxlsx2 with pipes
 wb <- wb_workbook() %>%
   wb_add_worksheet("Sheet 1") %>%
   wb_add_data_table(1, x = iris[1:30, ]) %>%
-  wb_add_data_validation(1,
-    col = 1:3, rows = 2:31, type = "whole",
-    operator = "between", value = c(1, 9)
+  wb_add_data_validation(
+    sheet = 1,
+    dims = "A2:C31", # alternatively, dims = wb_dims(rows = 2:31, cols = 1:3)
+    type = "whole",
+    operator = "between",
+    value = c(1, 9)
   )
 

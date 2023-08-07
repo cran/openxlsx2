@@ -1,3 +1,55 @@
+# openxlsx2 0.8
+
+## API Change
+
+* Function arguments are now defaulting to `snake_case`. For the time being, both arguments are accepted and `camelCase` will be switched to `snake_case` under the hood. Some examples are currently still displaying `camelCase` and maybe some `camelCase` function slipped through. [678](https://github.com/JanMarvin/openxlsx2/pull/678)
+
+* `write_formula()`, `write_data()`, `write_datatable()`, `write_comment()` are no longer recommended,
+  * Use `wb_add_formula()`, `wb_add_data()`, `wb_add_data_table()`, `wb_add_comment()` instead.
+
+## Breaking changes
+
+* Order of arguments in `wb_add_named_region()` changed, because previously overlooked `dims` argument was added.
+* In various functions the order of `dims` was changed, to highlight it's importance
+
+* Cleanups
+  * remove deprecated functions
+  
+  * remove deprecated arguments
+    * `xy` argument
+    * arguments `col`, `row`, `cols`, `rows`. `start_col`, `start_row` and `gridExpand` were deprecated in favor of `dims`. Row and column vectors can be converted to `dims` using `wb_dims()`.
+    * `xlsx_file` in favor of `file` in `wb_to_df()`
+    
+  * deprecating function
+    * `convertToExcelDate()` for `convert_to_excel_date()`  
+    * `wb_grid_lines()` for `wb_set_grid_lines()`
+
+  * make `get_cell_refs()`, `get_date_origin()`, `guess_col_type()`, and `write_file()`, `dataframe_to_dims()`, `dims_to_dataframe()`, `wb_get_sheet_name()` internal functions
+  * make classes `styles_mgr()`, `wbSheetData`, `wbWorksheet`, `wbChartSheet`, `wbComment`, `wbHyperlink` internal
+  
+## New features
+
+* `wb_dims()` was added as a more convenient replacement for `rowcol_to_dims()`.([691](https://github.com/JanMarvin/openxlsx2/pull/691) and [702](https://github.com/JanMarvin/openxlsx2/pull/702), @olivroy) The new function can take either numeric (for rows or columns) or character (column) vectors, in addition it is able to create dimensions for R objects that are coercible to data frame. This allows the following variants:
+  * `wb_dims(1:5, letters)`
+  * `wb_dims(1:5, 1:26)`
+  * `wb_dims(x = matrix(1, 5, 26))`
+  * `wb_dims(x = mtcars, from_col = "C", from_row = 2, row_names = TRUE)`
+* Handling of thread comments is now possible via `wb_add_thread()`. This includes options to reply and resolve comments.
+
+## Fixes
+
+* Improve `show_formula`. Previously it was called to early in the function and skipped a few cases. [715](https://github.com/JanMarvin/openxlsx2/pull/715)
+
+## Refactoring
+
+* Cleanup / revisit documentation and vignettes ([682](https://github.com/JanMarvin/openxlsx2/pull/682), @olivroy)
+
+* The [function index](https://janmarvin.github.io/openxlsx2/reference/) has been improved. ([717](https://github.com/JanMarvin/openxlsx2/pull/717), @olivroy)
+
+
+***************************************************************************
+
+
 # openxlsx2 0.7.1
 
 ## New features

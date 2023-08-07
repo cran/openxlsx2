@@ -9,22 +9,22 @@ wb_workbook(
   title = NULL,
   subject = NULL,
   category = NULL,
-  datetimeCreated = Sys.time(),
-  theme = NULL
+  datetime_created = Sys.time(),
+  theme = NULL,
+  ...
 )
 }
 \arguments{
 \item{creator}{Creator of the workbook (your name). Defaults to login username}
 
-\item{title}{Workbook properties title}
+\item{title, subject, category}{Workbook property, a string.}
 
-\item{subject}{Workbook properties subject}
+\item{datetime_created}{The time of the workbook is created}
 
-\item{category}{Workbook properties category}
+\item{theme}{Optional theme identified by string or number.
+See \strong{Details} for options.}
 
-\item{datetimeCreated}{The time of the workbook is created}
-
-\item{theme}{Optional theme identified by string or number}
+\item{...}{additional arguments}
 }
 \value{
 A \link{wbWorkbook} object
@@ -33,6 +33,7 @@ A \link{wbWorkbook} object
 Create a new Workbook object
 }
 \details{
+\code{theme} can be one of
 "Atlas", "Badge", "Berlin", "Celestial", "Crop", "Depth", "Droplet",
 "Facet", "Feathered", "Gallery", "Headlines", "Integral", "Ion",
 "Ion Boardroom", "Madison", "Main Event", "Mesh", "Office Theme",
@@ -59,16 +60,16 @@ Other workbook wrappers:
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_font}},
 \code{\link{wb_clone_worksheet}()},
+\code{\link{wb_col_widths}},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_creators}},
 \code{\link{wb_freeze_pane}()},
-\code{\link{wb_get_base_font}()},
+\code{\link{wb_grouping}},
+\code{\link{wb_merge_cells}()},
 \code{\link{wb_save}()},
-\code{\link{wb_set_col_widths}()},
 \code{\link{wb_set_last_modified_by}()},
-\code{\link{wb_set_row_heights}()},
-\code{\link{workbook_grouping}},
-\code{\link{ws_cell_merge}}
+\code{\link{wb_set_row_heights}()}
 }
 \concept{workbook wrappers}

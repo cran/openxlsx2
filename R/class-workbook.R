@@ -1,10 +1,11 @@
 
 
 # R6 class ----------------------------------------------------------------
-
+# Lines 7 and 8 are needed until r-lib/roxygen2#1504 is fixed
 #' R6 class for a Workbook
 #'
-#' A Workbook
+#' @description
+#' A workbook
 #'
 #' @export
 wbWorkbook <- R6::R6Class(
@@ -174,19 +175,26 @@ wbWorkbook <- R6::R6Class(
     #' @param title title
     #' @param subject subject
     #' @param category category
-    #' @param datetimeCreated The datetime (as `POSIXt`) the workbook is
+    #' @param datetime_created The datetime (as `POSIXt`) the workbook is
     #'   created.  Defaults to the current `Sys.time()` when the workbook object
     #'   is created, not when the Excel files are saved.
     #' @param theme Optional theme identified by string or number
+    #' @param ... additional arguments
     #' @return a `wbWorkbook` object
     initialize = function(
-      creator         = NULL,
-      title           = NULL,
-      subject         = NULL,
-      category        = NULL,
-      datetimeCreated = Sys.time(),
-      theme           = NULL
+      creator          = NULL,
+      title            = NULL,
+      subject          = NULL,
+      category         = NULL,
+      datetime_created = Sys.time(),
+      theme            = NULL,
+      ...
     ) {
+
+      force(datetime_created)
+
+      standardize_case_names(...)
+
       self$app <- genBaseApp()
       self$charts <- list()
       self$is_chartsheet <- logical()
@@ -286,22 +294,24 @@ wbWorkbook <- R6::R6Class(
         # USERNAME may only be present for windows
         Sys.getenv("USERNAME", Sys.getenv("USER"))
 
-      assert_class(self$creator,    "character")
-      assert_class(title,           "character", or_null = TRUE)
-      assert_class(subject,         "character", or_null = TRUE)
-      assert_class(category,        "character", or_null = TRUE)
-      assert_class(datetimeCreated, "POSIXt")
+      self$datetimeCreated <- getOption("openxlsx2.datetimeCreated") %||%
+        datetime_created
+
+      assert_class(self$creator,         "character")
+      assert_class(title,                "character", or_null = TRUE)
+      assert_class(subject,              "character", or_null = TRUE)
+      assert_class(category,             "character", or_null = TRUE)
+      assert_class(self$datetimeCreated, "POSIXt")
 
       stopifnot(
         length(title) <= 1L,
         length(category) <= 1L,
-        length(datetimeCreated) == 1L
+        length(datetime_created) == 1L
       )
 
       self$title           <- title
       self$subject         <- subject
       self$category        <- category
-      self$datetimeCreated <- datetimeCreated
       private$generate_base_core()
       private$current_sheet <- 0L
       invisible(self)
@@ -326,7 +336,7 @@ wbWorkbook <- R6::R6Class(
 
     #' @description validate sheet
     #' @param sheet A character sheet name or integer location
-    #' @returns The integer position of the sheet
+    #' @return The integer position of the sheet
     validate_sheet = function(sheet) {
 
       # workbook has no sheets
@@ -356,14 +366,14 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Add a chart sheet to the workbook
     #' @param sheet sheet
-    #' @param tabColor tabColor
+    #' @param tab_color tab_color
     #' @param zoom zoom
     #' @param visible visible
     #' @param ... ...
     #' @return The `wbWorkbook` object, invisibly
     add_chartsheet = function(
       sheet     = next_sheet(),
-      tabColor  = NULL,
+      tab_color = NULL,
       zoom      = 100,
       visible   = c("true", "false", "hidden", "visible", "veryhidden"),
       ...
@@ -397,8 +407,8 @@ wbWorkbook <- R6::R6Class(
       }
 
       sheet <- as.character(sheet)
+      private$validate_new_sheet(sheet)
       sheet_name <- replace_legal_chars(sheet)
-      private$validate_new_sheet(sheet_name)
 
 
       newSheetIndex <- length(self$worksheets) + 1L
@@ -415,12 +425,13 @@ wbWorkbook <- R6::R6Class(
         )
       )
 
-      standardize_color_names(...)
-      if (!is.null(tabColor)) {
-        if (is_wbColour(tabColor)) {
-          tabColor <- as.character(tabColor)
+      standardize(...)
+
+      if (!is.null(tab_color)) {
+        if (is_wbColour(tab_color)) {
+          tab_color <- as.character(tab_color)
         } else {
-          tabColor <- validateColor(tabColor, "Invalid tabColor in add_chartsheet.")
+          tab_color <- validateColor(tab_color, "Invalid tab_color in add_chartsheet.")
         }
       }
 
@@ -439,14 +450,14 @@ wbWorkbook <- R6::R6Class(
 
       self$append("worksheets",
         wbChartSheet$new(
-          tabColor = tabColor
+          tabColor = tab_color
         )
       )
 
       self$worksheets[[newSheetIndex]]$set_sheetview(
-        workbookViewId = 0,
-        zoomScale      = zoom,
-        tabSelected    = newSheetIndex == 1
+        workbook_view_id = 0,
+        zoom_scale       = zoom,
+        tab_selected     = newSheetIndex == 1
       )
 
       self$append("sheet_names", sheet)
@@ -486,48 +497,51 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Add worksheet to the `wbWorkbook` object
     #' @param sheet sheet
-    #' @param gridLines gridLines
-    #' @param rowColHeaders rowColHeaders
-    #' @param tabColor tabColor
+    #' @param grid_lines gridLines
+    #' @param row_col_headers rowColHeaders
+    #' @param tab_color tabColor
     #' @param zoom zoom
     #' @param header header
     #' @param footer footer
-    #' @param oddHeader oddHeader
-    #' @param oddFooter oddFooter
-    #' @param evenHeader evenHeader
-    #' @param evenFooter evenFooter
-    #' @param firstHeader firstHeader
-    #' @param firstFooter firstFooter
+    #' @param odd_header oddHeader
+    #' @param odd_footer oddFooter
+    #' @param even_header evenHeader
+    #' @param even_footer evenFooter
+    #' @param first_header firstHeader
+    #' @param first_footer firstFooter
     #' @param visible visible
-    #' @param hasDrawing hasDrawing
-    #' @param paperSize paperSize
+    #' @param has_drawing hasDrawing
+    #' @param paper_size paperSize
     #' @param orientation orientation
     #' @param hdpi hdpi
     #' @param vdpi vdpi
     #' @param ... ...
     #' @return The `wbWorkbook` object, invisibly
     add_worksheet = function(
-      sheet       = next_sheet(),
-      gridLines   = TRUE,
-      rowColHeaders = TRUE,
-      tabColor    = NULL,
-      zoom        = 100,
-      header      = NULL,
-      footer      = NULL,
-      oddHeader   = header,
-      oddFooter   = footer,
-      evenHeader  = header,
-      evenFooter  = footer,
-      firstHeader = header,
-      firstFooter = footer,
-      visible     = c("true", "false", "hidden", "visible", "veryhidden"),
-      hasDrawing  = FALSE,
-      paperSize   = getOption("openxlsx2.paperSize", default = 9),
-      orientation = getOption("openxlsx2.orientation", default = "portrait"),
-      hdpi        = getOption("openxlsx2.hdpi", default = getOption("openxlsx2.dpi", default = 300)),
-      vdpi        = getOption("openxlsx2.vdpi", default = getOption("openxlsx2.dpi", default = 300)),
+      sheet           = next_sheet(),
+      grid_lines      = TRUE,
+      row_col_headers = TRUE,
+      tab_color       = NULL,
+      zoom            = 100,
+      header          = NULL,
+      footer          = NULL,
+      odd_header      = header,
+      odd_footer      = footer,
+      even_header     = header,
+      even_footer     = footer,
+      first_header    = header,
+      first_footer    = footer,
+      visible         = c("true", "false", "hidden", "visible", "veryhidden"),
+      has_drawing     = FALSE,
+      paper_size      = getOption("openxlsx2.paperSize", default = 9),
+      orientation     = getOption("openxlsx2.orientation", default = "portrait"),
+      hdpi            = getOption("openxlsx2.hdpi", default = getOption("openxlsx2.dpi", default = 300)),
+      vdpi            = getOption("openxlsx2.vdpi", default = getOption("openxlsx2.dpi", default = 300)),
       ...
     ) {
+
+      standardize(...)
+
       visible <- tolower(as.character(visible))
       visible <- match.arg(visible)
       orientation <- match.arg(orientation, c("portrait", "landscape"))
@@ -558,20 +572,19 @@ wbWorkbook <- R6::R6Class(
       }
 
       sheet <- as.character(sheet)
+      private$validate_new_sheet(sheet)
       sheet_name <- replace_legal_chars(sheet)
-      private$validate_new_sheet(sheet_name)
 
-      if (!is.logical(gridLines) | length(gridLines) > 1) {
+      if (!is.logical(grid_lines) | length(grid_lines) > 1) {
         fail <- TRUE
-        msg <- c(msg, "gridLines must be a logical of length 1.")
+        msg <- c(msg, "grid_lines must be a logical of length 1.")
       }
 
-      standardize_color_names(...)
-      if (!is.null(tabColor)) {
-        if (is_wbColour(tabColor)) {
-          tabColor <- as.character(tabColor)
+      if (!is.null(tab_color)) {
+        if (is_wbColour(tab_color)) {
+          tabColor <- as.character(tab_color)
         } else {
-          tabColor <- validateColor(tabColor, "Invalid tabColor in add_worksheet.")
+          tabColor <- validateColor(tab_color, "Invalid tab_color in add_worksheet.")
         }
       }
 
@@ -588,32 +601,32 @@ wbWorkbook <- R6::R6Class(
       }
       #nocov end
 
-      if (!is.null(oddHeader) & length(oddHeader) != 3) {
+      if (!is.null(odd_header) & length(odd_header) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("header"))
       }
 
-      if (!is.null(oddFooter) & length(oddFooter) != 3) {
+      if (!is.null(odd_footer) & length(odd_footer) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("footer"))
       }
 
-      if (!is.null(evenHeader) & length(evenHeader) != 3) {
+      if (!is.null(even_header) & length(even_header) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("evenHeader"))
       }
 
-      if (!is.null(evenFooter) & length(evenFooter) != 3) {
+      if (!is.null(even_footer) & length(even_footer) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("evenFooter"))
       }
 
-      if (!is.null(firstHeader) & length(firstHeader) != 3) {
+      if (!is.null(first_header) & length(first_header) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("firstHeader"))
       }
 
-      if (!is.null(firstFooter) & length(firstFooter) != 3) {
+      if (!is.null(first_footer) & length(first_footer) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("firstFooter"))
       }
@@ -671,18 +684,18 @@ wbWorkbook <- R6::R6Class(
       ## append to worksheets list
       self$append("worksheets",
         wbWorksheet$new(
-          tabColor   = tabColor,
-          oddHeader   = oddHeader,
-          oddFooter   = oddFooter,
-          evenHeader  = evenHeader,
-          evenFooter  = evenFooter,
-          firstHeader = firstHeader,
-          firstFooter = firstFooter,
-          paperSize   = paperSize,
-          orientation = orientation,
-          hdpi        = hdpi,
-          vdpi        = vdpi,
-          printGridLines = gridLines
+          tab_color    = tab_color,
+          odd_header   = odd_header,
+          odd_footer   = odd_footer,
+          even_header  = even_header,
+          even_footer  = even_footer,
+          first_header = first_header,
+          first_footer = first_footer,
+          paper_size   = paper_size,
+          orientation  = orientation,
+          hdpi         = hdpi,
+          vdpi         = vdpi,
+          grid_lines   = grid_lines
         )
       )
 
@@ -691,18 +704,18 @@ wbWorkbook <- R6::R6Class(
 
       # set preselected set for sheetview
       self$worksheets[[newSheetIndex]]$set_sheetview(
-        workbookViewId    = 0,
-        zoomScale         = zoom,
-        showGridLines     = gridLines,
-        showRowColHeaders = rowColHeaders,
-        tabSelected       = newSheetIndex == 1,
-        rightToLeft       = rightToLeft
+        workbook_view_id     = 0,
+        zoom_scale           = zoom,
+        show_grid_lines      = grid_lines,
+        show_row_col_headers = row_col_headers,
+        tab_selected         = newSheetIndex == 1,
+        right_to_left        = rightToLeft
       )
 
 
       ## update content_tyes
       ## add a drawing.xml for the worksheet
-      if (hasDrawing) {
+      if (has_drawing) {
         self$append("Content_Types", c(
           sprintf('<Override PartName="/xl/worksheets/sheet%s.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>', newSheetIndex),
           sprintf('<Override PartName="/xl/drawings/drawing%s.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>', newSheetIndex)
@@ -749,7 +762,10 @@ wbWorkbook <- R6::R6Class(
     #' @param old name of worksheet to clone
     #' @param new name of new worksheet to add
     clone_worksheet = function(old = current_sheet(), new = next_sheet()) {
-      private$validate_new_sheet(new)
+
+      sheet <- new
+      private$validate_new_sheet(sheet)
+      new <- sheet
       old <- private$get_sheet_index(old)
 
       newSheetIndex <- length(self$worksheets) + 1L
@@ -1051,56 +1067,60 @@ wbWorkbook <- R6::R6Class(
     #' @description add data
     #' @param sheet sheet
     #' @param x x
-    #' @param startCol startCol
-    #' @param startRow startRow
     #' @param dims dims
+    #' @param start_col startCol
+    #' @param start_row startRow
     #' @param array array
-    #' @param colNames colNames
-    #' @param rowNames rowNames
-    #' @param withFilter withFilter
+    #' @param col_names colNames
+    #' @param row_names rowNames
+    #' @param with_filter withFilter
     #' @param name name
     #' @param sep sep
-    #' @param applyCellStyle applyCellStyle
-    #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
+    #' @param apply_cell_style applyCellStyle
+    #' @param remove_cell_style if writing into existing cells, should the cell style be removed?
     #' @param na.strings Value used for replacing `NA` values from `x`. Default
     #'   `na_strings()` uses the special `#N/A` value within the workbook.
     #' @param inline_strings write characters as inline strings
+    #' @param ... additional arguments
     #' @param return The `wbWorkbook` object
     add_data = function(
-        sheet           = current_sheet(),
+        sheet            = current_sheet(),
         x,
-        startCol        = 1,
-        startRow        = 1,
-        dims            = rowcol_to_dims(startRow, startCol),
-        array           = FALSE,
-        colNames        = TRUE,
-        rowNames        = FALSE,
-        withFilter      = FALSE,
-        name            = NULL,
-        sep             = ", ",
-        applyCellStyle  = TRUE,
-        removeCellStyle = FALSE,
-        na.strings      = na_strings(),
-        inline_strings  = TRUE
+        dims              = wb_dims(start_row, start_col),
+        start_col         = 1,
+        start_row         = 1,
+        array             = FALSE,
+        col_names         = TRUE,
+        row_names         = FALSE,
+        with_filter       = FALSE,
+        name              = NULL,
+        sep               = ", ",
+        apply_cell_style  = TRUE,
+        remove_cell_style = FALSE,
+        na.strings        = na_strings(),
+        inline_strings    = TRUE,
+        ...
       ) {
 
+      standardize(...)
+
       write_data(
-        wb              = self,
-        sheet           = sheet,
-        x               = x,
-        startCol        = startCol,
-        startRow        = startRow,
-        dims            = dims,
-        array           = array,
-        colNames        = colNames,
-        rowNames        = rowNames,
-        withFilter      = withFilter,
-        name            = name,
-        sep             = sep,
-        applyCellStyle  = applyCellStyle,
-        removeCellStyle = removeCellStyle,
-        na.strings      = na.strings,
-        inline_strings  = inline_strings
+        wb                = self,
+        sheet             = sheet,
+        x                 = x,
+        dims              = dims,
+        start_col         = start_col,
+        start_row         = start_row,
+        array             = array,
+        col_names         = col_names,
+        row_names         = row_names,
+        with_filter       = with_filter,
+        name              = name,
+        sep               = sep,
+        apply_cell_style  = apply_cell_style,
+        remove_cell_style = remove_cell_style,
+        na.strings        = na.strings,
+        inline_strings    = inline_strings
       )
       invisible(self)
     },
@@ -1108,66 +1128,70 @@ wbWorkbook <- R6::R6Class(
     #' @description add a data table
     #' @param sheet sheet
     #' @param x x
-    #' @param startCol startCol
-    #' @param startRow startRow
     #' @param dims dims
-    #' @param colNames colNames
-    #' @param rowNames rowNames
-    #' @param tableStyle tableStyle
-    #' @param tableName tableName
-    #' @param withFilter withFilter
+    #' @param start_col startCol
+    #' @param start_row startRow
+    #' @param col_names colNames
+    #' @param row_names rowNames
+    #' @param table_style tableStyle
+    #' @param table_name tableName
+    #' @param with_filter withFilter
     #' @param sep sep
-    #' @param firstColumn firstColumn
-    #' @param lastColumn lastColumn
-    #' @param bandedRows bandedRows
-    #' @param bandedCols bandedCols
-    #' @param applyCellStyle applyCellStyle
-    #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
+    #' @param first_column firstColumn
+    #' @param last_column lastColumn
+    #' @param banded_rows bandedRows
+    #' @param banded_cols bandedCols
+    #' @param apply_cell_style applyCellStyle
+    #' @param remove_cell_style if writing into existing cells, should the cell style be removed?
     #' @param na.strings Value used for replacing `NA` values from `x`. Default
     #'   `na_strings()` uses the special `#N/A` value within the workbook.
     #' @param inline_strings write characters as inline strings
-    #' @returns The `wbWorkbook` object
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_data_table = function(
-        sheet           = current_sheet(),
+        sheet             = current_sheet(),
         x,
-        startCol        = 1,
-        startRow        = 1,
-        dims            = rowcol_to_dims(startRow, startCol),
-        colNames        = TRUE,
-        rowNames        = FALSE,
-        tableStyle      = "TableStyleLight9",
-        tableName       = NULL,
-        withFilter      = TRUE,
-        sep             = ", ",
-        firstColumn     = FALSE,
-        lastColumn      = FALSE,
-        bandedRows      = TRUE,
-        bandedCols      = FALSE,
-        applyCellStyle  = TRUE,
-        removeCellStyle = FALSE,
-        na.strings      = na_strings(),
-        inline_strings  = TRUE
+        dims              = wb_dims(start_row, start_col),
+        start_col         = 1,
+        start_row         = 1,
+        col_names         = TRUE,
+        row_names         = FALSE,
+        table_style       = "TableStyleLight9",
+        table_name        = NULL,
+        with_filter       = TRUE,
+        sep               = ", ",
+        first_column      = FALSE,
+        last_column       = FALSE,
+        banded_rows       = TRUE,
+        banded_cols       = FALSE,
+        apply_cell_style  = TRUE,
+        remove_cell_style = FALSE,
+        na.strings        = na_strings(),
+        inline_strings    = TRUE,
+        ...
     ) {
+
+      standardize(...)
 
       write_datatable(
         wb              = self,
-        sheet           = sheet,
         x               = x,
+        sheet           = sheet,
         dims            = dims,
-        startCol        = startCol,
-        startRow        = startRow,
-        colNames        = colNames,
-        rowNames        = rowNames,
-        tableStyle      = tableStyle,
-        tableName       = tableName,
-        withFilter      = withFilter,
+        startCol        = start_col,
+        startRow        = start_row,
+        colNames        = col_names,
+        rowNames        = row_names,
+        tableStyle      = table_style,
+        tableName       = table_name,
+        withFilter      = with_filter,
         sep             = sep,
-        firstColumn     = firstColumn,
-        lastColumn      = lastColumn,
-        bandedRows      = bandedRows,
-        bandedCols      = bandedCols,
-        applyCellStyle  = applyCellStyle,
-        removeCellStyle = removeCellStyle,
+        firstColumn     = first_column,
+        lastColumn      = last_column,
+        bandedRows      = banded_rows,
+        bandedCols      = banded_cols,
+        applyCellStyle  = apply_cell_style,
+        removeCellStyle = remove_cell_style,
         na.strings      = na.strings,
         inline_strings  = inline_strings
       )
@@ -1188,7 +1212,7 @@ wbWorkbook <- R6::R6Class(
     #' @details
     #' `fun` can be either of AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV,
     #' STDEVP, SUM, VAR, VARP
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     add_pivot_table = function(
       x,
       sheet = next_sheet(),
@@ -1324,37 +1348,41 @@ wbWorkbook <- R6::R6Class(
 
     #' @description add formula
     #' @param sheet sheet
-    #' @param x x
-    #' @param startCol startCol
-    #' @param startRow startRow
     #' @param dims dims
+    #' @param x x
+    #' @param start_col startCol
+    #' @param start_row startRow
     #' @param array array
     #' @param cm cm
-    #' @param applyCellStyle applyCellStyle
-    #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
-    #' @returns The `wbWorkbook` object
+    #' @param apply_cell_style applyCellStyle
+    #' @param remove_cell_style if writing into existing cells, should the cell style be removed?
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_formula = function(
-        sheet           = current_sheet(),
+        sheet             = current_sheet(),
         x,
-        startCol        = 1,
-        startRow        = 1,
-        dims            = rowcol_to_dims(startRow, startCol),
-        array           = FALSE,
-        cm              = FALSE,
-        applyCellStyle  = TRUE,
-        removeCellStyle = FALSE
+        dims              = wb_dims(start_row, start_col),
+        start_col         = 1,
+        start_row         = 1,
+        array             = FALSE,
+        cm                = FALSE,
+        apply_cell_style  = TRUE,
+        remove_cell_style = FALSE,
+        ...
     ) {
+
+      standardize_case_names(...)
       write_formula(
         wb              = self,
         sheet           = sheet,
         x               = x,
-        startCol        = startCol,
-        startRow        = startRow,
+        startCol        = start_col,
+        startRow        = start_row,
         dims            = dims,
         array           = array,
         cm              = cm,
-        applyCellStyle  = applyCellStyle,
-        removeCellStyle = removeCellStyle
+        applyCellStyle  = apply_cell_style,
+        removeCellStyle = remove_cell_style
       )
       invisible(self)
     },
@@ -1362,7 +1390,7 @@ wbWorkbook <- R6::R6Class(
     #' @description add style
     #' @param style style
     #' @param style_name style_name
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     add_style = function(style = NULL, style_name = NULL) {
 
       assert_class(style, "character")
@@ -1385,103 +1413,107 @@ wbWorkbook <- R6::R6Class(
     ### to dataframe ----
     #' @description to_df
     #' @param sheet Either sheet name or index. When missing the first sheet in the workbook is selected.
-    #' @param colNames If TRUE, the first row of data will be used as column names.
-    #' @param rowNames If TRUE, the first col of data will be used as row names.
+    #' @param col_names If TRUE, the first row of data will be used as column names.
+    #' @param row_names If TRUE, the first col of data will be used as row names.
     #' @param dims Character string of type "A1:B2" as optional dimensions to be imported.
-    #' @param detectDates If TRUE, attempt to recognize dates and perform conversion.
-    #' @param showFormula If TRUE, the underlying Excel formulas are shown.
+    #' @param detect_dates If TRUE, attempt to recognize dates and perform conversion.
+    #' @param show_formula If TRUE, the underlying Excel formulas are shown.
     #' @param convert If TRUE, a conversion to dates and numerics is attempted.
-    #' @param skipEmptyCols If TRUE, empty columns are skipped.
-    #' @param skipEmptyRows If TRUE, empty rows are skipped.
-    #' @param skipHiddenCols If TRUE, hidden columns are skipped.
-    #' @param skipHiddenRows If TRUE, hidden rows are skipped.
-    #' @param startRow first row to begin looking for data.
-    #' @param startCol first column to begin looking for data.
+    #' @param skip_empty_cols If TRUE, empty columns are skipped.
+    #' @param skip_empty_rows If TRUE, empty rows are skipped.
+    #' @param skip_hidden_cols If TRUE, hidden columns are skipped.
+    #' @param skip_hidden_rows If TRUE, hidden rows are skipped.
+    #' @param start_row first row to begin looking for data.
+    #' @param start_col first column to begin looking for data.
     #' @param rows A numeric vector specifying which rows in the Excel file to read. If NULL, all rows are read.
     #' @param cols A numeric vector specifying which columns in the Excel file to read. If NULL, all columns are read.
     #' @param named_region Character string with a named_region (defined name or table). If no sheet is selected, the first appearance will be selected.
     #' @param types A named numeric indicating, the type of the data. 0: character, 1: numeric, 2: date, 3: posixt, 4:logical. Names must match the returned data
     #' @param na.strings A character vector of strings which are to be interpreted as NA. Blank cells will be returned as NA.
     #' @param na.numbers A numeric vector of digits which are to be interpreted as NA. Blank cells will be returned as NA.
-    #' @param fillMergedCells If TRUE, the value in a merged cell is given to all cells within the merge.
+    #' @param fill_merged_cells If TRUE, the value in a merged cell is given to all cells within the merge.
     #' @param keep_attributes If TRUE additional attributes are returned. (These are used internally to define a cell type.)
+    #' @param ... additional arguments
     #' @return a data frame
     to_df = function(
       sheet,
-      startRow        = 1,
-      startCol        = NULL,
-      rowNames        = FALSE,
-      colNames        = TRUE,
-      skipEmptyRows   = FALSE,
-      skipEmptyCols   = FALSE,
-      skipHiddenRows  = FALSE,
-      skipHiddenCols  = FALSE,
-      rows            = NULL,
-      cols            = NULL,
-      detectDates     = TRUE,
-      na.strings      = "#N/A",
-      na.numbers      = NA,
-      fillMergedCells = FALSE,
+      start_row         = 1,
+      start_col         = NULL,
+      row_names         = FALSE,
+      col_names         = TRUE,
+      skip_empty_rows   = FALSE,
+      skip_empty_cols   = FALSE,
+      skip_hidden_rows  = FALSE,
+      skip_hidden_cols  = FALSE,
+      rows              = NULL,
+      cols              = NULL,
+      detect_dates      = TRUE,
+      na.strings        = "#N/A",
+      na.numbers        = NA,
+      fill_merged_cells = FALSE,
       dims,
-      showFormula     = FALSE,
-      convert         = TRUE,
+      show_formula      = FALSE,
+      convert           = TRUE,
       types,
       named_region,
-      keep_attributes = FALSE
+      keep_attributes   = FALSE,
+      ...
     ) {
 
       if (missing(sheet)) sheet <- substitute()
       if (missing(dims)) dims <- substitute()
       if (missing(named_region)) named_region <- substitute()
 
+      standardize_case_names(...)
+
       wb_to_df(
-        xlsxFile        = self,
-        sheet           = sheet,
-        startRow        = startRow,
-        startCol        = startCol,
-        rowNames        = rowNames,
-        colNames        = colNames,
-        skipEmptyRows   = skipEmptyRows,
-        skipEmptyCols   = skipEmptyCols,
-        skipHiddenRows  = skipHiddenRows,
-        skipHiddenCols  = skipHiddenCols,
-        rows            = rows,
-        cols            = cols,
-        detectDates     = detectDates,
-        na.strings      = na.strings,
-        na.numbers      = na.numbers,
-        fillMergedCells = fillMergedCells,
-        dims            = dims,
-        showFormula     = showFormula,
-        convert         = convert,
-        types           = types,
-        named_region    = named_region
+        file              = self,
+        sheet             = sheet,
+        start_row         = start_row,
+        start_col         = start_col,
+        row_names         = row_names,
+        col_names         = col_names,
+        skip_empty_rows   = skip_empty_rows,
+        skip_empty_cols   = skip_empty_cols,
+        skip_hidden_rows  = skip_hidden_rows,
+        skip_hidden_cols  = skip_hidden_cols,
+        rows              = rows,
+        cols              = cols,
+        detect_dates      = detect_dates,
+        na.strings        = na.strings,
+        na.numbers        = na.numbers,
+        fill_merged_cells = fill_merged_cells,
+        dims              = dims,
+        show_formula      = show_formula,
+        convert           = convert,
+        types             = types,
+        named_region      = named_region
       )
     },
 
     ### load workbook ----
     #' @description load workbook
     #' @param file file
-    #' @param xlsxFile xlsxFile
     #' @param sheet sheet
     #' @param data_only data_only
     #' @param calc_chain calc_chain
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object invisibly
     load = function(
       file,
-      xlsxFile   = NULL,
       sheet,
       data_only  = FALSE,
-      calc_chain = FALSE
+      calc_chain = FALSE,
+      ...
     ) {
       if (missing(file)) file <- substitute()
       if (missing(sheet)) sheet <- substitute()
       self <- wb_load(
         file       = file,
-        xlsxFile   = xlsxFile,
         sheet      = sheet,
         data_only  = data_only,
-        calc_chain = calc_chain
+        calc_chain = calc_chain,
+        ...        = ...
       )
       invisible(self)
     },
@@ -1492,14 +1524,21 @@ wbWorkbook <- R6::R6Class(
 
     #' @description
     #' Save the workbook
-    #' @param path The path to save the workbook to
+    #' @param file The path to save the workbook to
     #' @param overwrite If `FALSE`, will not overwrite when `path` exists
+    #' @param path Deprecated argument previously used for file. Please use file in new code.
     #' @return The `wbWorkbook` object invisibly
-    save = function(path = self$path, overwrite = TRUE) {
-      assert_class(path, "character")
+    save = function(file = self$path, overwrite = TRUE, path = NULL) {
+
+      if (!is.null(path)) {
+        .Deprecated(old = "wb_save(path)", new = "wb_save(file)", package = "openxlsx2")
+        file <- path
+      }
+
+      assert_class(file, "character")
       assert_class(overwrite, "logical")
 
-      if (file.exists(path) & !overwrite) {
+      if (file.exists(file) & !overwrite) {
         stop("File already exists!")
       }
 
@@ -1593,12 +1632,11 @@ wbWorkbook <- R6::R6Class(
 
         for (i in seq_len(nSheets)) {
           if (length(self$threadComments[[i]])) {
-            fl <- self$threadComments[[i]]
-            file.copy(
-              from = fl,
-              to = file.path(xlThreadComments, basename(fl)),
-              overwrite = TRUE,
-              copy.date = TRUE
+            write_file(
+              head = "<ThreadedComments xmlns=\"http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments\" xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">",
+              body = pxml(self$threadComments[[i]]),
+              tail = "</ThreadedComments>",
+              fl = file.path(xlThreadComments, sprintf("threadedComment%s.xml", i))
             )
           }
         }
@@ -1607,11 +1645,13 @@ wbWorkbook <- R6::R6Class(
       ## xl/persons/person.xml
       if (nPersons) {
         personDir <- dir_create(tmpDir, "xl", "persons")
-        file.copy(self$persons, personDir, overwrite = TRUE)
+        write_file(
+          body = self$persons,
+          fl = file.path(personDir, "person.xml")
+        )
       }
 
-
-
+      ## xl/embeddings
       if (length(self$embeddings)) {
         embeddingsDir <- dir_create(tmpDir, "xl", "embeddings")
         for (fl in self$embeddings) {
@@ -2174,12 +2214,12 @@ wbWorkbook <- R6::R6Class(
       )
 
       # Copy file; stop if failed
-      if (!file.copy(from = tmpFile, to = path, overwrite = overwrite, copy.mode = FALSE)) {
+      if (!file.copy(from = tmpFile, to = file, overwrite = overwrite, copy.mode = FALSE)) {
         stop("Failed to save workbook")
       }
 
       # (re)assign file path (if successful)
-      self$path <- path
+      self$path <- file
       invisible(self)
     },
 
@@ -2536,51 +2576,60 @@ wbWorkbook <- R6::R6Class(
 
     #' @description
     #' Get the base font
-    #' @param fontSize fontSize
-    #' @param fontColor fontColor
-    #' @param fontName fontName
+    #' @param font_size fontSize
+    #' @param font_color font_color
+    #' @param font_name font_name
     #' @param ... ...
     #' @return The `wbWorkbook` object
-    set_base_font = function(fontSize = 11, fontColor = wb_color(theme = "1"), fontName = "Calibri", ...) {
-      if (fontSize < 0) stop("Invalid fontSize")
-      standardize_color_names(...)
-      if (is.character(fontColor) && is.null(names(fontColor))) fontColor <- wb_color(fontColor)
-      self$styles_mgr$styles$fonts[[1]] <- create_font(sz = as.character(fontSize), color = fontColor, name = fontName)
+    set_base_font = function(
+      font_size  = 11,
+      font_color = wb_color(theme = "1"),
+      font_name  = "Calibri",
+       ...
+    ) {
+      standardize(...)
+      if (font_size < 0) stop("Invalid font_size")
+      if (!is_wbColour(font_color)) font_color <- wb_color(font_color)
+      self$styles_mgr$styles$fonts[[1]] <- create_font(sz = font_size, color = font_color, name = font_name)
     },
 
     ### book views ----
 
     #' @description
     #' Set the book views
-    #' @param activeTab activeTab
-    #' @param autoFilterDateGrouping autoFilterDateGrouping
-    #' @param firstSheet firstSheet
+    #' @param active_tab activeTab
+    #' @param auto_filter_date_grouping autoFilterDateGrouping
+    #' @param first_sheet firstSheet
     #' @param minimized minimized
-    #' @param showHorizontalScroll showHorizontalScroll
-    #' @param showSheetTabs showSheetTabs
-    #' @param showVerticalScroll showVerticalScroll
-    #' @param tabRatio tabRatio
+    #' @param show_horizontal_scroll showHorizontalScroll
+    #' @param show_sheet_tabs showSheetTabs
+    #' @param show_vertical_scroll showVerticalScroll
+    #' @param tab_ratio tabRatio
     #' @param visibility visibility
-    #' @param windowHeight windowHeight
-    #' @param windowWidth windowWidth
-    #' @param xWindow xWindow
-    #' @param yWindow yWindow
+    #' @param window_height windowHeight
+    #' @param window_width windowWidth
+    #' @param x_window xWindow
+    #' @param y_window yWindow
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object
     set_bookview = function(
-      activeTab              = NULL,
-      autoFilterDateGrouping = NULL,
-      firstSheet             = NULL,
-      minimized              = NULL,
-      showHorizontalScroll   = NULL,
-      showSheetTabs          = NULL,
-      showVerticalScroll     = NULL,
-      tabRatio               = NULL,
-      visibility             = NULL,
-      windowHeight           = NULL,
-      windowWidth            = NULL,
-      xWindow                = NULL,
-      yWindow                = NULL
+      active_tab                = NULL,
+      auto_filter_date_grouping = NULL,
+      first_sheet               = NULL,
+      minimized                 = NULL,
+      show_horizontal_scroll    = NULL,
+      show_sheet_tabs           = NULL,
+      show_vertical_scroll      = NULL,
+      tab_ratio                 = NULL,
+      visibility                = NULL,
+      window_height             = NULL,
+      window_width              = NULL,
+      x_window                  = NULL,
+      y_window                  = NULL,
+      ...
     ) {
+
+      standardize_case_names(...)
 
       wbv <- self$workbook$bookViews
 
@@ -2593,19 +2642,19 @@ wbWorkbook <- R6::R6Class(
       wbv <- xml_attr_mod(
         wbv,
         xml_attributes = c(
-          activeTab              = as_xml_attr(activeTab),
-          autoFilterDateGrouping = as_xml_attr(autoFilterDateGrouping),
-          firstSheet             = as_xml_attr(firstSheet),
+          activeTab              = as_xml_attr(active_tab),
+          autoFilterDateGrouping = as_xml_attr(auto_filter_date_grouping),
+          firstSheet             = as_xml_attr(first_sheet),
           minimized              = as_xml_attr(minimized),
-          showHorizontalScroll   = as_xml_attr(showHorizontalScroll),
-          showSheetTabs          = as_xml_attr(showSheetTabs),
-          showVerticalScroll     = as_xml_attr(showVerticalScroll),
-          tabRatio               = as_xml_attr(tabRatio),
+          showHorizontalScroll   = as_xml_attr(show_horizontal_scroll),
+          showSheetTabs          = as_xml_attr(show_sheet_tabs),
+          showVerticalScroll     = as_xml_attr(show_vertical_scroll),
+          tabRatio               = as_xml_attr(tab_ratio),
           visibility             = as_xml_attr(visibility),
-          windowHeight           = as_xml_attr(windowHeight),
-          windowWidth            = as_xml_attr(windowWidth),
-          xWindow                = as_xml_attr(xWindow),
-          yWindow                = as_xml_attr(yWindow)
+          windowHeight           = as_xml_attr(window_height),
+          windowWidth            = as_xml_attr(window_width),
+          xWindow                = as_xml_attr(x_window),
+          yWindow                = as_xml_attr(y_window)
         ),
         remove_empty_attr = FALSE
       )
@@ -2621,7 +2670,7 @@ wbWorkbook <- R6::R6Class(
     ### sheet names ----
 
     #' @description Get sheet names
-    #' @returns A `named` `character` vector of sheet names in their order.  The
+    #' @return A `named` `character` vector of sheet names in their order.  The
     #'   names represent the original value of the worksheet prior to any
     #'   character substitutions.
     get_sheet_names = function() {
@@ -2667,7 +2716,9 @@ wbWorkbook <- R6::R6Class(
 
       # should be able to pull this out into a single private function
       for (i in seq_along(pos)) {
-        private$validate_new_sheet(new_name[i])
+        sheet <- new_name[i]
+        private$validate_new_sheet(sheet)
+        new_name[i] <- sheet
         private$set_single_sheet_name(pos[i], new_name[i], new_raw[i])
         # TODO move this work into private$set_single_sheet_name()
 
@@ -2890,7 +2941,7 @@ wbWorkbook <- R6::R6Class(
     #' @description ungroup cols
     #' @param sheet sheet
     #' @param cols = cols
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     ungroup_cols = function(sheet = current_sheet(), cols) {
       sheet <- private$get_sheet_index(sheet)
 
@@ -3365,48 +3416,52 @@ wbWorkbook <- R6::R6Class(
 
     #' @description Adds data validation
     #' @param sheet sheet
-    #' @param cols cols
-    #' @param rows rows
+    #' @param dims cell dimension
     #' @param type type
     #' @param operator operator
     #' @param value value
-    #' @param allowBlank allowBlank
-    #' @param showInputMsg showInputMsg
-    #' @param showErrorMsg showErrorMsg
-    #' @param errorStyle The icon shown and the options how to deal with such inputs. Default "stop" (cancel), else "information" (prompt popup) or "warning" (prompt accept or change input)
-    #' @param errorTitle The error title
+    #' @param allow_blank allowBlank
+    #' @param show_input_msg showInputMsg
+    #' @param show_error_msg showErrorMsg
+    #' @param error_style The icon shown and the options how to deal with such inputs. Default "stop" (cancel), else "information" (prompt popup) or "warning" (prompt accept or change input)
+    #' @param error_title The error title
     #' @param error The error text
-    #' @param promptTitle The prompt title
+    #' @param prompt_title The prompt title
     #' @param prompt The prompt text
-    #' @returns The `wbWorkbook` object
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_data_validation = function(
-      sheet = current_sheet(),
-      cols,
-      rows,
+      sheet          = current_sheet(),
+      dims           = "A1",
       type,
       operator,
       value,
-      allowBlank = TRUE,
-      showInputMsg = TRUE,
-      showErrorMsg = TRUE,
-      errorStyle = NULL,
-      errorTitle = NULL,
-      error = NULL,
-      promptTitle = NULL,
-      prompt = NULL
+      allow_blank    = TRUE,
+      show_input_msg = TRUE,
+      show_error_msg = TRUE,
+      error_style    = NULL,
+      error_title    = NULL,
+      error          = NULL,
+      prompt_title   = NULL,
+      prompt         = NULL,
+      ...
     ) {
 
       sheet <- private$get_sheet_index(sheet)
 
-      ## rows and cols
-      if (!is.numeric(cols)) {
-        cols <- col2int(cols)
-      }
-      rows <- as.integer(rows)
+      cols <- list(...)[["cols"]]
+      rows <- list(...)[["rows"]]
 
-      assert_class(allowBlank, "logical")
-      assert_class(showInputMsg, "logical")
-      assert_class(showErrorMsg, "logical")
+      if (!is.null(rows) && !is.null(cols)) {
+        .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
+        dims <- rowcol_to_dims(rows, cols)
+      }
+
+      standardize(...)
+
+      assert_class(allow_blank, "logical")
+      assert_class(show_input_msg, "logical")
+      assert_class(show_error_msg, "logical")
 
       ## check length of value
       if (length(value) > 2) {
@@ -3464,23 +3519,10 @@ wbWorkbook <- R6::R6Class(
         stop("If type == 'time' value argument must be a POSIXct or POSIXlt vector.")
       }
 
-
       value <- head(value, 2)
-      allowBlank <- as.character(as.integer(allowBlank[1]))
-      showInputMsg <- as.character(as.integer(showInputMsg[1]))
-      showErrorMsg <- as.character(as.integer(showErrorMsg[1]))
 
       # prepare for worksheet
       origin <- get_date_origin(self, origin = TRUE)
-
-      sqref <- stri_join(
-        get_cell_refs(data.frame(
-          "x" = c(min(rows), max(rows)),
-          "y" = c(min(cols), max(cols))
-        )),
-        sep = " ",
-        collapse = ":"
-      )
 
       if (type == "list") {
         operator <- NULL
@@ -3490,16 +3532,16 @@ wbWorkbook <- R6::R6Class(
         type         = type,
         operator     = operator,
         value        = value,
-        allowBlank   = allowBlank,
-        showInputMsg = showInputMsg,
-        showErrorMsg = showErrorMsg,
-        errorStyle   = errorStyle,
-        errorTitle   = errorTitle,
+        allowBlank   = as_xml_attr(allow_blank),
+        showInputMsg = as_xml_attr(show_input_msg),
+        showErrorMsg = as_xml_attr(show_error_msg),
+        errorStyle   = error_style,
+        errorTitle   = error_title,
         error        = error,
-        promptTitle  = promptTitle,
+        promptTitle  = prompt_title,
         prompt       = prompt,
         origin       = origin,
-        sqref        = sqref
+        sqref        = dims
       )
 
       invisible(self)
@@ -3508,9 +3550,30 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Set cell merging for a sheet
     #' @param sheet sheet
-    #' @param rows,cols Row and column specifications.
+    #' @param dims worksheet cells
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
-    merge_cells = function(sheet = current_sheet(), rows = NULL, cols = NULL) {
+    merge_cells = function(sheet = current_sheet(), dims = NULL, ...) {
+
+      cols <- list(...)[["cols"]]
+      rows <- list(...)[["rows"]]
+
+      if (!is.null(rows) && !is.null(cols)) {
+
+        if (length(cols) > 2 && any(diff(cols) != 1))
+          warning("cols > 2, will create range from min to max.")
+
+        if (getOption("openxlsx2.soon_deprecated", default = FALSE))
+          .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
+
+        dims <- rowcol_to_dims(rows, cols)
+      }
+
+      ddims <- dims_to_rowcol(dims)
+
+      rows <- ddims[[2]]
+      cols <- ddims[[1]]
+
       sheet <- private$get_sheet_index(sheet)
       self$worksheets[[sheet]]$merge_cells(
         rows   = rows,
@@ -3522,9 +3585,30 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Removes cell merging for a sheet
     #' @param sheet sheet
-    #' @param rows,cols Row and column specifications.
+    #' @param dims worksheet cells
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
-    unmerge_cells = function(sheet = current_sheet(), rows = NULL, cols = NULL) {
+    unmerge_cells = function(sheet = current_sheet(), dims = NULL, ...) {
+
+      cols <- list(...)[["cols"]]
+      rows <- list(...)[["rows"]]
+
+      if (!is.null(rows) && !is.null(cols)) {
+
+        if (length(cols) > 2 && any(diff(cols) != 1))
+          warning("cols > 2, will create range from min to max.")
+
+        if (getOption("openxlsx2.soon_deprecated", default = FALSE))
+          .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
+
+        dims <- rowcol_to_dims(rows, cols)
+      }
+
+      ddims <- dims_to_rowcol(dims)
+
+      rows <- ddims[[2]]
+      cols <- ddims[[1]]
+
       sheet <- private$get_sheet_index(sheet)
       self$worksheets[[sheet]]$unmerge_cells(
         rows   = rows,
@@ -3536,82 +3620,86 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Set freeze panes for a sheet
     #' @param sheet sheet
-    #' @param firstActiveRow firstActiveRow
-    #' @param firstActiveCol firstActiveCol
-    #' @param firstRow firstRow
-    #' @param firstCol firstCol
+    #' @param first_active_row first_active_row
+    #' @param first_active_col first_active_col
+    #' @param first_row first_row
+    #' @param first_col first_col
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
     freeze_pane = function(
-      sheet = current_sheet(),
-      firstActiveRow = NULL,
-      firstActiveCol = NULL,
-      firstRow = FALSE,
-      firstCol = FALSE
+      sheet            = current_sheet(),
+      first_active_row = NULL,
+      first_active_col = NULL,
+      first_row        = FALSE,
+      first_col        = FALSE,
+      ...
     ) {
+
       # TODO rename to setFreezePanes?
+      standardize_case_names(...)
 
       # fine to do the validation before the actual check to prevent other errors
       sheet <- private$get_sheet_index(sheet)
 
-      if (is.null(firstActiveRow) & is.null(firstActiveCol) & !firstRow & !firstCol) {
+      if (is.null(first_active_row) & is.null(first_active_col) & !first_row & !first_col) {
         return(invisible(self))
       }
 
       # TODO simplify asserts
-      if (!is.logical(firstRow)) stop("firstRow must be TRUE/FALSE")
-      if (!is.logical(firstCol)) stop("firstCol must be TRUE/FALSE")
+      if (!is.logical(first_row)) stop("first_row must be TRUE/FALSE")
+      if (!is.logical(first_col)) stop("first_col must be TRUE/FALSE")
 
       # make overwrides for arguments
-      if (firstRow & !firstCol) {
-        firstActiveCol <- NULL
-        firstActiveRow <- NULL
-        firstCol <- FALSE
-      } else if (firstCol & !firstRow) {
-        firstActiveRow <- NULL
-        firstActiveCol <- NULL
-        firstRow <- FALSE
-      } else if (firstRow & firstCol) {
-        firstActiveRow <- 2L
-        firstActiveCol <- 2L
-        firstRow <- FALSE
-        firstCol <- FALSE
+      if (first_row & !first_col) {
+        first_active_col <- NULL
+        first_active_row <- NULL
+        first_col <- FALSE
+      } else if (first_col & !first_row) {
+        first_active_row <- NULL
+        first_active_col <- NULL
+        first_row <- FALSE
+      } else if (first_row & first_col) {
+        first_active_row <- 2L
+        first_active_col <- 2L
+        first_row <- FALSE
+        first_col <- FALSE
       } else {
         ## else both firstRow and firstCol are FALSE
-        firstActiveRow <- firstActiveRow %||% 1L
-        firstActiveCol <- firstActiveCol %||% 1L
+        first_active_row <- first_active_row %||% 1L
+        first_active_col <- first_active_col %||% 1L
 
         # Convert to numeric if column letter given
         # TODO is col2int() safe for non characters?
-        firstActiveRow <- col2int(firstActiveRow)
-        firstActiveCol <- col2int(firstActiveCol)
+        first_active_row <- col2int(first_active_row)
+        first_active_col <- col2int(first_active_col)
       }
 
       paneNode <-
-        if (firstRow) {
+        if (first_row) {
           '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
-        } else if (firstCol) {
+        } else if (first_col) {
           '<pane xSplit="1" topLeftCell="B1" activePane="topRight" state="frozen"/>'
         } else {
-          if (firstActiveRow == 1 & firstActiveCol == 1) {
+          if (first_active_row == 1 & first_active_col == 1) {
             ## nothing to do
             # return(NULL)
             return(invisible(self))
           }
 
-          if (firstActiveRow > 1 & firstActiveCol == 1) {
-            attrs <- sprintf('ySplit="%s"', firstActiveRow - 1L)
+          if (first_active_row > 1 & first_active_col == 1) {
+            attrs <- sprintf('ySplit="%s"', first_active_row - 1L)
             activePane <- "bottomLeft"
           }
 
-          if (firstActiveRow == 1 & firstActiveCol > 1) {
-            attrs <- sprintf('xSplit="%s"', firstActiveCol - 1L)
+          if (first_active_row == 1 & first_active_col > 1) {
+            attrs <- sprintf('xSplit="%s"', first_active_col - 1L)
             activePane <- "topRight"
           }
 
-          if (firstActiveRow > 1 & firstActiveCol > 1) {
+          if (first_active_row > 1 & first_active_col > 1) {
             attrs <- sprintf('ySplit="%s" xSplit="%s"',
-              firstActiveRow - 1L,
-              firstActiveCol - 1L
+              first_active_row - 1L,
+              first_active_col - 1L
             )
             activePane <- "bottomRight"
           }
@@ -3619,7 +3707,7 @@ wbWorkbook <- R6::R6Class(
           sprintf(
             '<pane %s topLeftCell="%s" activePane="%s" state="frozen"/><selection pane="%s"/>',
             stri_join(attrs, collapse = " ", sep = " "),
-            get_cell_refs(data.frame(firstActiveRow, firstActiveCol)),
+            get_cell_refs(data.frame(first_active_row, first_active_col)),
             activePane,
             activePane
           )
@@ -3633,24 +3721,28 @@ wbWorkbook <- R6::R6Class(
 
     #' @description Add comment
     #' @param sheet sheet
-    #' @param col column to apply the comment
-    #' @param row row to apply the comment
     #' @param dims row and column as spreadsheet dimension, e.g. "A1"
     #' @param comment a comment to apply to the worksheet
-    #' @returns The `wbWorkbook` object
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_comment = function(
         sheet   = current_sheet(),
-        col     = NULL,
-        row     = NULL,
-        dims    = rowcol_to_dim(row, col),
-        comment
+        dims    = "A1",
+        comment,
+        ...
     ) {
+
+      col <- list(...)[["col"]]
+      row <- list(...)[["row"]]
+
+      if (!is.null(row) && !is.null(col)) {
+        .Deprecated(old = "col/row", new = "dims", package = "openxlsx2")
+        dims <- rowcol_to_dim(row, col)
+      }
 
       write_comment(
         wb      = self,
         sheet   = sheet,
-        col     = col,
-        row     = row,
         comment = comment,
         dims    = dims
       ) # has no use: xy
@@ -3660,18 +3752,29 @@ wbWorkbook <- R6::R6Class(
 
     #' @description Remove comment
     #' @param sheet sheet
-    #' @param col column to apply the comment
-    #' @param row row to apply the comment
     #' @param dims row and column as spreadsheet dimension, e.g. "A1"
-    #' @param gridExpand Remove all comments inside the grid. Similar to dims "A1:B2"
-    #' @returns The `wbWorkbook` object
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     remove_comment = function(
       sheet      = current_sheet(),
-      col        = NULL,
-      row        = NULL,
-      dims       = rowcol_to_dims(row, col),
-      gridExpand = TRUE
+      dims       = "A1",
+      ...
     ) {
+
+      col <- list(...)[["col"]]
+      row <- list(...)[["row"]]
+      gridExpand <- list(...)[["gridExpand"]]
+
+      if ((!is.null(row) && !is.null(col))) {
+        .Deprecated(old = "col/row/gridExpand", new = "dims", package = "openxlsx2")
+        dims <- wb_dims(row, col)
+      }
+
+      # TODO: remove with deprication
+      if (is.null(gridExpand)) {
+        # default until deprecating
+        gridExpand <- TRUE
+      }
 
       remove_comment(
         wb         = self,
@@ -3685,6 +3788,143 @@ wbWorkbook <- R6::R6Class(
       invisible(self)
     },
 
+
+    #' @description add threaded comment to worksheet
+    #' @param sheet a worksheet
+    #' @param dims a cell
+    #' @param comment the comment to add
+    #' @param person_id the person Id this should be added for
+    #' @param reply logical if the comment is a reply
+    #' @param resolve logical if the comment should be marked as resolved
+    #' @export
+    add_thread = function(
+      sheet      = current_sheet(),
+      dims       = "A1",
+      comment    = NULL,
+      person_id,
+      reply      = FALSE,
+      resolve    = FALSE
+    ) {
+
+      if (missing(person_id)) {
+        person_id <- getOption("openxlsx2.thread_id")
+        if (is.null(person_id)) stop("no person id found")
+      }
+
+      sheet <- self$validate_sheet(sheet)
+      wb_cmt <- wb_get_comment(self, sheet, dims)
+
+      if (length(cmt <- wb_cmt$comment)) {
+        # TODO not sure yet what to do
+      } else {
+        cmt <- create_comment(text = comment, author = "")
+        self$add_comment(sheet = sheet, dims = dims, comment = cmt)
+      }
+
+      if (!length(self$worksheets[[sheet]]$relships$threadedComment)) {
+
+        # TODO the sheet id is correct ... ?
+        self$worksheets[[sheet]]$relships$threadedComment <- sheet
+
+        self$append(
+          "Content_Types",
+          sprintf("<Override PartName=\"/xl/threadedComments/threadedComment%s.xml\" ContentType=\"application/vnd.ms-excel.threadedcomments+xml\"/>", sheet)
+        )
+
+        self$worksheets_rels[[sheet]] <- append(
+          self$worksheets_rels[[sheet]],
+          sprintf("<Relationship Id=\"rId%s\" Type=\"http://schemas.microsoft.com/office/2017/10/relationships/threadedComment\" Target=\"../threadedComments/threadedComment%s.xml\"/>", length(self$worksheets_rels[[sheet]]) + 1L, sheet)
+        )
+
+        self$threadComments[[sheet]] <- character()
+      }
+
+      parentId <- NULL
+      tcs <- rbindlist(xml_attr(self$threadComments[[sheet]], "threadedComment"))
+      sel <- which(tcs$ref == dims)
+
+      if (reply && nrow(tcs)) {
+        if (length(sel))  {
+          parentId <- tcs[sel[1], ]$id
+        } else {
+          warning("cannot reply, will create a new thread")
+        }
+      }
+
+      # update or remove any previous thread from the dims
+      if (length(sel)) {
+        if (resolve) {
+          self$threadComments[[sheet]][sel[1]] <- xml_attr_mod(
+            self$threadComments[[sheet]][sel[1]],
+            xml_attributes = c(done = as_xml_attr(resolve))
+          )
+        } else if (!reply) {
+          self$threadComments[[sheet]] <- self$threadComments[[sheet]][-(sel)]
+        }
+      }
+
+      if (!is.null(comment)) {
+
+        # For replies we can update the comment, but the id remains the parentId
+        cmt_id <- st_guid()
+
+        done <- as_xml_attr(resolve)
+        if (reply) done <- NULL
+
+        ts <- getOption("openxlsx2.datetimeCreated") %||% Sys.time()
+
+        tc <- xml_node_create(
+          "threadedComment",
+          xml_attributes = c(
+            ref      = dims,
+            dT       = format(as_POSIXct_utc(ts), "%Y-%m-%dT%H:%M:%SZ"),
+            personId = person_id,
+            id       = cmt_id,
+            parentId = parentId,
+            done     = done
+          ),
+          xml_children = xml_node_create("text", xml_children = comment)
+        )
+
+        self$threadComments[[sheet]] <- append(
+          self$threadComments[[sheet]],
+          tc
+        )
+
+        if (reply) cmt_id <- parentId
+
+        wb_cmt <- wb_get_comment(self, sheet, dims)
+        sId <- wb_cmt$sheet_id
+        cId <- as.integer(rownames(wb_cmt))
+
+        tc <- cbind(
+          rbindlist(xml_attr(self$threadComments[[sheet]], "threadedComment")),
+          text = xml_value(self$threadComments[[sheet]], "threadedComment", "text")
+        )
+
+        # probably correclty ordered, but we could order these by date?
+        tc <- tc[which(tc$ref == dims), ]
+
+        tc <- paste0(
+          "<t>[Threaded comment]\n\nYour spreadsheet software allows you to read this threaded comment; ",
+          "however, any edits to it will get removed if the file is opened in a newer version of a certain spreadsheet software.\n\n",
+          paste("Comment:", paste0(tc$text, collapse = "\nReplie:")),
+          "</t>"
+        )
+
+        self$comments[[sId]][[cId]] <- list(
+          ref = dims,
+          author = sprintf("tc=%s", cmt_id),
+          comment = tc,
+          style = FALSE,
+          clientData = NULL
+        )
+
+      }
+
+      invisible(self)
+    },
+
     ## conditional formatting ----
 
     # TODO remove_conditional_formatting?
@@ -3692,18 +3932,15 @@ wbWorkbook <- R6::R6Class(
     #' @description Add conditional formatting
     #' @param sheet sheet
     #' @param dims dims
-    #' @param cols cols
-    #' @param rows rows
     #' @param rule rule
     #' @param style style
     #' @param type type
     #' @param params Additional parameters
-    #' @returns The `wbWorkbook` object
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_conditional_formatting = function(
         sheet  = current_sheet(),
         dims   = NULL,
-        cols   = NULL,
-        rows   = NULL,
         rule   = NULL,
         style  = NULL,
         # TODO add vector of possible values
@@ -3723,17 +3960,33 @@ wbWorkbook <- R6::R6Class(
           border    = TRUE,
           percent   = FALSE,
           rank      = 5L
-        )
+        ),
+        ...
     ) {
+
+      cols <- list(...)[["cols"]]
+      rows <- list(...)[["rows"]]
+
+      if (!is.null(rows) && !is.null(cols)) {
+
+        if (length(cols) > 2 && any(diff(cols) != 1))
+          warning("cols > 2, will create range from min to max.")
+
+        if (getOption("openxlsx2.soon_deprecated", default = FALSE))
+          .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
+
+        dims <- rowcol_to_dims(rows, cols)
+      }
+
+      ddims <- dims_to_rowcol(dims, as_integer = TRUE)
+      rows <- ddims[[2]]
+      cols <- ddims[[1]]
 
       if (!is.null(style)) assert_class(style, "character")
       assert_class(type, "character")
       assert_class(params, "list")
 
       type <- match.arg(type)
-
-      if (length(cols) > 2)
-        warning("cols > 2, will create range from min to max.")
 
       ## rows and cols
       if (!is.null(cols) && !is.null(rows)) {
@@ -4005,36 +4258,42 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Insert an image into a sheet
     #' @param sheet sheet
+    #' @param dims dims
     #' @param file file
-    #' @param startRow startRow
-    #' @param startCol startCol
     #' @param width width
     #' @param height height
-    #' @param rowOffset rowOffset
-    #' @param colOffset colOffset
+    #' @param row_offset,col_offset offsets
     #' @param units units
     #' @param dpi dpi
-    #' @param dims dims
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
     add_image = function(
       sheet = current_sheet(),
+      dims      = "A1",
       file,
       width     = 6,
       height    = 3,
-      startRow  = 1,
-      startCol  = 1,
-      rowOffset = 0,
-      colOffset = 0,
+      row_offset = 0,
+      col_offset = 0,
       units     = "in",
       dpi       = 300,
-      dims      = rowcol_to_dim(startRow, startCol)
+      ...
     ) {
-      if (!file.exists(file)) {
-        stop("File ", file, " does not exist.")
+
+      arguments <- c(ls(), "start_row", "start_col")
+      standardize_case_names(..., arguments = arguments)
+
+      if ((exists("start_row") && !is.null(start_row)) ||
+          (exists("start_col") && !is.null(start_col))) {
+        if (!exists("start_row") || is.null(start_row)) start_row <- 1
+        if (!exists("start_row") || is.null(start_col)) start_col <- 1
+        .Deprecated(old = "start_col/start_row", new = "dims", package = "openxlsx2")
+        start_col <- col2int(start_col)
+        start_row <- as.integer(start_row)
       }
 
-      if (is.null(dims) && (startRow > 1 || startCol > 1)) {
-        warning("dims is NULL, startRow/startCol will have no impact")
+      if (!file.exists(file)) {
+        stop("File ", file, " does not exist.")
       }
 
       # TODO require user to pass a valid path
@@ -4048,9 +4307,6 @@ wbWorkbook <- R6::R6Class(
       if (!units %in% c("cm", "in", "px")) {
         stop("Invalid units.\nunits must be one of: cm, in, px")
       }
-
-      startCol <- col2int(startCol)
-      startRow <- as.integer(startRow)
 
       ## convert to inches
       if (units == "px") {
@@ -4071,8 +4327,6 @@ wbWorkbook <- R6::R6Class(
       imageType <- regmatches(file, gregexpr("\\.[a-zA-Z]*$", file))
       imageType <- gsub("^\\.", "", imageType)
       mediaNo <- length(self$media) + 1L
-
-      startCol <- col2int(startCol)
 
       ## update Content_Types
       if (!any(grepl(stri_join("image/", imageType), self$Content_Types))) {
@@ -4125,8 +4379,13 @@ wbWorkbook <- R6::R6Class(
         xml_attributes = xml_attr
       )
 
-      self$add_drawing(sheet, drawing, dims, colOffset, rowOffset)
-
+      self$add_drawing(
+        sheet      = sheet,
+        dims       = dims,
+        xml        = drawing,
+        col_offset = col_offset,
+        row_offset = row_offset
+      )
 
       # add image to drawings_rels
       old_drawings_rels <- unlist(self$drawings_rels[[sheet_drawing]])
@@ -4149,44 +4408,45 @@ wbWorkbook <- R6::R6Class(
 
     #' @description Add plot. A wrapper for add_image()
     #' @param sheet sheet
+    #' @param dims dims
     #' @param width width
     #' @param height height
-    #' @param xy xy
-    #' @param startRow startRow
-    #' @param startCol startCol
-    #' @param rowOffset rowOffset
-    #' @param colOffset colOffset
-    #' @param fileType fileType
+    #' @param row_offset,col_offset offsets
+    #' @param file_type fileType
     #' @param units units
     #' @param dpi dpi
-    #' @param dims dims
-    #' @returns The `wbWorkbook` object
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_plot = function(
-      sheet = current_sheet(),
-      width     = 6,
-      height    = 4,
-      xy        = NULL,
-      startRow  = 1,
-      startCol  = 1,
-      rowOffset = 0,
-      colOffset = 0,
-      fileType  = "png",
-      units     = "in",
-      dpi       = 300,
-      dims      = rowcol_to_dim(startRow, startCol)
+      sheet      = current_sheet(),
+      dims       = "A1",
+      width      = 6,
+      height     = 4,
+      row_offset = 0,
+      col_offset = 0,
+      file_type  = "png",
+      units      = "in",
+      dpi        = 300,
+      ...
     ) {
+
+      arguments <- c(ls(), "start_row", "start_col")
+      standardize_case_names(..., arguments = arguments)
+
+      if ((exists("start_row") && !is.null(start_row)) ||
+          (exists("start_col") && !is.null(start_col))) {
+        if (!exists("start_row") || is.null(start_row)) start_row <- 1
+        if (!exists("start_row") || is.null(start_col)) start_col <- 1
+        .Deprecated(old = "start_row/start_col", new = "dims", package = "openxlsx2")
+        dims <- rowcol_to_dim(start_row, start_col)
+      }
+
       if (is.null(dev.list()[[1]])) {
         warning("No plot to insert.")
         return(invisible(self))
       }
 
-      if (!is.null(xy)) {
-        .Deprecated("dims", old = "xy")
-        startCol <- xy[[1]]
-        startRow <- xy[[2]]
-      }
-
-      fileType <- tolower(fileType)
+      fileType <- tolower(file_type)
       units <- tolower(units)
 
       # TODO just don't allow jpg
@@ -4203,7 +4463,7 @@ wbWorkbook <- R6::R6Class(
         stop("Invalid units.\nunits must be one of: cm, in, px")
       }
 
-      fileName <- tempfile(pattern = "figureImage", fileext = paste0(".", fileType))
+      fileName <- tempfile(pattern = "figureImage", fileext = paste0(".", file_type))
 
       # Workaround for wrapper test. Otherwise tempfile names differ
       if (requireNamespace("testthat")) {
@@ -4226,17 +4486,15 @@ wbWorkbook <- R6::R6Class(
       stopifnot(file.exists(fileName))
 
       self$add_image(
-        sheet     = sheet,
-        file      = fileName,
-        width     = width,
-        height    = height,
-        startRow  = startRow,
-        startCol  = startCol,
-        rowOffset = rowOffset,
-        colOffset = colOffset,
-        units     = units,
-        dpi       = dpi,
-        dims      = dims
+        sheet      = sheet,
+        dims       = dims,
+        file       = fileName,
+        width      = width,
+        height     = height,
+        row_offset = row_offset,
+        col_offset = col_offset,
+        units      = units,
+        dpi        = dpi
       )
     },
 
@@ -4244,15 +4502,20 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param dims dims
     #' @param xml xml
-    #' @param colOffset,rowOffset offsets for column and row
-    #' @returns The `wbWorkbook` object
+    #' @param col_offset,row_offset offsets for column and row
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_drawing = function(
-      sheet = current_sheet(),
+      sheet      = current_sheet(),
+      dims       = "A1",
       xml,
-      dims = NULL,
-      colOffset = 0,
-      rowOffset = 0
+      col_offset = 0,
+      row_offset = 0,
+      ...
     ) {
+
+      standardize_case_names(...)
+
       sheet <- private$get_sheet_index(sheet)
 
       is_chartsheet <- self$is_chartsheet[sheet]
@@ -4303,8 +4566,8 @@ wbWorkbook <- R6::R6Class(
           dims_list <- strsplit(dims, ":")[[1]]
           cols <- col2int(dims_list)
           rows <- as.numeric(gsub("\\D+", "", dims_list))
-          if (length(colOffset) != 2) colOffset <- rep(colOffset, 2)
-          if (length(rowOffset) != 2) rowOffset <- rep(rowOffset, 2)
+          if (length(col_offset) != 2) col_offset <- rep(col_offset, 2)
+          if (length(row_offset) != 2) row_offset <- rep(row_offset, 2)
 
           anchor <- paste0(
             "<xdr:from>",
@@ -4318,10 +4581,10 @@ wbWorkbook <- R6::R6Class(
           )
           anchor <- sprintf(
             anchor,
-            cols[1] - 1L, colOffset[1],
-            rows[1] - 1L, rowOffset[1],
-            cols[2], colOffset[2],
-            rows[2], rowOffset[2]
+            cols[1] - 1L, col_offset[1],
+            rows[1] - 1L, row_offset[1],
+            cols[2], col_offset[2],
+            rows[2], row_offset[2]
           )
 
         } else {
@@ -4339,8 +4602,8 @@ wbWorkbook <- R6::R6Class(
           )
           anchor <- sprintf(
             anchor,
-            cols[1] - 1L, colOffset[1],
-            rows[1] - 1L, rowOffset[1]
+            cols[1] - 1L, col_offset[1],
+            rows[1] - 1L, row_offset[1]
           )
 
         }
@@ -4409,15 +4672,28 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param dims dims
     #' @param xml xml
-    #' @param colOffset,rowOffset startCol and startRow
-    #' @returns The `wbWorkbook` object
+    #' @param col_offset,row_offset positioning parameters
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_chart_xml = function(
-      sheet     = current_sheet(),
+      sheet      = current_sheet(),
+      dims       = NULL,
       xml,
-      dims      = NULL,
-      colOffset = 0,
-      rowOffset = 0
+      col_offset = 0,
+      row_offset = 0,
+      ...
     ) {
+
+      arguments <- c(ls(), "start_row", "start_col")
+      standardize_case_names(..., arguments = arguments)
+
+      if ((exists("start_row") && !is.null(start_row)) ||
+          (exists("start_col") && !is.null(start_col))) {
+        if (!exists("start_row") || is.null(start_row)) start_row <- 1
+        if (!exists("start_row") || is.null(start_col)) start_col <- 1
+        .Deprecated(old = "start_col/start_row", new = "dims", package = "openxlsx2")
+        dims <- rowcol_to_dim(start_row, start_col)
+      }
 
       sheet <- private$get_sheet_index(sheet)
       if (length(self$worksheets[[sheet]]$relships$drawing)) {
@@ -4431,12 +4707,12 @@ wbWorkbook <- R6::R6Class(
       next_chart <- NROW(self$charts) + 1
 
       chart <- data.frame(
-        chart = xml,
-        colors = colors1_xml,
-        style = styleplot_xml,
-        rels = chart1_rels_xml(next_chart),
+        chart   = xml,
+        colors  = colors1_xml,
+        style   = styleplot_xml,
+        rels    = chart1_rels_xml(next_chart),
         chartEx = "",
-        relsEx = ""
+        relsEx  = ""
       )
 
       self$charts <- rbind(self$charts, chart)
@@ -4445,11 +4721,11 @@ wbWorkbook <- R6::R6Class(
 
       # create drawing. add it to self$drawings, the worksheet and rels
       self$add_drawing(
-        sheet     = sheet,
-        xml       = next_chart,
-        dims      = dims,
-        colOffset = colOffset,
-        rowOffset = rowOffset
+        sheet      = sheet,
+        dims       = dims,
+        xml        = next_chart,
+        col_offset = col_offset,
+        row_offset = row_offset
       )
 
       sheet_drawing <- self$worksheets[[sheet]]$relships$drawing
@@ -4466,15 +4742,19 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet the sheet on which the graph will appear
     #' @param dims the dimensions where the sheet will appear
     #' @param graph mschart graph
-    #' @param colOffset,rowOffset startCol and startRow
-    #' @returns The `wbWorkbook` object
+    #' @param col_offset,row_offset offsets for column and row
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_mschart = function(
-      sheet     = current_sheet(),
-      dims      = NULL,
+      sheet      = current_sheet(),
+      dims       = NULL,
       graph,
-      colOffset = 0,
-      rowOffset = 0
+      col_offset = 0,
+      row_offset = 0,
+      ...
     ) {
+
+      standardize_case_names(...)
 
       requireNamespace("mschart")
       assert_class(graph, "ms_chart")
@@ -4496,11 +4776,23 @@ wbWorkbook <- R6::R6Class(
       # write the chart data to the workbook
       if (inherits(graph$data_series, "wb_data")) {
         self$
-          add_chart_xml(sheet = sheet, xml = out_xml, dims = dims, colOffset = colOffset, rowOffset = rowOffset)
+          add_chart_xml(
+            sheet      = sheet,
+            dims       = dims,
+            xml        = out_xml,
+            col_offset = col_offset,
+            row_offset = row_offset
+          )
       } else {
         self$
           add_data(sheet = sheet, x = graph$data_series)$
-          add_chart_xml(sheet = sheet, xml = out_xml, dims = dims, colOffset = colOffset, rowOffset = rowOffset)
+          add_chart_xml(
+            sheet      = sheet,
+            dims       = dims,
+            xml        = out_xml,
+            col_offset = col_offset,
+            row_offset = row_offset
+          )
       }
     },
 
@@ -4742,24 +5034,28 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Protect a workbook
     #' @param protect protect
-    #' @param lockStructure lockStructure
-    #' @param lockWindows lockWindows
+    #' @param lock_structure lock_structure
+    #' @param lock_windows lock_windows
     #' @param password password
     #' @param type type
-    #' @param fileSharing fileSharing
+    #' @param file_sharing file_sharing
     #' @param username username
-    #' @param readOnlyRecommended readOnlyRecommended
+    #' @param read_only_recommended read_only_recommended
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
     protect = function(
-      protect             = TRUE,
-      password            = NULL,
-      lockStructure       = FALSE,
-      lockWindows         = FALSE,
-      type                = 1,
-      fileSharing         = FALSE,
-      username            = unname(Sys.info()["user"]),
-      readOnlyRecommended = FALSE
+      protect               = TRUE,
+      password              = NULL,
+      lock_structure        = FALSE,
+      lock_windows          = FALSE,
+      type                  = 1,
+      file_sharing          = FALSE,
+      username              = unname(Sys.info()["user"]),
+      read_only_recommended = FALSE,
+      ...
     ) {
+
+      standardize_case_names(...)
 
       if (!protect) {
         self$workbook$workbookProtection <- NULL
@@ -4773,12 +5069,12 @@ wbWorkbook <- R6::R6Class(
       # TODO: Shall we parse the existing protection settings and preserve all
       # unchanged attributes?
 
-      if (fileSharing) {
+      if (file_sharing) {
         self$workbook$fileSharing <- xml_node_create(
           "fileSharing",
           xml_attributes = c(
             userName = username,
-            readOnlyRecommended = if (readOnlyRecommended | type == "2") "1",
+            readOnlyRecommended = if (read_only_recommended | type == "2") "1",
             reservationPassword = password
           )
         )
@@ -4788,8 +5084,8 @@ wbWorkbook <- R6::R6Class(
         "workbookProtection",
         xml_attributes = c(
           hashPassword = password,
-          lockStructure = toString(as.numeric(lockStructure)),
-          lockWindows = toString(as.numeric(lockWindows))
+          lockStructure = toString(as.numeric(lock_structure)),
+          lockWindows = toString(as.numeric(lock_windows))
         )
       )
 
@@ -4807,7 +5103,7 @@ wbWorkbook <- R6::R6Class(
     #'   `"formatRows"`, `"insertColumns"`, `"insertRows"`,
     #'   `"insertHyperlinks"`, `"deleteColumns"`, `"deleteRows"`, `"sort"`,
     #'   `"autoFilter"`, `"pivotTables"`, `"objects"`, `"scenarios"`
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     protect_worksheet = function(
         sheet = current_sheet(),
         protect    = TRUE,
@@ -4884,18 +5180,23 @@ wbWorkbook <- R6::R6Class(
 
     #' @description
     #' Change the last modified by
-    #' @param LastModifiedBy A new value
+    #' @param name A new value
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
-    set_last_modified_by = function(LastModifiedBy = NULL) {
+    set_last_modified_by = function(name, ...) {
+      if (missing(name) && list(...)$LastModifiedBy) {
+        .Deprecated(old = "LastModifiedBy", new = "name", package = "openxlsx2")
+        name <- list(...)$LastModifiedBy
+      }
       # TODO rename to wb_set_last_modified_by() ?
-      if (!is.null(LastModifiedBy)) {
+      if (!is.null(name)) {
         current_LastModifiedBy <-
           stri_match(self$core, regex = "<cp:lastModifiedBy>(.*?)</cp:lastModifiedBy>")[1, 2]
         self$core <-
           stri_replace_all_fixed(
             self$core,
             pattern = current_LastModifiedBy,
-            replacement = LastModifiedBy
+            replacement = name
           )
       }
 
@@ -4912,32 +5213,37 @@ wbWorkbook <- R6::R6Class(
     #' @param bottom bottom
     #' @param header header
     #' @param footer footer
-    #' @param fitToWidth fitToWidth
-    #' @param fitToHeight fitToHeight
-    #' @param paperSize paperSize
-    #' @param printTitleRows printTitleRows
-    #' @param printTitleCols printTitleCols
-    #' @param summaryRow summaryRow
-    #' @param summaryCol summaryCol
+    #' @param fit_to_width fitToWidth
+    #' @param fit_to_height fitToHeight
+    #' @param paper_size paperSize
+    #' @param print_title_rows printTitleRows
+    #' @param print_title_cols printTitleCols
+    #' @param summary_row summaryRow
+    #' @param summary_col summaryCol
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
     page_setup = function(
-      sheet = current_sheet(),
-      orientation    = NULL,
-      scale          = 100,
-      left           = 0.7,
-      right          = 0.7,
-      top            = 0.75,
-      bottom         = 0.75,
-      header         = 0.3,
-      footer         = 0.3,
-      fitToWidth     = FALSE,
-      fitToHeight    = FALSE,
-      paperSize      = NULL,
-      printTitleRows = NULL,
-      printTitleCols = NULL,
-      summaryRow     = NULL,
-      summaryCol     = NULL
+      sheet            = current_sheet(),
+      orientation      = NULL,
+      scale            = 100,
+      left             = 0.7,
+      right            = 0.7,
+      top              = 0.75,
+      bottom           = 0.75,
+      header           = 0.3,
+      footer           = 0.3,
+      fit_to_width     = FALSE,
+      fit_to_height    = FALSE,
+      paper_size       = NULL,
+      print_title_rows = NULL,
+      print_title_cols = NULL,
+      summary_row      = NULL,
+      summary_col      = NULL,
+      ...
     ) {
+
+      standardize_case_names(...)
+
       sheet <- private$get_sheet_index(sheet)
       xml <- self$worksheets[[sheet]]$pageSetup
 
@@ -4953,15 +5259,15 @@ wbWorkbook <- R6::R6Class(
         stop("Scale must be between 10 and 400.")
       }
 
-      if (!is.null(paperSize)) {
-        paperSizes <- 1:68
-        paperSizes <- paperSizes[!paperSizes %in% 48:49]
-        if (!paperSize %in% paperSizes) {
-          stop("paperSize must be an integer in range [1, 68]. See ?ws_page_setup details.")
+      if (!is.null(paper_size)) {
+        paper_sizes <- 1:68
+        paper_sizes <- paper_sizes[!paper_sizes %in% 48:49]
+        if (!paper_size %in% paper_sizes) {
+          stop("paper_size must be an integer in range [1, 68]. See ?wb_page_setup details.")
         }
-        paperSize <- as.integer(paperSize)
+        paper_size <- as.integer(paper_size)
       } else {
-        paperSize <- regmatches(xml, regexpr('(?<=paperSize=")[0-9]+', xml, perl = TRUE)) ## get existing
+        paper_size <- regmatches(xml, regexpr('(?<=paperSize=")[0-9]+', xml, perl = TRUE)) ## get existing
       }
 
       ## Keep defaults on orientation, hdpi, vdpi, paperSize ----
@@ -4971,41 +5277,41 @@ wbWorkbook <- R6::R6Class(
       ## Update ----
       self$worksheets[[sheet]]$pageSetup <- sprintf(
         '<pageSetup paperSize="%s" orientation="%s" scale = "%s" fitToWidth="%s" fitToHeight="%s" horizontalDpi="%s" verticalDpi="%s"/>',
-        paperSize, orientation, scale, as.integer(fitToWidth), as.integer(fitToHeight), hdpi, vdpi
+        paper_size, orientation, scale, as_xml_attr(fit_to_width), as_xml_attr(fit_to_height), hdpi, vdpi
       )
 
-      if (fitToHeight || fitToWidth) {
+      if (fit_to_height || fit_to_width) {
         self$worksheets[[sheet]]$sheetPr <- unique(c(self$worksheets[[sheet]]$sheetPr, '<pageSetupPr fitToPage="1"/>'))
       }
 
       self$worksheets[[sheet]]$pageMargins <-
         sprintf('<pageMargins left="%s" right="%s" top="%s" bottom="%s" header="%s" footer="%s"/>', left, right, top, bottom, header, footer)
 
-      validRow <- function(summaryRow) {
-        return(tolower(summaryRow) %in% c("above", "below"))
+      validRow <- function(summary_row) {
+        return(tolower(summary_row) %in% c("above", "below"))
       }
-      validCol <- function(summaryCol) {
-        return(tolower(summaryCol) %in% c("left", "right"))
+      validCol <- function(summary_col) {
+        return(tolower(summary_col) %in% c("left", "right"))
       }
 
       outlinepr <- ""
 
-      if (!is.null(summaryRow)) {
+      if (!is.null(summary_row)) {
 
-        if (!validRow(summaryRow)) {
-          stop("Invalid \`summaryRow\` option. Must be one of \"Above\" or \"Below\".")
-        } else if (tolower(summaryRow) == "above") {
+        if (!validRow(summary_row)) {
+          stop("Invalid \`summary_row\` option. Must be one of \"Above\" or \"Below\".")
+        } else if (tolower(summary_row) == "above") {
           outlinepr <- ' summaryBelow=\"0\"'
         } else {
           outlinepr <- ' summaryBelow=\"1\"'
         }
       }
 
-      if (!is.null(summaryCol)) {
+      if (!is.null(summary_col)) {
 
-        if (!validCol(summaryCol)) {
-          stop("Invalid \`summaryCol\` option. Must be one of \"Left\" or \"Right\".")
-        } else if (tolower(summaryCol) == "left") {
+        if (!validCol(summary_col)) {
+          stop("Invalid \`summary_col\` option. Must be one of \"Left\" or \"Right\".")
+        } else if (tolower(summary_col) == "left") {
           outlinepr <- paste0(outlinepr, ' summaryRight=\"0\"')
         } else {
           outlinepr <- paste0(outlinepr, ' summaryRight=\"1\"')
@@ -5017,24 +5323,24 @@ wbWorkbook <- R6::R6Class(
       }
 
       ## print Titles ----
-      if (!is.null(printTitleRows) && is.null(printTitleCols)) {
-        if (!is.numeric(printTitleRows)) {
-          stop("printTitleRows must be numeric.")
+      if (!is.null(print_title_rows) && is.null(print_title_cols)) {
+        if (!is.numeric(print_title_rows)) {
+          stop("print_title_rows must be numeric.")
         }
 
         private$create_named_region(
-          ref1 = paste0("$", min(printTitleRows)),
-          ref2 = paste0("$", max(printTitleRows)),
+          ref1 = paste0("$", min(print_title_rows)),
+          ref2 = paste0("$", max(print_title_rows)),
           name = "_xlnm.Print_Titles",
           sheet = self$get_sheet_names()[[sheet]],
           localSheetId = sheet - 1L
         )
-      } else if (!is.null(printTitleCols) && is.null(printTitleRows)) {
-        if (!is.numeric(printTitleCols)) {
-          stop("printTitleCols must be numeric.")
+      } else if (!is.null(print_title_cols) && is.null(print_title_rows)) {
+        if (!is.numeric(print_title_cols)) {
+          stop("print_title_cols must be numeric.")
         }
 
-        cols <- int2col(range(printTitleCols))
+        cols <- int2col(range(print_title_cols))
         private$create_named_region(
           ref1 = paste0("$", cols[1]),
           ref2 = paste0("$", cols[2]),
@@ -5042,17 +5348,17 @@ wbWorkbook <- R6::R6Class(
           sheet = self$get_sheet_names()[[sheet]],
           localSheetId = sheet - 1L
         )
-      } else if (!is.null(printTitleCols) && !is.null(printTitleRows)) {
-        if (!is.numeric(printTitleRows)) {
-          stop("printTitleRows must be numeric.")
+      } else if (!is.null(print_title_cols) && !is.null(print_title_rows)) {
+        if (!is.numeric(print_title_rows)) {
+          stop("print_title_rows must be numeric.")
         }
 
-        if (!is.numeric(printTitleCols)) {
-          stop("printTitleCols must be numeric.")
+        if (!is.numeric(print_title_cols)) {
+          stop("print_title_cols must be numeric.")
         }
 
-        cols <- int2col(range(printTitleCols))
-        rows <- range(printTitleRows)
+        cols <- int2col(range(print_title_cols))
+        rows <- range(print_title_rows)
 
         cols <- paste(paste0("$", cols[1]), paste0("$", cols[2]), sep = ":")
         rows <- paste(paste0("$", rows[1]), paste0("$", rows[2]), sep = ":")
@@ -5075,20 +5381,25 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param header header
     #' @param footer footer
-    #' @param evenHeader evenHeader
-    #' @param evenFooter evenFooter
-    #' @param firstHeader firstHeader
-    #' @param firstFooter firstFooter
+    #' @param even_header evenHeader
+    #' @param even_footer evenFooter
+    #' @param first_header firstHeader
+    #' @param first_footer firstFooter
+    #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
     set_header_footer = function(
       sheet = current_sheet(),
-      header      = NULL,
-      footer      = NULL,
-      evenHeader  = NULL,
-      evenFooter  = NULL,
-      firstHeader = NULL,
-      firstFooter = NULL
+      header       = NULL,
+      footer       = NULL,
+      even_header  = NULL,
+      even_footer  = NULL,
+      first_header = NULL,
+      first_footer = NULL,
+      ...
     ) {
+
+      standardize_case_names(...)
+
       sheet <- private$get_sheet_index(sheet)
 
       if (!is.null(header) && length(header) != 3) {
@@ -5099,29 +5410,29 @@ wbWorkbook <- R6::R6Class(
         stop("footer must have length 3 where elements correspond to positions: left, center, right.")
       }
 
-      if (!is.null(evenHeader) && length(evenHeader) != 3) {
+      if (!is.null(even_header) && length(even_header) != 3) {
         stop("evenHeader must have length 3 where elements correspond to positions: left, center, right.")
       }
 
-      if (!is.null(evenFooter) && length(evenFooter) != 3) {
+      if (!is.null(even_footer) && length(even_footer) != 3) {
         stop("evenFooter must have length 3 where elements correspond to positions: left, center, right.")
       }
 
-      if (!is.null(firstHeader) && length(firstHeader) != 3) {
+      if (!is.null(first_header) && length(first_header) != 3) {
         stop("firstHeader must have length 3 where elements correspond to positions: left, center, right.")
       }
 
-      if (!is.null(firstFooter) && length(firstFooter) != 3) {
+      if (!is.null(first_footer) && length(first_footer) != 3) {
         stop("firstFooter must have length 3 where elements correspond to positions: left, center, right.")
       }
 
       # TODO this could probably be moved to the hf assignment
       oddHeader   <- headerFooterSub(header)
       oddFooter   <- headerFooterSub(footer)
-      evenHeader  <- headerFooterSub(evenHeader)
-      evenFooter  <- headerFooterSub(evenFooter)
-      firstHeader <- headerFooterSub(firstHeader)
-      firstFooter <- headerFooterSub(firstFooter)
+      evenHeader  <- headerFooterSub(even_header)
+      evenFooter  <- headerFooterSub(even_footer)
+      firstHeader <- headerFooterSub(first_header)
+      firstFooter <- headerFooterSub(first_footer)
 
       hf <- list(
         oddHeader = naToNULLList(oddHeader),
@@ -5142,7 +5453,7 @@ wbWorkbook <- R6::R6Class(
 
     #' @description get tables
     #' @param sheet sheet
-    #' @returns The sheet tables.  `character()` if empty
+    #' @return The sheet tables.  `character()` if empty
     get_tables = function(sheet = current_sheet()) {
       if (length(sheet) != 1) {
         stop("sheet argument must be length 1")
@@ -5164,7 +5475,7 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param table table
     #' @param remove_data removes the data as well
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     remove_tables = function(sheet = current_sheet(), table, remove_data = TRUE) {
       if (length(table) != 1) {
         stop("table argument must be length 1")
@@ -5213,7 +5524,7 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param rows rows
     #' @param cols cols
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     add_filter = function(sheet = current_sheet(), rows, cols) {
       sheet <- private$get_sheet_index(sheet)
 
@@ -5235,7 +5546,7 @@ wbWorkbook <- R6::R6Class(
 
     #' @description remove filters
     #' @param sheet sheet
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     remove_filter = function(sheet = current_sheet()) {
       for (s in private$get_sheet_index(sheet)) {
         self$worksheets[[s]]$autoFilter <- character()
@@ -5248,8 +5559,8 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param show show
     #' @param print print
-    #' @returns The `wbWorkbook` object
-    grid_lines = function(sheet = current_sheet(), show = FALSE, print = show) {
+    #' @return The `wbWorkbook` object
+    set_grid_lines = function(sheet = current_sheet(), show = FALSE, print = show) {
       sheet <- private$get_sheet_index(sheet)
 
       assert_class(show, "logical")
@@ -5267,62 +5578,76 @@ wbWorkbook <- R6::R6Class(
       invisible(self)
     },
 
+    #' @description grid lines
+    #' @param sheet sheet
+    #' @param show show
+    #' @param print print
+    #' @return The `wbWorkbook` object
+    grid_lines = function(sheet = current_sheet(), show = FALSE, print = show) {
+      .Deprecated(old = "grid_lines", new = "set_grid_lines", package = "openxlsx2")
+      self$set_grid_lines(sheet = sheet, show = show, print = print)
+    },
+
     ### named region ----
 
     #' @description add a named region
     #' @param sheet sheet
-    #' @param cols cols
-    #' @param rows rows
+    #' @param dims dims
     #' @param name name
-    #' @param localSheet localSheet
+    #' @param local_sheet local_sheet
     #' @param overwrite overwrite
     #' @param comment comment
-    #' @param customMenu customMenu
+    #' @param custom_menu custom_menu
     #' @param description description
     #' @param is_function function
-    #' @param functionGroupId function group id
+    #' @param function_group_id function group id
     #' @param help help
     #' @param hidden hidden
-    #' @param localName localName
-    #' @param publishToServer publish to server
-    #' @param statusBar status bar
-    #' @param vbProcedure wbProcedure
-    #' @param workbookParameter workbookParameter
+    #' @param local_name localName
+    #' @param publish_to_server publish to server
+    #' @param status_bar status bar
+    #' @param vb_procedure vb procedure
+    #' @param workbook_parameter workbookParameter
     #' @param xml xml
-    #' @returns The `wbWorkbook` object
+    #' @param ... additional arguments
+    #' @return The `wbWorkbook` object
     add_named_region = function(
       sheet = current_sheet(),
-      cols,
-      rows,
+      dims = "A1",
       name,
-      localSheet        = FALSE,
-      overwrite         = FALSE,
-      comment           = NULL,
-      customMenu        = NULL,
-      description       = NULL,
-      is_function       = NULL,
-      functionGroupId   = NULL,
-      help              = NULL,
-      hidden            = NULL,
-      localName         = NULL,
-      publishToServer   = NULL,
-      statusBar         = NULL,
-      vbProcedure       = NULL,
-      workbookParameter = NULL,
-      xml               = NULL
+      local_sheet        = FALSE,
+      overwrite          = FALSE,
+      comment            = NULL,
+      custom_menu        = NULL,
+      description        = NULL,
+      is_function        = NULL,
+      function_group_id  = NULL,
+      help               = NULL,
+      hidden             = NULL,
+      local_name         = NULL,
+      publish_to_server  = NULL,
+      status_bar         = NULL,
+      vb_procedure       = NULL,
+      workbook_parameter = NULL,
+      xml                = NULL,
+      ...
     ) {
+
+      arguments <- c(ls(), "rows", "cols")
+      standardize_case_names(..., arguments = arguments)
+
       sheet <- private$get_sheet_index(sheet)
 
-      if (!is.numeric(rows)) {
-        stop("rows argument must be a numeric/integer vector")
-      }
+      cols <- list(...)[["cols"]]
+      rows <- list(...)[["rows"]]
 
-      if (!is.numeric(cols)) {
-        stop("cols argument must be a numeric/integer vector")
+      if (!is.null(rows) && !is.null(cols)) {
+        .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
+        dims <- rowcol_to_dims(rows, cols)
       }
 
       localSheetId <- ""
-      if (localSheet) localSheetId <- as.character(sheet)
+      if (local_sheet) localSheetId <- as.character(sheet)
 
       ## check name doesn't already exist
       ## named region
@@ -5346,8 +5671,9 @@ wbWorkbook <- R6::R6Class(
         stop("name cannot look like a cell reference.")
       }
 
-      cols <- round(cols)
-      rows <- round(rows)
+      rowcols <- dims_to_rowcol(dims, as_integer = TRUE)
+      rows <- rowcols[[2]]
+      cols <- rowcols[[1]]
 
       startCol <- min(cols)
       endCol <- max(cols)
@@ -5367,17 +5693,17 @@ wbWorkbook <- R6::R6Class(
         sheet              = self$sheet_names[sheet],
         localSheetId       = localSheetId,
         comment            = comment,
-        customMenu         = customMenu,
+        customMenu         = custom_menu,
         description        = description,
         is_function        = is_function,
-        functionGroupId    = functionGroupId,
+        functionGroupId    = function_group_id,
         help               = help,
         hidden             = hidden,
-        localName          = localName,
-        publishToServer    = publishToServer,
-        statusBar          = statusBar,
-        vbProcedure        = vbProcedure,
-        workbookParameter  = workbookParameter,
+        localName          = local_name,
+        publishToServer    = publish_to_server,
+        statusBar          = status_bar,
+        vbProcedure        = vb_procedure,
+        workbookParameter  = workbook_parameter,
         xml                = xml
       )
 
@@ -5387,7 +5713,7 @@ wbWorkbook <- R6::R6Class(
     #' @description remove a named region
     #' @param sheet sheet
     #' @param name name
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     remove_named_region = function(sheet = current_sheet(), name = NULL) {
       # get all nown defined names
       dn <- wb_get_named_regions(self)
@@ -5441,7 +5767,7 @@ wbWorkbook <- R6::R6Class(
     ## sheet visibility ----
 
     #' @description Get sheet visibility
-    #' @returns Returns sheet visibility
+    #' @return Returns sheet visibility
     get_sheet_visibility = function() {
       state <- rep("visible", length(self$workbook$sheets))
       state[grepl("hidden", self$workbook$sheets)] <- "hidden"
@@ -5452,7 +5778,7 @@ wbWorkbook <- R6::R6Class(
     #' @description Set sheet visibility
     #' @param value value
     #' @param sheet sheet
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     set_sheet_visibility = function(sheet = current_sheet(), value) {
       if (length(value) != length(sheet)) {
         stop("`value` and `sheet` must be the same length")
@@ -5497,7 +5823,7 @@ wbWorkbook <- R6::R6Class(
     #' @param sheet sheet
     #' @param row row
     #' @param col col
-    #' @returns The `wbWorkbook` object
+    #' @return The `wbWorkbook` object
     add_page_break = function(sheet = current_sheet(), row = NULL, col = NULL) {
       sheet <- private$get_sheet_index(sheet)
       self$worksheets[[sheet]]$add_page_break(row = row, col = col)
@@ -6044,31 +6370,31 @@ wbWorkbook <- R6::R6Class(
     #' @param scheme font scheme
     #' @param shadow shadow
     #' @param extend extend
-    #' @param vertAlign vertical alignment
+    #' @param vert_align vertical alignment
     #' @param ... ...
     #' @examples
     #'  wb <- wb_workbook()$add_worksheet("S1")$add_data("S1", mtcars)
     #'  wb$add_font("S1", "A1:K1", name = "Arial", color = wb_color(theme = "4"))
     #' @return The `wbWorksheetObject`, invisibly
     add_font = function(
-        sheet     = current_sheet(),
-        dims      = "A1",
-        name      = "Calibri",
-        color     = wb_color(hex = "FF000000"),
-        size      = "11",
-        bold      = "",
-        italic    = "",
-        outline   = "",
-        strike    = "",
-        underline = "",
+        sheet      = current_sheet(),
+        dims       = "A1",
+        name       = "Calibri",
+        color      = wb_color(hex = "FF000000"),
+        size       = "11",
+        bold       = "",
+        italic     = "",
+        outline    = "",
+        strike     = "",
+        underline  = "",
         # fine tuning
-        charset   = "",
-        condense  = "",
-        extend    = "",
-        family    = "",
-        scheme    = "",
-        shadow    = "",
-        vertAlign = "",
+        charset    = "",
+        condense   = "",
+        extend     = "",
+        family     = "",
+        scheme     = "",
+        shadow     = "",
+        vert_align = "",
         ...
     ) {
       sheet <- private$get_sheet_index(sheet)
@@ -6081,7 +6407,7 @@ wbWorkbook <- R6::R6Class(
       cc <- cc[cc$r %in% dims, ]
       styles <- unique(cc[["c_s"]])
 
-      standardize_color_names(...)
+      standardize(...)
 
       for (style in styles) {
         dim <- cc[cc$c_s == style, "r"]
@@ -6101,7 +6427,7 @@ wbWorkbook <- R6::R6Class(
           strike = strike,
           sz = size,
           u = underline,
-          vertAlign = vertAlign
+          vertAlign = vert_align
         )
         self$styles_mgr$add(new_font, new_font)
 
@@ -6175,33 +6501,34 @@ wbWorkbook <- R6::R6Class(
     #' @description provide simple cell style format function
     #' @param sheet the worksheet
     #' @param dims the cell range
-    #' @param extLst extension list something like `<extLst>...</extLst>`
+    #' @param ext_lst extension list something like `<extLst>...</extLst>`
     #' @param hidden logical cell is hidden
     #' @param horizontal align content horizontal ('left', 'center', 'right')
     #' @param indent logical indent content
-    #' @param justifyLastLine logical justify last line
+    #' @param justify_last_line logical justify last line
     #' @param locked logical cell is locked
-    #' @param pivotButton unknown
-    #' @param quotePrefix unknown
-    #' @param readingOrder reading order left to right
-    #' @param relativeIndent relative indentation
-    #' @param shrinkToFit logical shrink to fit
-    #' @param textRotation degrees of text rotation
+    #' @param pivot_button unknown
+    #' @param quote_prefix unknown
+    #' @param reading_order reading order left to right
+    #' @param relative_indent relative indentation
+    #' @param shrink_to_fit logical shrink to fit
+    #' @param text_rotation degrees of text rotation
     #' @param vertical vertical alignment of content ('top', 'center', 'bottom')
-    #' @param wrapText wrap text in cell
+    #' @param wrap_text wrap text in cell
     # alignments
-    #' @param applyAlignment logical apply alignment
-    #' @param applyBorder logical apply border
-    #' @param applyFill logical apply fill
-    #' @param applyFont logical apply font
-    #' @param applyNumberFormat logical apply number format
-    #' @param applyProtection logical apply protection
+    #' @param apply_alignment logical apply alignment
+    #' @param apply_border logical apply border
+    #' @param apply_fill logical apply fill
+    #' @param apply_font logical apply font
+    #' @param apply_number_format logical apply number format
+    #' @param apply_protection logical apply protection
     # ids
-    #' @param borderId border ID to apply
-    #' @param fillId fill ID to apply
-    #' @param fontId font ID to apply
-    #' @param numFmtId number format ID to apply
-    #' @param xfId xf ID to apply
+    #' @param border_id border ID to apply
+    #' @param fill_id fill ID to apply
+    #' @param font_id font ID to apply
+    #' @param num_fmt_id number format ID to apply
+    #' @param xf_id xf ID to apply
+    #' @param ... additional arguments
     #' @examples
     #'  wb <- wb_workbook()$add_worksheet("S1")$add_data("S1", mtcars)
     #'  wb$add_cell_style("S1", "A1:K1",
@@ -6211,34 +6538,38 @@ wbWorkbook <- R6::R6Class(
     #'                    wrapText = "1")
     #' @return The `wbWorksheetObject`, invisibly
     add_cell_style = function(
-        sheet             = current_sheet(),
-        dims              = "A1",
-        applyAlignment    = NULL,
-        applyBorder       = NULL,
-        applyFill         = NULL,
-        applyFont         = NULL,
-        applyNumberFormat = NULL,
-        applyProtection   = NULL,
-        borderId          = NULL,
-        extLst            = NULL,
-        fillId            = NULL,
-        fontId            = NULL,
-        hidden            = NULL,
-        horizontal        = NULL,
-        indent            = NULL,
-        justifyLastLine   = NULL,
-        locked            = NULL,
-        numFmtId          = NULL,
-        pivotButton       = NULL,
-        quotePrefix       = NULL,
-        readingOrder      = NULL,
-        relativeIndent    = NULL,
-        shrinkToFit       = NULL,
-        textRotation      = NULL,
-        vertical          = NULL,
-        wrapText          = NULL,
-        xfId              = NULL
+        sheet               = current_sheet(),
+        dims                = "A1",
+        apply_alignment     = NULL,
+        apply_border        = NULL,
+        apply_fill          = NULL,
+        apply_font          = NULL,
+        apply_number_format = NULL,
+        apply_protection    = NULL,
+        border_id           = NULL,
+        ext_lst             = NULL,
+        fill_id             = NULL,
+        font_id             = NULL,
+        hidden              = NULL,
+        horizontal          = NULL,
+        indent              = NULL,
+        justify_last_line   = NULL,
+        locked              = NULL,
+        num_fmt_id          = NULL,
+        pivot_button        = NULL,
+        quote_prefix        = NULL,
+        reading_order       = NULL,
+        relative_indent     = NULL,
+        shrink_to_fit       = NULL,
+        text_rotation       = NULL,
+        vertical            = NULL,
+        wrap_text           = NULL,
+        xf_id               = NULL,
+        ...
     ) {
+
+      standardize_case_names(...)
+
       sheet <- private$get_sheet_index(sheet)
       private$do_cell_init(sheet, dims)
 
@@ -6254,31 +6585,31 @@ wbWorkbook <- R6::R6Class(
         xf_prev <- get_cell_styles(self, sheet, dim[[1]])
         xf_new_cellstyle <- set_cellstyle(
           xf_node           = xf_prev,
-          applyAlignment    = applyAlignment,
-          applyBorder       = applyBorder,
-          applyFill         = applyFill,
-          applyFont         = applyFont,
-          applyNumberFormat = applyNumberFormat,
-          applyProtection   = applyProtection,
-          borderId          = borderId,
-          extLst            = extLst,
-          fillId            = fillId,
-          fontId            = fontId,
+          applyAlignment    = apply_alignment,
+          applyBorder       = apply_border,
+          applyFill         = apply_fill,
+          applyFont         = apply_font,
+          applyNumberFormat = apply_number_format,
+          applyProtection   = apply_protection,
+          borderId          = border_id,
+          extLst            = ext_lst,
+          fillId            = fill_id,
+          fontId            = font_id,
           hidden            = hidden,
           horizontal        = horizontal,
           indent            = indent,
-          justifyLastLine   = justifyLastLine,
+          justifyLastLine   = justify_last_line,
           locked            = locked,
-          numFmtId          = numFmtId,
-          pivotButton       = pivotButton,
-          quotePrefix       = quotePrefix,
-          readingOrder      = readingOrder,
-          relativeIndent    = relativeIndent,
-          shrinkToFit       = shrinkToFit,
-          textRotation      = textRotation,
+          numFmtId          = num_fmt_id,
+          pivotButton       = pivot_button,
+          quotePrefix       = quote_prefix,
+          readingOrder      = reading_order,
+          relativeIndent    = relative_indent,
+          shrinkToFit       = shrink_to_fit,
+          textRotation      = text_rotation,
           vertical          = vertical,
-          wrapText          = wrapText,
-          xfId              = xfId
+          wrapText          = wrap_text,
+          xfId              = xf_id
         )
         self$styles_mgr$add(xf_new_cellstyle, xf_new_cellstyle)
         s_id <- self$styles_mgr$get_xf_id(xf_new_cellstyle)
@@ -6291,7 +6622,7 @@ wbWorkbook <- R6::R6Class(
     #' @description get sheet style
     #' @param sheet sheet
     #' @param dims dims
-    #' @returns a character vector of cell styles
+    #' @return a character vector of cell styles
     get_cell_style = function(sheet = current_sheet(), dims) {
 
       if (length(dims) == 1 && grepl(":", dims))
@@ -6377,12 +6708,12 @@ wbWorkbook <- R6::R6Class(
     #' @param font_name the font name
     #' @param font_size the font size
     #' @param font_color the font color (a `wb_color()` object)
-    #' @param numFmt the number format
+    #' @param num_fmt the number format
     #' @param border logical if borders are applied
     #' @param border_color the border color
     #' @param border_style the border style
-    #' @param bgFill any background fill
-    #' @param gradientFill any gradient fill
+    #' @param bg_fill any background fill
+    #' @param gradient_fill any gradient fill
     #' @param text_bold logical if text is bold
     #' @param text_italic logical if text is italic
     #' @param text_underline logical if text is underlined
@@ -6394,28 +6725,30 @@ wbWorkbook <- R6::R6Class(
       font_name      = NULL,
       font_size      = NULL,
       font_color     = NULL,
-      numFmt         = NULL,
+      num_fmt        = NULL,
       border         = NULL,
       border_color   = wb_color(getOption("openxlsx2.borderColor", "black")),
       border_style   = getOption("openxlsx2.borderStyle", "thin"),
-      bgFill         = NULL,
-      gradientFill   = NULL,
+      bg_fill        = NULL,
+      gradient_fill  = NULL,
       text_bold      = NULL,
       text_italic    = NULL,
       text_underline = NULL,
       ...
     ) {
 
+      standardize(...)
+
       xml_style <- create_dxfs_style(
         font_name      = font_name,
         font_size      = font_size,
         font_color     = font_color,
-        numFmt         = numFmt,
+        num_fmt        = num_fmt,
         border         = border,
         border_color   = border_color,
         border_style   = border_style,
-        bgFill         = bgFill,
-        gradientFill   = gradientFill,
+        bg_fill        = bg_fill,
+        gradient_fill  = gradient_fill,
         text_bold      = text_bold,
         text_italic    = text_italic,
         text_underline = text_underline,
@@ -6517,110 +6850,173 @@ wbWorkbook <- R6::R6Class(
     #' @description Ignore error on worksheet
     #' @param sheet sheet
     #' @param dims dims
-    #' @param calculatedColumn calculatedColumn
-    #' @param emptyCellReference emptyCellReference
-    #' @param evalError evalError
+    #' @param calculated_column calculatedColumn
+    #' @param empty_cell_reference emptyCellReference
+    #' @param eval_error evalError
     #' @param formula formula
-    #' @param formulaRange formulaRange
-    #' @param listDataValidation listDataValidation
-    #' @param numberStoredAsText numberStoredAsText
-    #' @param twoDigitTextYear twoDigitTextYear
-    #' @param unlockedFormula unlockedFormula
+    #' @param formula_range formulaRange
+    #' @param list_data_validation listDataValidation
+    #' @param number_stored_as_text numberStoredAsText
+    #' @param two_digit_text_year twoDigitTextYear
+    #' @param unlocked_formula unlockedFormula
+    #' @param ... additional arguments
     add_ignore_error = function(
-      sheet              = current_sheet(),
-      dims               = "A1",
-      calculatedColumn   = FALSE,
-      emptyCellReference = FALSE,
-      evalError          = FALSE,
-      formula            = FALSE,
-      formulaRange       = FALSE,
-      listDataValidation = FALSE,
-      numberStoredAsText = FALSE,
-      twoDigitTextYear   = FALSE,
-      unlockedFormula    = FALSE
+      sheet                 = current_sheet(),
+      dims                  = "A1",
+      calculated_column     = FALSE,
+      empty_cell_reference  = FALSE,
+      eval_error            = FALSE,
+      formula               = FALSE,
+      formula_range         = FALSE,
+      list_data_validation  = FALSE,
+      number_stored_as_text = FALSE,
+      two_digit_text_year   = FALSE,
+      unlocked_formula      = FALSE,
+      ...
     ) {
+      standardize_case_names(...)
       sheet <- private$get_sheet_index(sheet)
       self$worksheets[[sheet]]$ignore_error(
         dims               = dims,
-        calculatedColumn   = calculatedColumn,
-        emptyCellReference = emptyCellReference,
-        evalError          = evalError,
+        calculatedColumn   = calculated_column,
+        emptyCellReference = empty_cell_reference,
+        evalError          = eval_error,
         formula            = formula,
-        formulaRange       = formulaRange,
-        listDataValidation = listDataValidation,
-        numberStoredAsText = numberStoredAsText,
-        twoDigitTextYear   = twoDigitTextYear,
-        unlockedFormula    = unlockedFormula
+        formulaRange       = formula_range,
+        listDataValidation = list_data_validation,
+        numberStoredAsText = number_stored_as_text,
+        twoDigitTextYear   = two_digit_text_year,
+        unlockedFormula    = unlocked_formula
       )
     },
 
     #' @description add sheetview
     #' @param sheet sheet
-    #' @param colorId colorId
-    #' @param defaultGridColor defaultGridColor
-    #' @param rightToLeft rightToLeft
-    #' @param showFormulas showFormulas
-    #' @param showGridLines showGridLines
-    #' @param showOutlineSymbols showOutlineSymbols
-    #' @param showRowColHeaders showRowColHeaders
-    #' @param showRuler showRuler
-    #' @param showWhiteSpace showWhiteSpace
-    #' @param showZeros showZeros
-    #' @param tabSelected tabSelected
-    #' @param topLeftCell topLeftCell
-    #' @param view view
-    #' @param windowProtection windowProtection
-    #' @param workbookViewId workbookViewId
-    #' @param zoomScale zoomScale
-    #' @param zoomScaleNormal zoomScaleNormal
-    #' @param zoomScalePageLayoutView zoomScalePageLayoutView
-    #' @param zoomScaleSheetLayoutView zoomScaleSheetLayoutView
+    #' @param color_id,default_grid_color Integer: A color, default is 64
+    #' @param right_to_left Logical: if TRUE column ordering is right  to left
+    #' @param show_formulas Logical: if TRUE cell formulas are shown
+    #' @param show_grid_lines Logical: if TRUE the worksheet grid is shown
+    #' @param show_outline_symbols Logical: if TRUE outline symbols are shown
+    #' @param show_row_col_headers Logical: if TRUE row and column headers are shown
+    #' @param show_ruler Logical: if TRUE a ruler is shown in page layout view
+    #' @param show_white_space Logical: if TRUE margins are shown in page layout view
+    #' @param show_zeros Logical: if FALSE cells containing zero are shown blank if !showFormulas
+    #' @param tab_selected Integer: zero vector indicating the selected tab
+    #' @param top_left_cell Cell: the cell shown in the top left corner / or top right with rightToLeft
+    #' @param view View: "normal", "pageBreakPreview" or "pageLayout"
+    #' @param window_protection Logical: if TRUE the panes are protected
+    #' @param workbook_view_id integer: Pointing to some other view inside the workbook
+    #' @param zoom_scale,zoom_scale_normal,zoom_scale_page_layout_view,zoom_scale_sheet_layout_view Integer: the zoom scale should be between 10 and 400. These are values for current, normal etc.
+    #' @param ... additional arguments
     #' @return The `wbWorksheetObject`, invisibly
     set_sheetview = function(
       sheet                    = current_sheet(),
-      colorId                  = NULL,
-      defaultGridColor         = NULL,
-      rightToLeft              = NULL,
-      showFormulas             = NULL,
-      showGridLines            = NULL,
-      showOutlineSymbols       = NULL,
-      showRowColHeaders        = NULL,
-      showRuler                = NULL,
-      showWhiteSpace           = NULL,
-      showZeros                = NULL,
-      tabSelected              = NULL,
-      topLeftCell              = NULL,
-      view                     = NULL,
-      windowProtection         = NULL,
-      workbookViewId           = NULL,
-      zoomScale                = NULL,
-      zoomScaleNormal          = NULL,
-      zoomScalePageLayoutView  = NULL,
-      zoomScaleSheetLayoutView = NULL
+      color_id                     = NULL,
+      default_grid_color           = NULL,
+      right_to_left                = NULL,
+      show_formulas                = NULL,
+      show_grid_lines              = NULL,
+      show_outline_symbols         = NULL,
+      show_row_col_headers         = NULL,
+      show_ruler                   = NULL,
+      show_white_space             = NULL,
+      show_zeros                   = NULL,
+      tab_selected                 = NULL,
+      top_left_cell                = NULL,
+      view                         = NULL,
+      window_protection            = NULL,
+      workbook_view_id             = NULL,
+      zoom_scale                   = NULL,
+      zoom_scale_normal            = NULL,
+      zoom_scale_page_layout_view  = NULL,
+      zoom_scale_sheet_layout_view = NULL,
+      ...
     ) {
       sheet <- private$get_sheet_index(sheet)
       self$worksheets[[sheet]]$set_sheetview(
-        colorId                  = colorId,
-        defaultGridColor         = defaultGridColor,
-        rightToLeft              = rightToLeft,
-        showFormulas             = showFormulas,
-        showGridLines            = showGridLines,
-        showOutlineSymbols       = showOutlineSymbols,
-        showRowColHeaders        = showRowColHeaders,
-        showRuler                = showRuler,
-        showWhiteSpace           = showWhiteSpace,
-        showZeros                = showZeros,
-        tabSelected              = tabSelected,
-        topLeftCell              = topLeftCell,
-        view                     = view,
-        windowProtection         = windowProtection,
-        workbookViewId           = workbookViewId,
-        zoomScale                = zoomScale,
-        zoomScaleNormal          = zoomScaleNormal,
-        zoomScalePageLayoutView  = zoomScalePageLayoutView,
-        zoomScaleSheetLayoutView = zoomScaleSheetLayoutView
+        color_id                     = color_id,
+        default_grid_color           = default_grid_color,
+        right_to_left                = right_to_left,
+        show_formulas                = show_formulas,
+        show_grid_lines              = show_grid_lines,
+        show_outline_symbols         = show_outline_symbols,
+        show_row_col_headers         = show_row_col_headers,
+        show_ruler                   = show_ruler,
+        show_white_space             = show_white_space,
+        show_zeros                   = show_zeros,
+        tab_selected                 = tab_selected,
+        top_left_cell                = top_left_cell,
+        view                         = view,
+        window_protection            = window_protection,
+        workbook_view_id             = workbook_view_id,
+        zoom_scale                   = zoom_scale,
+        zoom_scale_normal            = zoom_scale_normal,
+        zoom_scale_page_layout_view  = zoom_scale_page_layout_view,
+        zoom_scale_sheet_layout_view = zoom_scale_sheet_layout_view,
+        ...                          = ...
       )
       invisible(self)
+    },
+
+    #' @description add person to workbook
+    #' @param name name
+    #' @param id id
+    #' @param user_id user_id
+    #' @param provider_id provider_id
+    add_person = function(
+      name        = NULL,
+      id          = NULL,
+      user_id     = NULL,
+      provider_id = "None"
+    ) {
+
+      if (is.null(name))    name    <- Sys.getenv("USERNAME", Sys.getenv("USER"))
+      if (is.null(id))      id      <- st_guid()
+      if (is.null(user_id)) user_id <- st_userid()
+
+      xml_person <- xml_node_create(
+        "person",
+        xml_attributes = c(
+          displayName = name,
+          id          = id,
+          userId      = user_id,
+          providerId  = "None"
+        )
+      )
+
+      options("openxlsx2.thread_id" = id)
+
+      if (is.null(self$persons)) {
+        self$persons <- xml_node_create(
+          "personList",
+          xml_attributes = c(
+            `xmlns`   = "http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments",
+            `xmlns:x` = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          )
+        )
+
+        self$append(
+          "workbook.xml.rels",
+          "<Relationship Id=\"rId5\" Type=\"http://schemas.microsoft.com/office/2017/10/relationships/person\" Target=\"persons/person.xml\"/>"
+        )
+
+        self$append(
+          "Content_Types",
+          "<Override PartName=\"/xl/persons/person.xml\" ContentType=\"application/vnd.ms-excel.person+xml\"/>"
+        )
+      }
+
+      self$persons <- xml_add_child(self$persons, xml_person)
+
+      invisible(self)
+    },
+
+    #' description get person
+    #' @param name name
+    get_person = function(name = NULL) {
+      persons <- rbindlist(xml_attr(self$persons, "personList", "person"))
+      if (!is.null(name)) persons <- persons[persons$displayName == name, ]
+      persons
     }
 
   ),
@@ -6690,20 +7086,33 @@ wbWorkbook <- R6::R6Class(
 
       sheet <- as.character(sheet)
       if (has_illegal_chars(sheet)) {
-        stop("illegal characters found in sheet. Please remove. See ?openxlsx::clean_worksheet_name")
+        warning("Fixing: removing illegal characters found in sheet name. See ?openxlsx2::clean_worksheet_name.")
+        sheet <- replace_illegal_chars(sheet)
       }
 
       if (!nzchar(sheet)) {
-        stop("sheet name must contain at least 1 character")
+        warning("Fixing: sheet name must contain at least 1 character.")
+        sheet <- paste("Sheet", length(self$sheet_names) + 1)
       }
 
       if (nchar(sheet) > 31) {
-        stop("sheet names must be <= 31 chars")
+        warning("Fixing: shortening sheet name to 31 characters.")
+        sheet <- stringi::stri_sub(sheet, 1, 31)
+        if (any(duplicated(c(sheet, self$sheet_names))))
+          stop(
+            "Cannot shorten sheet name to a unique string. ",
+            "Please provide a unique sheetname with maximum 31 characters."
+          )
       }
 
       if (tolower(sheet) %in% self$sheet_names) {
-        stop("a sheet with name '", sheet, '"already exists"')
+        warning("Fixing: a sheet with name '", sheet, '"already exists. Creating a unique sheetname"')
+        ## We simply append (1), while spreadsheet software would increase
+        ## the integer as: Sheet, Sheet (1), Sheet (2) etc.
+        sheet <- paste(sheet, "(1)")
       }
+
+      assign("sheet", sheet, parent.frame())
     },
 
     set_current_sheet = function(sheet_index) {
@@ -6795,7 +7204,7 @@ wbWorkbook <- R6::R6Class(
 
     generate_base_core = function() {
       # how do self$datetimeCreated and genBaseCore time differ?
-      self$core <- genBaseCore(creator = self$creator, title = self$title, subject = self$subject, category = self$category)
+      self$core <- genBaseCore(creator = self$creator, title = self$title, subject = self$subject, category = self$category, datetimeCreated = self$datetimeCreated)
       invisible(self)
     },
 
@@ -7421,12 +7830,12 @@ wbWorkbook <- R6::R6Class(
 
       if (is.null(self$workbook$bookViews))
         self$set_bookview(
-          xWindow      = 0,
-          yWindow      = 0,
-          windowWidth  = 13125,
-          windowHeight = 13125,
-          firstSheet   = visible_sheet_index - 1L,
-          activeTab    = visible_sheet_index - 1L
+          x_window      = 0,
+          y_window      = 0,
+          window_width  = 13125,
+          window_height = 13125,
+          first_sheet   = visible_sheet_index - 1L,
+          active_tab    = visible_sheet_index - 1L
         )
 
       # Failsafe: hidden sheet can not be selected.

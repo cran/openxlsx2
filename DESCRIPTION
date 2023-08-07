@@ -1,7 +1,7 @@
 Type: Package
 Package: openxlsx2
 Title: Read, Write and Edit 'xlsx' Files
-Version: 0.7.1
+Version: 0.8
 Language: en-US
 Authors@R: c(
   person("Jordan Mark", "Barbone", email = "jmbarbone@gmail.com", role = "aut", comment = c(ORCID = "0000-0001-9788-3628")),
@@ -13,13 +13,14 @@ Description: Simplifies the creation of 'xlsx' files by
     providing a high level interface to writing, styling and editing
     worksheets.
 License: MIT + file LICENSE
-URL: https://github.com/JanMarvin/openxlsx2
+URL: https://janmarvin.github.io/openxlsx2/,
+        https://github.com/JanMarvin/openxlsx2
 BugReports: https://github.com/JanMarvin/openxlsx2/issues
 Depends: R (>= 3.5.0)
 Imports: R6, Rcpp, grDevices, magrittr, stringi, utils, zip
 LinkingTo: Rcpp
-Suggests: covr, ggplot2, knitr, mschart (>= 0.4), rmarkdown, roxygen2,
-        rvg, testthat (>= 3.0.0), waldo
+Suggests: ggplot2, knitr, mschart (>= 0.4), rmarkdown, rvg, testthat
+        (>= 3.0.0), waldo
 VignetteBuilder: knitr
 Encoding: UTF-8
 RoxygenNote: 7.2.3
@@ -27,11 +28,11 @@ Config/testthat/edition: 3
 Config/testthat/parallel: false
 Config/testthat/start-first: aaa
 NeedsCompilation: yes
-Packaged: 2023-06-30 07:37:11 UTC; janmarvingarbuszus
+Packaged: 2023-08-07 09:25:56 UTC; jmg
 Author: Jordan Mark Barbone [aut] (<https://orcid.org/0000-0001-9788-3628>),
   Jan Marvin Garbuszus [aut, cre],
   openxlsx authors [cph] (openxlsx package),
   Arseny Kapoulkine [ctb, cph] (Author of included pugixml code)
 Maintainer: Jan Marvin Garbuszus <jan.garbuszus@ruhr-uni-bochum.de>
 Repository: CRAN
-Date/Publication: 2023-06-30 08:00:02 UTC
+Date/Publication: 2023-08-07 10:20:02 UTC

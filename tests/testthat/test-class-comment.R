@@ -94,7 +94,7 @@ test_that("wb_add_comment", {
 
   wb2 <- wb_workbook() %>%
     wb_add_worksheet() %>%
-    wb_add_comment(col = "A", row = 1, comment = c1)
+    wb_add_comment(dims = "A1", comment = c1)
 
   expect_equal(wb$comments, wb2$comments)
 
@@ -114,10 +114,17 @@ test_that("wb_remove_comment", {
     add_comment(dims = "A1", comment = c1)$
     remove_comment(dims = "A1")
 
-  wb2 <- wb_workbook() %>%
-    wb_add_worksheet() %>%
-    wb_add_comment(col = "A", row = 1, comment = c1) %>%
-    wb_remove_comment(col = "A", row = 1)
+  # deprecated col / row code
+  wb2 <- wb_workbook() %>% wb_add_worksheet()
+  expect_warning(
+    wb2 <- wb2 %>%
+      wb_add_comment(col = "A", row = 1, comment = c1),
+    "'col/row' is deprecated."
+  )
+  expect_warning(
+    wb2 <- wb2 %>% wb_remove_comment(col = "A", row = 1),
+    "'col/row/gridExpand' is deprecated."
+  )
 
   expect_equal(wb$comments, wb2$comments)
 
@@ -141,7 +148,7 @@ test_that("removing comment sheet works", {
 
   wb <- wb_workbook()$
     add_worksheet("Sheet 1")$
-    add_comment(1, col = "B", row = 10, comment = c1)$
+    add_comment(dims = "B10", comment = c1)$
     add_worksheet()$
     remove_worksheet(1)
 
@@ -165,6 +172,79 @@ test_that("fmt_txt in comment", {
     "<t xml:space=\"preserve\">Hello </t>", "<t>World</t>"
   )
   got <- wb$comments[[1]][[1]]$comment
+  expect_equal(exp, got)
+
+})
+
+test_that("threaded comments work", {
+
+  wb <- wb_workbook()$add_worksheet()
+
+  wb$add_person(name = "Kirk")
+  wb$add_person(name = "Uhura")
+  wb$add_person(name = "Spock")
+  wb$add_person(name = "Scotty")
+
+  kirk_id <- wb$get_person(name = "Kirk")$id
+  uhura_id <- wb$get_person(name = "Uhura")$id
+  spock_id <- wb$get_person(name = "Spock")$id
+  scotty_id <- wb$get_person(name = "Scotty")$id
+
+  # write a comment to a thread, reply to one and solve some
+  wb <- wb %>%
+    wb_add_thread(dims = "A1", comment = "wow it works!", person_id = kirk_id) %>%
+    wb_add_thread(dims = "A2", comment = "indeed", person_id = uhura_id, resolve = TRUE) %>%
+    wb_add_thread(dims = "A1", comment = "fascinating", person_id = spock_id, reply = TRUE)
+
+  exp <- data.frame(
+    ref = c("A1", "A1"),
+    displayName = c("Kirk", "Spock"),
+    text = c("wow it works!", "fascinating"),
+    done = c("0", "")
+  )
+  got <- wb_get_thread(wb)[, -1]
+  expect_equal(exp, got)
+
+  exp <- "[Threaded comment]\n\nYour spreadsheet software allows you to read this threaded comment; however, any edits to it will get removed if the file is opened in a newer version of a certain spreadsheet software.\n\nComment: wow it works!\nReplie:fascinating"
+  got <- wb_get_comment(wb)$comment
+  expect_equal(exp, got)
+
+  # start a new thread
+  wb <- wb %>%
+    wb_add_thread(dims = "A1", comment = "oops", person_id = kirk_id)
+
+  exp <- data.frame(
+    ref = "A1",
+    displayName = "Kirk",
+    text = "oops",
+    done = "0"
+  )
+  got <- wb_get_thread(wb)[, -1]
+  expect_equal(exp, got)
+
+  wb <- wb %>%
+    wb_add_worksheet() %>%
+    wb_add_thread(dims = "A1", comment = "hmpf", person_id = scotty_id)
+
+  exp <- data.frame(
+    ref = "A1",
+    displayName = "Scotty",
+    text = "hmpf",
+    done = "0"
+  )
+  got <- wb_get_thread(wb)[, -1]
+  expect_equal(exp, got)
+
+})
+
+test_that("thread option works", {
+
+  wb <- wb_workbook()$add_worksheet()
+  wb$add_person(name = "Kirk")
+  wb <- wb %>% wb_add_thread(comment = "works")
+
+  exp <- "works"
+  got <- wb_get_thread(wb)$text
   expect_equal(exp, got)
 
 })

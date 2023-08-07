@@ -2,8 +2,6 @@
 % Please edit documentation in R/class-comment.R, R/class-workbook-wrappers.R
 \name{create_comment}
 \alias{create_comment}
-\alias{write_comment}
-\alias{remove_comment}
 \alias{wb_add_comment}
 \alias{wb_remove_comment}
 \title{Create, write and remove comments}
@@ -17,51 +15,18 @@ create_comment(
   height = 4
 )
 
-write_comment(
-  wb,
-  sheet,
-  col = NULL,
-  row = NULL,
-  comment,
-  xy = NULL,
-  dims = rowcol_to_dim(row, col)
-)
+wb_add_comment(wb, sheet = current_sheet(), dims = "A1", comment, ...)
 
-remove_comment(
-  wb,
-  sheet,
-  col = NULL,
-  row = NULL,
-  gridExpand = TRUE,
-  dims = NULL
-)
-
-wb_add_comment(
-  wb,
-  sheet = current_sheet(),
-  col = NULL,
-  row = NULL,
-  dims = rowcol_to_dim(row, col),
-  comment
-)
-
-wb_remove_comment(
-  wb,
-  sheet = current_sheet(),
-  col = NULL,
-  row = NULL,
-  dims = rowcol_to_dims(row, col),
-  gridExpand = TRUE
-)
+wb_remove_comment(wb, sheet = current_sheet(), dims = "A1", ...)
 }
 \arguments{
 \item{text}{Comment text. Character vector.}
 
-\item{author}{Author of comment. Character vector of length 1}
+\item{author}{Author of comment. A string.}
 
 \item{style}{A Style object or list of style objects the same length as comment vector.}
 
-\item{visible}{TRUE or FALSE. Is comment visible.}
+\item{visible}{\code{TRUE} or \code{FALSE}. Is comment visible?}
 
 \item{width}{Textbox integer width in number of cells}
 
@@ -71,30 +36,21 @@ wb_remove_comment(
 
 \item{sheet}{A worksheet of the workbook}
 
-\item{col}{A column to apply the comment}
-
-\item{row}{A row to apply the comment}
+\item{dims}{Optional row and column as spreadsheet dimension, e.g. "A1"}
 
 \item{comment}{A comment to apply to the worksheet}
 
-\item{xy}{An alternative to specifying \code{col} and
-\code{row} individually.  A vector of the form
-\code{c(col, row)}.}
-
-\item{dims}{Optional row and column as spreadsheet dimension, e.g. "A1"}
-
-\item{gridExpand}{Remove all comments inside the grid. Similar to dims "A1:B2"}
+\item{...}{additional arguments}
 }
 \value{
-The \code{wbWorkbook} object
-
 The \code{wbWorkbook} object
 }
 \description{
 The comment functions (create, write and remove) allow the
-modification of comments. In newer Excels they are called notes, while they
-are called comments in openxml. Modification of what Excel now calls comment
-(openxml calls them threadedComments) is not yet possible
+modification of comments. In newer spreadsheet software they are called
+notes, while they are called comments in openxml. Modification of what
+newer spreadsheet software now calls comment is possible via
+\code{\link[=wb_add_thread]{wb_add_thread()}}.
 }
 \examples{
 wb <- wb_workbook()
@@ -102,19 +58,22 @@ wb$add_worksheet("Sheet 1")
 
 # write comment without author
 c1 <- create_comment(text = "this is a comment", author = "")
-write_comment(wb, 1, col = "B", row = 10, comment = c1)
+wb$add_comment(dims = "B10", comment = c1)
 
 # Write another comment with author information
 c2 <- create_comment(text = "this is another comment", author = "Marco Polo")
-write_comment(wb, 1, col = "C", row = 10, comment = c2)
+wb$add_comment(sheet = 1, dims = "C10", comment = c2)
 
 # write a styled comment with system author
 s1 <- create_font(b = "true", color = wb_color(hex = "FFFF0000"), sz = "12")
 s2 <- create_font(color = wb_color(hex = "FF000000"), sz = "9")
 c3 <- create_comment(text = c("This Part Bold red\n\n", "This part black"), style = c(s1, s2))
 
-write_comment(wb, 1, col = 6, row = 3, comment = c3)
+wb$add_comment(sheet = 1, dims = wb_dims(3, 6), comment = c3)
 
-# remove the first comment
-remove_comment(wb, 1, col = "B", row = 10)
+# remove the first comment c1
+wb$remove_comment(1, dims = "B10")
+}
+\seealso{
+\code{\link[=wb_add_thread]{wb_add_thread()}}
 }

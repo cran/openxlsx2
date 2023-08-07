@@ -9,7 +9,7 @@ test_that("write_formula", {
          c_t = "", c_cm = "",
          c_ph = "", c_vm = "",
          v = "", f = "SUM(C2:C11*D2:D11)",
-         f_t = "array", f_ref = "E2:E2",
+         f_t = "array", f_ref = "E2",
          f_ca = "", f_si = "",
          is = "", typ = "11"),
     row.names = 23L, class = "data.frame")
@@ -18,7 +18,7 @@ test_that("write_formula", {
   wb <- wb_workbook()
   wb <- wb_add_worksheet(wb, "df")
   wb$add_data("df", df, startCol = "C")
-  write_formula(wb, "df", startCol = "E", startRow = "2",
+  write_formula(wb, "df", startCol = "E", startRow = 2,
                x = "SUM(C2:C11*D2:D11)",
                array = TRUE)
 
@@ -31,7 +31,7 @@ test_that("write_formula", {
   # write formula first add data later
   wb <- wb_workbook()
   wb <- wb_add_worksheet(wb, "df")
-  write_formula(wb, "df", startCol = "E", startRow = "2",
+  write_formula(wb, "df", startCol = "E", startRow = 2,
                x = "SUM(C2:C11*D2:D11)",
                array = TRUE)
   wb$add_data("df", df, startCol = "C")
@@ -113,7 +113,7 @@ test_that("update_cells", {
     add_worksheet("df")$
     add_data(x = df, startCol = "C")
   # TODO add_formula()
-  write_formula(wb, "df", startCol = "E", startRow = "2",
+  write_formula(wb, "df", startCol = "E", startRow = 2,
                 x = "SUM(C2:C11*D2:D11)",
                 array = TRUE)
   write_formula(wb, "df", x = "C3 + D3", startCol = "E", startRow = 3)

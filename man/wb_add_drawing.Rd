@@ -7,22 +7,25 @@
 wb_add_drawing(
   wb,
   sheet = current_sheet(),
+  dims = "A1",
   xml,
-  dims = NULL,
-  colOffset = 0,
-  rowOffset = 0
+  col_offset = 0,
+  row_offset = 0,
+  ...
 )
 }
 \arguments{
-\item{wb}{a wbWorkbook}
+\item{wb}{a \code{wbWorkbook}}
 
 \item{sheet}{a sheet in the workbook}
 
+\item{dims}{the dimension where the drawing is added. Can be \code{NULL}}
+
 \item{xml}{the drawing xml as character or file}
 
-\item{dims}{the dimension where the drawing is added. Can be NULL}
+\item{col_offset, row_offset}{offsets for column and row}
 
-\item{colOffset, rowOffset}{offsets for column and row}
+\item{...}{additional arguments}
 }
 \description{
 add drawings to workbook
@@ -42,4 +45,7 @@ wb <- wb_workbook()$
   add_drawing(xml = tmp)$
   add_drawing(xml = tmp, dims = NULL)
 }
+}
+\seealso{
+\code{\link[=wb_add_chart_xml]{wb_add_chart_xml()}} \code{\link[=wb_add_image]{wb_add_image()}} \code{\link[=wb_add_mschart]{wb_add_mschart()}} \code{\link[=wb_add_plot]{wb_add_plot()}}
 }
