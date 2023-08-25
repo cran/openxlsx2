@@ -198,7 +198,6 @@ update_cell <- function(x, wb, sheet, cell, colNames = FALSE,
 #'
 #' wb$add_worksheet("sheet4")
 #' write_data2(wb, "sheet4", as.data.frame(Titanic), startRow = 2, startCol = 2)
-#' @keywords internal
 #' @noRd
 write_data2 <- function(
     wb,
@@ -310,8 +309,8 @@ write_data2 <- function(
       stop("name cannot look like a cell reference.")
     }
 
-    sheet_name <- wb$sheet_names[[sheetno]]
-    if (grepl(" ", sheet_name)) sheet_name <- shQuote(sheet_name, "sh")
+    sheet_name <- wb$get_sheet_names(escape = TRUE)[[sheetno]]
+    if (grepl("[^A-Za-z0-9]", sheet_name)) sheet_name <- shQuote(sheet_name, "sh")
 
     sheet_dim <- paste0(sheet_name, "!", dims)
 
@@ -728,7 +727,7 @@ write_data_table <- function(
   # force with globalenv() options
   x <- force(x)
 
-  op <- openxlsx2_options()
+  op <- default_save_opt()
   on.exit(options(op), add = TRUE)
 
   if (!is.null(dims)) {
@@ -827,7 +826,7 @@ write_data_table <- function(
       wb$worksheets[[sheet]]$autoFilter <- sprintf('<autoFilter ref="%s"/>', ref)
 
       l <- int2col(unlist(coords[, 2]))
-      dfn <- sprintf("'%s'!%s", wb$get_sheet_names()[sheet], stri_join("$", l, "$", coords[, 1], collapse = ":"))
+      dfn <- sprintf("'%s'!%s", wb$get_sheet_names(escape = TRUE)[sheet], stri_join("$", l, "$", coords[, 1], collapse = ":"))
 
       dn <- sprintf('<definedName name="_xlnm._FilterDatabase" localSheetId="%s" hidden="1">%s</definedName>', sheet - 1L, dfn)
 
@@ -946,84 +945,10 @@ write_data_table <- function(
 # `write_data()` ---------------------------------------------------------------
 #' Write an object to a worksheet
 #'
-#' Write an object to worksheet with optional styling. Use [wb_add_data()] in new code.
+#' Use [wb_add_data()] or [write_xlsx()] in new code.
 #'
-#' Formulae written using write_formula to a Workbook object will not get picked up by read_xlsx().
-#' This is because only the formula is written and left to Excel to evaluate the formula when the file is opened in Excel.
-#' The string `"_openxlsx_NA"` is reserved for `openxlsx2`. If the data frame contains this string, the output will be broken.
-#'
-#' @param wb A Workbook object containing a worksheet.
-#' @param sheet The worksheet to write to. Can be the worksheet index or name.
-#' @param x Object to be written. For classes supported look at the examples.
-#' @param start_col A vector specifying the starting column to write to.
-#' @param start_row A vector specifying the starting row to write to.
-#' @param dims Spreadsheet dimensions that will determine startCol and startRow: "A1", "A1:B2", "A:B"
-#' @param array A bool if the function written is of type array
-#' @param col_names If `TRUE`, column names of x are written.
-#' @param row_names If `TRUE`, data.frame row names of x are written.
-#' @param with_filter If `TRUE`, add filters to the column name row. NOTE can only have one filter per worksheet.
-#' @param sep Only applies to list columns. The separator used to collapse list columns to a character vector e.g. sapply(x$list_column, paste, collapse = sep).
-#' @param name If not NULL, a named region is defined.
-#' @param apply_cell_style apply styles when writing on the sheet
-#' @param remove_cell_style if writing into existing cells, should the cell style be removed?
-#' @param na.strings Value used for replacing `NA` values from `x`. Default
-#'   `na_strings()` uses the special `#N/A` value within the workbook.
-#' @param inline_strings write characters as inline strings
-#' @param ... additional arguments
-#' @seealso [wb_add_data()], [wb_add_data_table()]
+#' @inheritParams wb_add_data
 #' @return invisible(0)
-# TODO examples them from here, as docs of `wb_add_data()` and `write_data()` are now separated.
-#' @examples
-#' ## See formatting vignette for further examples.
-#'
-#' ## Options for default styling (These are the defaults)
-#' options("openxlsx2.dateFormat" = "mm/dd/yyyy")
-#' options("openxlsx2.datetimeFormat" = "yyyy-mm-dd hh:mm:ss")
-#' options("openxlsx2.numFmt" = NULL)
-#'
-#' #############################################################################
-#' ## Create Workbook object and add worksheets
-#' wb <- wb_workbook()
-#'
-#' ## Add worksheets
-#' wb$add_worksheet("Cars")
-#' wb$add_worksheet("Formula")
-#'
-#' x <- mtcars[1:6, ]
-#' wb$add_data("Cars", x, startCol = 2, startRow = 3, rowNames = TRUE)
-#'
-#' #############################################################################
-#' ## Hyperlinks
-#' ## - vectors/columns with class 'hyperlink' are written as hyperlinks'
-#'
-#' v <- rep("https://CRAN.R-project.org/", 4)
-#' names(v) <- paste0("Hyperlink", 1:4) # Optional: names will be used as display text
-#' class(v) <- "hyperlink"
-#' wb$add_data("Cars", x = v, dims = c("B32"))
-#'
-#' #############################################################################
-#' ## Formulas
-#' ## - vectors/columns with class 'formula' are written as formulas'
-#'
-#' df <- data.frame(
-#'   x = 1:3, y = 1:3,
-#'   z = paste(paste0("A", 1:3 + 1L), paste0("B", 1:3 + 1L), sep = "+"),
-#'   stringsAsFactors = FALSE
-#' )
-#'
-#' class(df$z) <- c(class(df$z), "formula")
-#'
-#' wb$add_data(sheet = "Formula", x = df)
-#'
-#' #############################################################################
-#' # update cell range and add mtcars
-#' xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
-#' wb2 <- wb_load(xlsxFile)
-#'
-#' # read dataset with inlinestr
-#' wb_to_df(wb2)
-#' write_data(wb2, 1, mtcars, startCol = 4, startRow = 4)
-#' wb_to_df(wb2)
 #' @export
 #' @keywords internal
 write_data <- function(
@@ -1079,90 +1004,10 @@ write_data <- function(
 #' Write a character vector as an Excel Formula
 #'
 #' Write a a character vector containing Excel formula to a worksheet.
-#' Use [wb_add_formula()] or `add_formula()` in new code
+#' Use [wb_add_formula()] or `add_formula()` in new code. This function is meant
+#' for internal use.
 #'
-#' @details
-#' Currently only the English version of functions are supported. Please don't use the local translation.
-#' The examples below show a small list of possible formulas:
-#' * SUM(B2:B4)
-#' * AVERAGE(B2:B4)
-#' * MIN(B2:B4)
-#' * MAX(B2:B4)
-#' * ...
-#'
-#' @param wb A Workbook object containing a worksheet.
-#' @param sheet The worksheet to write to. Can be the worksheet index or name.
-#' @param x A character vector.
-#' @param dims Spreadsheet dimensions that will determine startCol and startRow: "A1", "A1:B2", "A:B"
-#' @param start_col A vector specifying the starting column to write to.
-#' @param start_row A vector specifying the starting row to write to.
-#' @param array A bool if the function written is of type array
-#' @param cm A bool if the function is of type cm (array with hidden curly braces)
-#' @param apply_cell_style apply styles when writing on the sheet
-#' @param remove_cell_style if writing into existing cells, should the cell style be removed?
-#' @param ... additional arguments
-#' @examples
-#' ## There are 3 ways to write a formula
-#'
-#' wb <- wb_workbook()
-#' wb$add_worksheet("Sheet 1")
-#' wb$add_data("Sheet 1", x = iris)
-#'
-#' ## SEE `int2col()` to convert int to Excel column label
-#'
-#' ## 1. -  As a character vector using write_formula
-#'
-#' v <- c("SUM(A2:A151)", "AVERAGE(B2:B151)") ## skip header row
-#' write_formula(wb, sheet = 1, x = v, startCol = 10, startRow = 2)
-#' write_formula(wb, 1, x = "A2 + B2", startCol = 10, startRow = 10)
-#'
-#'
-#' ## 2. - As a data.frame column with class "formula" using write_data
-#'
-#' df <- data.frame(
-#'   x = 1:3,
-#'   y = 1:3,
-#'   z = paste(paste0("A", 1:3 + 1L), paste0("B", 1:3 + 1L), sep = " + "),
-#'   z2 = sprintf("ADDRESS(1,%s)", 1:3),
-#'   stringsAsFactors = FALSE
-#' )
-#'
-#' class(df$z) <- c(class(df$z), "formula")
-#' class(df$z2) <- c(class(df$z2), "formula")
-#'
-#' wb$add_worksheet("Sheet 2")
-#' wb$add_data(sheet = 2, x = df)
-#'
-#'
-#' ## 3. - As a vector with class "formula" using write_data
-#'
-#' v2 <- c("SUM(A2:A4)", "AVERAGE(B2:B4)", "MEDIAN(C2:C4)")
-#' class(v2) <- c(class(v2), "formula")
-#'
-#' wb$add_data(sheet = 2, x = v2, startCol = 10, startRow = 2)
-#'
-#'
-#' ## 4. - Writing internal hyperlinks
-#'
-#' wb <- wb_workbook()
-#' wb$add_worksheet("Sheet1")
-#' wb$add_worksheet("Sheet2")
-#' write_formula(wb, "Sheet1", x = '=HYPERLINK("#Sheet2!B3", "Text to Display - Link to Sheet2")')
-#'
-#'
-#' ## 5. - Writing array formulas
-#'
-#' set.seed(123)
-#' df <- data.frame(C = rnorm(10), D = rnorm(10))
-#'
-#' wb <- wb_workbook()
-#' wb <- wb_add_worksheet(wb, "df")
-#'
-#' wb$add_data("df", df, startCol = "C")
-#'
-#' write_formula(wb, "df", startCol = "E", startRow = 2,
-#'              x = "SUM(C2:C11*D2:D11)",
-#'              array = TRUE)
+#' @inheritParams wb_add_formula
 #' @export
 #' @keywords internal
 write_formula <- function(
@@ -1269,127 +1114,9 @@ write_formula <- function(
 #' Write to a worksheet as an Excel table
 #'
 #' Write to a worksheet and format as an Excel table. Use [wb_add_data_table()] in new code.
-#'
-#' @param wb A Workbook object containing a worksheet.
-#' @param sheet The worksheet to write to. Can be the worksheet index or name.
-#' @param x A data frame.
-#' @param start_col A vector specifying the starting column to write df
-#' @param start_row A vector specifying the starting row to write df
-#' @param dims Spreadsheet dimensions that will determine startCol and startRow: "A1", "A1:B2", "A:B"
-#' @param col_names If `TRUE`, column names of x are written.
-#' @param row_names If `TRUE`, row names of x are written.
-#' @param table_style Any excel table style name or "none" (see "formatting" vignette).
-#' @param table_name name of table in workbook. The table name must be unique.
-#' @param with_filter If `TRUE`, columns with have filters in the first row.
-#' @param sep Only applies to list columns. The separator used to collapse list columns to a character vector e.g. sapply(x$list_column, paste, collapse = sep).
-#' \cr\cr
-#' \cr**The below options correspond to Excel table options:**
-#' \cr
-#' \if{html}{\figure{tableoptions.png}{options: width="40\%" alt="Figure: table_options.png"}}
-#' \if{latex}{\figure{tableoptions.pdf}{options: width=7cm}}
-#'
-#' @param first_column logical. If TRUE, the first column is bold
-#' @param last_column logical. If TRUE, the last column is bold
-#' @param banded_rows logical. If TRUE, rows are color banded
-#' @param banded_cols logical. If TRUE, the columns are color banded
-#' @param apply_cell_style apply styles when writing on the sheet
-#' @param remove_cell_style if writing into existing cells, should the cell style be removed?
-#' @param na.strings Value used for replacing `NA` values from `x`. Default
-#'   `na_strings()` uses the special `#N/A` value within the workbook.
-#' @param inline_strings write characters as inline strings
-#' @param ... additional arguments
-#' @details columns of x with class Date/POSIXt, currency, accounting,
-#' hyperlink, percentage are automatically styled as dates, currency, accounting,
-#' hyperlinks, percentages respectively.
-#' The string `"_openxlsx_NA"` is reserved for `openxlsx2`. If the data frame
-#' contains this string, the output will be broken.
-#' @seealso
-#'   [wb_add_worksheet()]
-#'   [wb_add_data_table()]
-#'   [wb_remove_tables()]
-#'   [wb_get_tables()]
-#' @examples
-#' ## see package vignettes for further examples.
-#'
-#' #####################################################################################
-#' ## Create Workbook object and add worksheets
-#' wb <- wb_workbook()
-#' wb$add_worksheet("S1")
-#' wb$add_worksheet("S2")
-#' wb$add_worksheet("S3")
-#'
-#' #####################################################################################
-#' ## -- write data.frame as an Excel table with column filters
-#' ## -- default table style is "TableStyleMedium2"
-#'
-#' wb$add_data_table("S1", x = iris)
-#'
-#' wb$add_data_table("S2",
-#'   x = mtcars, dims = c("B3"), rowNames = TRUE,
-#'   tableStyle = "TableStyleLight9"
-#' )
-#'
-#' df <- data.frame(
-#'   "Date" = Sys.Date() - 0:19,
-#'   "T" = TRUE, "F" = FALSE,
-#'   "Time" = Sys.time() - 0:19 * 60 * 60,
-#'   "Cash" = paste("$", 1:20), "Cash2" = 31:50,
-#'   "hLink" = "https://CRAN.R-project.org/",
-#'   "Percentage" = seq(0, 1, length.out = 20),
-#'   "TinyNumbers" = runif(20) / 1E9, stringsAsFactors = FALSE
-#' )
-#'
-#' ## openxlsx will apply default Excel styling for these classes
-#' class(df$Cash) <- c(class(df$Cash), "currency")
-#' class(df$Cash2) <- c(class(df$Cash2), "accounting")
-#' class(df$hLink) <- "hyperlink"
-#' class(df$Percentage) <- c(class(df$Percentage), "percentage")
-#' class(df$TinyNumbers) <- c(class(df$TinyNumbers), "scientific")
-#'
-#' wb$add_data_table("S3", x = df, startRow = 4, rowNames = TRUE, tableStyle = "TableStyleMedium9")
-#'
-#' #####################################################################################
-#' ## Additional Header Styling and remove column filters
-#'
-#' write_datatable(wb,
-#'   sheet = 1,
-#'   x = iris,
-#'   startCol = 7,
-#'   withFilter = FALSE,
-#'   firstColumn = TRUE,
-#'   lastColumn	= TRUE,
-#'   bandedRows = TRUE,
-#'   bandedCols = TRUE
-#' )
-#'
-#' #####################################################################################
-#' ## Pre-defined table styles gallery
-#'
-#' wb <- wb_workbook(paste0("tableStylesGallery.xlsx"))
-#' wb$add_worksheet("Style Samples")
-#' for (i in 1:21) {
-#'   style <- paste0("TableStyleLight", i)
-#'   write_datatable(wb,
-#'     x = data.frame(style), sheet = 1,
-#'     tableStyle = style, startRow = 1, startCol = i * 3 - 2
-#'   )
-#' }
-#'
-#' for (i in 1:28) {
-#'   style <- paste0("TableStyleMedium", i)
-#'   write_datatable(wb,
-#'     x = data.frame(style), sheet = 1,
-#'     tableStyle = style, startRow = 4, startCol = i * 3 - 2
-#'   )
-#' }
-#'
-#' for (i in 1:11) {
-#'   style <- paste0("TableStyleDark", i)
-#'   write_datatable(wb,
-#'     x = data.frame(style), sheet = 1,
-#'     tableStyle = style, startRow = 7, startCol = i * 3 - 2
-#'   )
-#' }
+#' This function may not be exported
+#' @inheritParams wb_add_data_table
+#' @inherit wb_add_data_table details
 #' @export
 #' @keywords internal
 write_datatable <- function(

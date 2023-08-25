@@ -15,7 +15,7 @@ wb_workbook(
 )
 }
 \arguments{
-\item{creator}{Creator of the workbook (your name). Defaults to login username}
+\item{creator}{Creator of the workbook (your name). Defaults to login username or \code{options("openxlsx2.creator")} if set.}
 
 \item{title, subject, category}{Workbook property, a string.}
 
@@ -27,10 +27,10 @@ See \strong{Details} for options.}
 \item{...}{additional arguments}
 }
 \value{
-A \link{wbWorkbook} object
+A \code{wbWorkbook} object
 }
 \description{
-Create a new Workbook object
+Initialize a \link{wbWorkbook} object. You can set workbook properties as well.
 }
 \details{
 \code{theme} can be one of
@@ -54,22 +54,22 @@ wb <- wb_workbook(
 }
 \seealso{
 Other workbook wrappers: 
+\code{\link{base_font-wb}},
+\code{\link{col_widths-wb}},
+\code{\link{creators-wb}},
+\code{\link{grouping-wb}},
+\code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
 \code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_worksheet}()},
-\code{\link{wb_base_font}},
 \code{\link{wb_clone_worksheet}()},
-\code{\link{wb_col_widths}},
 \code{\link{wb_copy_cells}()},
-\code{\link{wb_creators}},
 \code{\link{wb_freeze_pane}()},
-\code{\link{wb_grouping}},
 \code{\link{wb_merge_cells}()},
 \code{\link{wb_save}()},
-\code{\link{wb_set_last_modified_by}()},
-\code{\link{wb_set_row_heights}()}
+\code{\link{wb_set_last_modified_by}()}
 }
 \concept{workbook wrappers}

@@ -2,54 +2,55 @@
 % Please edit documentation in R/class-workbook-wrappers.R
 \name{wb_clone_worksheet}
 \alias{wb_clone_worksheet}
-\title{Clone a worksheet to a workbook}
+\title{Create copies of a worksheet within a workbook}
 \usage{
 wb_clone_worksheet(wb, old = current_sheet(), new = next_sheet())
 }
 \arguments{
-\item{wb}{A \link{wbWorkbook} object}
+\item{wb}{A \code{wbWorkbook} object}
 
 \item{old}{Name of existing worksheet to copy}
 
-\item{new}{Name of New worksheet to create}
+\item{new}{Name of the new worksheet to create}
 }
 \value{
-The \code{wb} object
+The \code{wbWorkbook} object, invisibly.
 }
 \description{
-Clone a worksheet to a Workbook object
-}
-\details{
+Create a copy of a worksheet in the same \code{wbWorkbook} object.
+
 Cloning is possible only to a limited extent. References to sheet names in
 formulas, charts, pivot tables, etc. may not be updated. Some elements like
 named ranges and slicers cannot be cloned yet.
 }
 \examples{
 # Create a new workbook
-wb <- wb_workbook("Fred")
+wb <- wb_workbook()
 
 # Add worksheets
 wb$add_worksheet("Sheet 1")
-wb$clone_worksheet("Sheet 1", "Sheet 2")
+wb$clone_worksheet("Sheet 1", new = "Sheet 2")
+# Take advantage of waiver functions
+wb$clone_worksheet(old = "Sheet 1")
 }
 \seealso{
 Other workbook wrappers: 
+\code{\link{base_font-wb}},
+\code{\link{col_widths-wb}},
+\code{\link{creators-wb}},
+\code{\link{grouping-wb}},
+\code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
 \code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_worksheet}()},
-\code{\link{wb_base_font}},
-\code{\link{wb_col_widths}},
 \code{\link{wb_copy_cells}()},
-\code{\link{wb_creators}},
 \code{\link{wb_freeze_pane}()},
-\code{\link{wb_grouping}},
 \code{\link{wb_merge_cells}()},
 \code{\link{wb_save}()},
 \code{\link{wb_set_last_modified_by}()},
-\code{\link{wb_set_row_heights}()},
 \code{\link{wb_workbook}()}
 }
 \concept{workbook wrappers}

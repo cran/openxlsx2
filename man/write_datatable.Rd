@@ -33,45 +33,47 @@ write_datatable(
 
 \item{sheet}{The worksheet to write to. Can be the worksheet index or name.}
 
-\item{x}{A data frame.}
+\item{x}{A data frame}
 
-\item{dims}{Spreadsheet dimensions that will determine startCol and startRow: "A1", "A1:B2", "A:B"}
+\item{dims}{Spreadsheet cell range that will determine \code{start_col} and \code{start_row}: "A1", "A1:B2", "A:B"}
 
-\item{start_col}{A vector specifying the starting column to write df}
+\item{start_col}{A vector specifying the starting column to write \code{x} to.}
 
-\item{start_row}{A vector specifying the starting row to write df}
+\item{start_row}{A vector specifying the starting row to write \code{x} to.}
 
-\item{col_names}{If \code{TRUE}, column names of x are written.}
+\item{col_names}{If \code{TRUE}, column names of \code{x} are written.}
 
-\item{row_names}{If \code{TRUE}, row names of x are written.}
+\item{row_names}{If \code{TRUE}, the row names of \code{x} are written.}
 
-\item{table_style}{Any excel table style name or "none" (see "formatting" vignette).}
+\item{table_style}{Any table style name or "none" (see \code{vignette("openxlsx2_style_manual")})}
 
-\item{table_name}{name of table in workbook. The table name must be unique.}
+\item{table_name}{Name of table in workbook. The table name must be unique.}
 
 \item{with_filter}{If \code{TRUE}, columns with have filters in the first row.}
 
-\item{sep}{Only applies to list columns. The separator used to collapse list columns to a character vector e.g. sapply(x$list_column, paste, collapse = sep).
+\item{sep}{Only applies to list columns. The separator used to collapse list
+columns to a character vector e.g.
+\code{sapply(x$list_column, paste, collapse = sep)}.
 \cr\cr
 \cr\strong{The below options correspond to Excel table options:}
 \cr
 \if{html}{\figure{tableoptions.png}{options: width="40\%" alt="Figure: table_options.png"}}
 \if{latex}{\figure{tableoptions.pdf}{options: width=7cm}}}
 
-\item{first_column}{logical. If TRUE, the first column is bold}
+\item{first_column}{logical. If \code{TRUE}, the first column is bold.}
 
-\item{last_column}{logical. If TRUE, the last column is bold}
+\item{last_column}{logical. If \code{TRUE}, the last column is bold.}
 
-\item{banded_rows}{logical. If TRUE, rows are color banded}
+\item{banded_rows}{logical. If \code{TRUE}, rows are color banded.}
 
-\item{banded_cols}{logical. If TRUE, the columns are color banded}
+\item{banded_cols}{logical. If \code{TRUE}, the columns are color banded.}
 
-\item{apply_cell_style}{apply styles when writing on the sheet}
+\item{apply_cell_style}{Should we write cell styles to the workbook}
 
-\item{remove_cell_style}{if writing into existing cells, should the cell style be removed?}
+\item{remove_cell_style}{keep the cell style?}
 
 \item{na.strings}{Value used for replacing \code{NA} values from \code{x}. Default
-\code{na_strings()} uses the special \verb{#N/A} value within the workbook.}
+\code{\link[=na_strings]{na_strings()}} uses the special \verb{#N/A} value within the workbook.}
 
 \item{inline_strings}{write characters as inline strings}
 
@@ -79,101 +81,14 @@ write_datatable(
 }
 \description{
 Write to a worksheet and format as an Excel table. Use \code{\link[=wb_add_data_table]{wb_add_data_table()}} in new code.
+This function may not be exported
 }
 \details{
-columns of x with class Date/POSIXt, currency, accounting,
-hyperlink, percentage are automatically styled as dates, currency, accounting,
-hyperlinks, percentages respectively.
-The string \code{"_openxlsx_NA"} is reserved for \code{openxlsx2}. If the data frame
-contains this string, the output will be broken.
-}
-\examples{
-## see package vignettes for further examples.
+The columns of \code{x} with class Date/POSIXt, currency, accounting, hyperlink,
+percentage are automatically styled as dates, currency, accounting, hyperlinks,
+percentages respectively.
 
-#####################################################################################
-## Create Workbook object and add worksheets
-wb <- wb_workbook()
-wb$add_worksheet("S1")
-wb$add_worksheet("S2")
-wb$add_worksheet("S3")
-
-#####################################################################################
-## -- write data.frame as an Excel table with column filters
-## -- default table style is "TableStyleMedium2"
-
-wb$add_data_table("S1", x = iris)
-
-wb$add_data_table("S2",
-  x = mtcars, dims = c("B3"), rowNames = TRUE,
-  tableStyle = "TableStyleLight9"
-)
-
-df <- data.frame(
-  "Date" = Sys.Date() - 0:19,
-  "T" = TRUE, "F" = FALSE,
-  "Time" = Sys.time() - 0:19 * 60 * 60,
-  "Cash" = paste("$", 1:20), "Cash2" = 31:50,
-  "hLink" = "https://CRAN.R-project.org/",
-  "Percentage" = seq(0, 1, length.out = 20),
-  "TinyNumbers" = runif(20) / 1E9, stringsAsFactors = FALSE
-)
-
-## openxlsx will apply default Excel styling for these classes
-class(df$Cash) <- c(class(df$Cash), "currency")
-class(df$Cash2) <- c(class(df$Cash2), "accounting")
-class(df$hLink) <- "hyperlink"
-class(df$Percentage) <- c(class(df$Percentage), "percentage")
-class(df$TinyNumbers) <- c(class(df$TinyNumbers), "scientific")
-
-wb$add_data_table("S3", x = df, startRow = 4, rowNames = TRUE, tableStyle = "TableStyleMedium9")
-
-#####################################################################################
-## Additional Header Styling and remove column filters
-
-write_datatable(wb,
-  sheet = 1,
-  x = iris,
-  startCol = 7,
-  withFilter = FALSE,
-  firstColumn = TRUE,
-  lastColumn	= TRUE,
-  bandedRows = TRUE,
-  bandedCols = TRUE
-)
-
-#####################################################################################
-## Pre-defined table styles gallery
-
-wb <- wb_workbook(paste0("tableStylesGallery.xlsx"))
-wb$add_worksheet("Style Samples")
-for (i in 1:21) {
-  style <- paste0("TableStyleLight", i)
-  write_datatable(wb,
-    x = data.frame(style), sheet = 1,
-    tableStyle = style, startRow = 1, startCol = i * 3 - 2
-  )
-}
-
-for (i in 1:28) {
-  style <- paste0("TableStyleMedium", i)
-  write_datatable(wb,
-    x = data.frame(style), sheet = 1,
-    tableStyle = style, startRow = 4, startCol = i * 3 - 2
-  )
-}
-
-for (i in 1:11) {
-  style <- paste0("TableStyleDark", i)
-  write_datatable(wb,
-    x = data.frame(style), sheet = 1,
-    tableStyle = style, startRow = 7, startCol = i * 3 - 2
-  )
-}
-}
-\seealso{
-\code{\link[=wb_add_worksheet]{wb_add_worksheet()}}
-\code{\link[=wb_add_data_table]{wb_add_data_table()}}
-\code{\link[=wb_remove_tables]{wb_remove_tables()}}
-\code{\link[=wb_get_tables]{wb_get_tables()}}
+The string \code{"_openxlsx_NA"} is reserved for \code{openxlsx2}. If \code{x} contains this
+string, the output will be broken.
 }
 \keyword{internal}

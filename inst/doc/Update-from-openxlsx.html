@@ -438,7 +438,7 @@ references</a></p>
 <p>In <code>openxlsx2</code> the same code looks something like
 this:</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># openxlsx2 chained</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>border_color <span class="ot">&lt;-</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;#4F81BD&quot;</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>border_color <span class="ot">&lt;-</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;4F81BD&quot;</span>)</span>
 <span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>(<span class="at">creator =</span> <span class="st">&quot;My name here&quot;</span>)<span class="sc">$</span></span>
 <span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="fu">add_worksheet</span>(<span class="st">&quot;Expenditure&quot;</span>, <span class="at">grid_lines =</span> <span class="cn">FALSE</span>)<span class="sc">$</span></span>
 <span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> USPersonalExpenditure, <span class="at">row_names =</span> <span class="cn">TRUE</span>)<span class="sc">$</span></span>
@@ -552,7 +552,7 @@ examples on formatting.</p>
 </div>
 <div id="saving" class="section level3">
 <h3>Saving</h3>
-<p>Saving has been switched from <code>saveWorbook()</code> to
+<p>Saving has been switched from <code>saveWorkbook()</code> to
 <code>wb_save()</code> and opening a workbook has been switched from
 <code>openXL()</code> to <code>wb_open()</code>.</p>
 </div>

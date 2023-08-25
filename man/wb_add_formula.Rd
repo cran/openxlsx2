@@ -2,7 +2,7 @@
 % Please edit documentation in R/class-workbook-wrappers.R
 \name{wb_add_formula}
 \alias{wb_add_formula}
-\title{Add a character vector as an Excel Formula}
+\title{Add a formula to a cell range in a worksheet}
 \usage{
 wb_add_formula(
   wb,
@@ -21,11 +21,11 @@ wb_add_formula(
 \arguments{
 \item{wb}{A Workbook object containing a worksheet.}
 
-\item{sheet}{The worksheet to write to. Can be the worksheet index or name.}
+\item{sheet}{The worksheet to write to. (either as index or name)}
 
-\item{x}{A character vector.}
+\item{x}{A formula as character vector.}
 
-\item{dims}{Spreadsheet dimensions that will determine startCol and startRow: "A1", "A1:B2", "A:B"}
+\item{dims}{Spreadsheet dimensions that will determine where \code{x} spans: "A1", "A1:B2", "A:B"}
 
 \item{start_col}{A vector specifying the starting column to write to.}
 
@@ -33,19 +33,26 @@ wb_add_formula(
 
 \item{array}{A bool if the function written is of type array}
 
-\item{cm}{A special kind of array function that hides the curly braces in the cell. Add this, if you see "@" inserted into your formulas}
+\item{cm}{A special kind of array function that hides the curly braces in the cell.
+Add this, if you see "@" inserted into your formulas.}
 
-\item{apply_cell_style}{Should we write cell styles to the workbook}
+\item{apply_cell_style}{Should we write cell styles to the workbook?}
 
-\item{remove_cell_style}{keep the cell style?,}
+\item{remove_cell_style}{Should we keep the cell style?}
 
 \item{...}{additional arguments}
 }
+\value{
+The workbook, invisibly.
+}
 \description{
-Add a character vector containing Excel formula to a worksheet.
+This function can be used to add a formula to a worksheet.
+In \code{wb_add_formula()}, you can provide the formula as a character vector.
 }
 \details{
-Currently only the English version of functions are supported. Please don't use the local translation.
+Currently, the local translations of formulas are not supported.
+Only the English functions work.
+
 The examples below show a small list of possible formulas:
 \itemize{
 \item SUM(B2:B4)
@@ -55,24 +62,47 @@ The examples below show a small list of possible formulas:
 \item ...
 }
 }
+\examples{
+wb <- wb_workbook()$add_worksheet()
+wb$add_data(dims = wb_dims(rows = 1, cols = 1:3), x = t(c(4, 5, 8)), col_names = FALSE)
+
+# calculate the sum of elements.
+wb$add_formula(dims = "D1", x = "SUM(A1:C1)")
+
+}
 \seealso{
 Other workbook wrappers: 
+\code{\link{base_font-wb}},
+\code{\link{col_widths-wb}},
+\code{\link{creators-wb}},
+\code{\link{grouping-wb}},
+\code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
 \code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_worksheet}()},
-\code{\link{wb_base_font}},
 \code{\link{wb_clone_worksheet}()},
-\code{\link{wb_col_widths}},
 \code{\link{wb_copy_cells}()},
-\code{\link{wb_creators}},
 \code{\link{wb_freeze_pane}()},
-\code{\link{wb_grouping}},
 \code{\link{wb_merge_cells}()},
 \code{\link{wb_save}()},
 \code{\link{wb_set_last_modified_by}()},
-\code{\link{wb_set_row_heights}()},
 \code{\link{wb_workbook}()}
+
+Other worksheet content functions: 
+\code{\link{col_widths-wb}},
+\code{\link{filter-wb}},
+\code{\link{grouping-wb}},
+\code{\link{named_region-wb}},
+\code{\link{row_heights-wb}},
+\code{\link{wb_add_conditional_formatting}()},
+\code{\link{wb_add_data_table}()},
+\code{\link{wb_add_data}()},
+\code{\link{wb_add_pivot_table}()},
+\code{\link{wb_add_thread}()},
+\code{\link{wb_freeze_pane}()},
+\code{\link{wb_merge_cells}()}
 }
 \concept{workbook wrappers}
+\concept{worksheet content functions}

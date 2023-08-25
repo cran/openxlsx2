@@ -2,7 +2,7 @@
 % Please edit documentation in R/class-workbook.R
 \name{wbWorkbook}
 \alias{wbWorkbook}
-\title{R6 class for a Workbook}
+\title{R6 class for a workbook}
 \description{
 A workbook
 }
@@ -72,9 +72,6 @@ wb$add_border(1, dims = "A2:K33", inner_vgrid = "thin", inner_vcolor = c(rgb="FF
                    vertical = "center",
                    wrapText = "1")
 }
-\seealso{
-create_border
-}
 \section{Public fields}{
 \if{html}{\out{<div class="r6-fields">}}
 \describe{
@@ -114,7 +111,7 @@ create_border
 
 \item{\code{media}}{media}
 
-\item{\code{metadata}}{metadata}
+\item{\code{metadata}}{contains cell/value metadata imported on load from xl/metadata.xml}
 
 \item{\code{persons}}{persons}
 
@@ -248,6 +245,7 @@ is created, not when the Excel files are saved.}
 \item \href{#method-wbWorkbook-set_grid_lines}{\code{wbWorkbook$set_grid_lines()}}
 \item \href{#method-wbWorkbook-grid_lines}{\code{wbWorkbook$grid_lines()}}
 \item \href{#method-wbWorkbook-add_named_region}{\code{wbWorkbook$add_named_region()}}
+\item \href{#method-wbWorkbook-get_named_regions}{\code{wbWorkbook$get_named_regions()}}
 \item \href{#method-wbWorkbook-remove_named_region}{\code{wbWorkbook$remove_named_region()}}
 \item \href{#method-wbWorkbook-set_order}{\code{wbWorkbook$set_order()}}
 \item \href{#method-wbWorkbook-get_sheet_visibility}{\code{wbWorkbook$get_sheet_visibility()}}
@@ -269,6 +267,10 @@ is created, not when the Excel files are saved.}
 \item \href{#method-wbWorkbook-set_sheetview}{\code{wbWorkbook$set_sheetview()}}
 \item \href{#method-wbWorkbook-add_person}{\code{wbWorkbook$add_person()}}
 \item \href{#method-wbWorkbook-get_person}{\code{wbWorkbook$get_person()}}
+\item \href{#method-wbWorkbook-get_active_sheet}{\code{wbWorkbook$get_active_sheet()}}
+\item \href{#method-wbWorkbook-set_active_sheet}{\code{wbWorkbook$set_active_sheet()}}
+\item \href{#method-wbWorkbook-get_selected}{\code{wbWorkbook$get_selected()}}
+\item \href{#method-wbWorkbook-set_selected}{\code{wbWorkbook$set_selected()}}
 \item \href{#method-wbWorkbook-clone}{\code{wbWorkbook$clone()}}
 }
 }
@@ -1161,9 +1163,16 @@ The \code{wbWorkbook} object
 \subsection{Method \code{get_sheet_names()}}{
 Get sheet names
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_sheet_names()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_sheet_names(escape = FALSE)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{escape}}{Logical if the xml special characters are escaped}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Returns}{
 A \code{named} \code{character} vector of sheet names in their order.  The
 names represent the original value of the worksheet prior to any
@@ -1516,7 +1525,12 @@ The \code{wbWorkbook} object
 \subsection{Method \code{merge_cells()}}{
 Set cell merging for a sheet
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$merge_cells(sheet = current_sheet(), dims = NULL, ...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$merge_cells(
+  sheet = current_sheet(),
+  dims = NULL,
+  solve = FALSE,
+  ...
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1525,6 +1539,8 @@ Set cell merging for a sheet
 \item{\code{sheet}}{sheet}
 
 \item{\code{dims}}{worksheet cells}
+
+\item{\code{solve}}{logical if intersecting cells should be solved}
 
 \item{\code{...}}{additional arguments}
 }
@@ -1934,7 +1950,7 @@ add form control to workbook
 \if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_form_control(
   sheet = current_sheet(),
   dims = "A1",
-  type = NULL,
+  type = c("Checkbox", "Radio", "Drop"),
   text = NULL,
   link = NULL,
   range = NULL,
@@ -2398,12 +2414,12 @@ add a named region
   local_sheet = FALSE,
   overwrite = FALSE,
   comment = NULL,
+  hidden = NULL,
   custom_menu = NULL,
   description = NULL,
   is_function = NULL,
   function_group_id = NULL,
   help = NULL,
-  hidden = NULL,
   local_name = NULL,
   publish_to_server = NULL,
   status_bar = NULL,
@@ -2429,6 +2445,8 @@ add a named region
 
 \item{\code{comment}}{comment}
 
+\item{\code{hidden}}{hidden}
+
 \item{\code{custom_menu}}{custom_menu}
 
 \item{\code{description}}{description}
@@ -2438,8 +2456,6 @@ add a named region
 \item{\code{function_group_id}}{function group id}
 
 \item{\code{help}}{help}
-
-\item{\code{hidden}}{hidden}
 
 \item{\code{local_name}}{localName}
 
@@ -2459,6 +2475,28 @@ add a named region
 }
 \subsection{Returns}{
 The \code{wbWorkbook} object
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-get_named_regions"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-get_named_regions}{}}}
+\subsection{Method \code{get_named_regions()}}{
+get named regions in a workbook
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_named_regions(tables = FALSE, x = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{tables}}{Return tables as well?}
+
+\item{\code{x}}{Not used.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A \code{data.frame} of named regions
 }
 }
 \if{html}{\out{<hr>}}
@@ -3291,8 +3329,7 @@ add person to workbook
 
 \item{\code{user_id}}{user_id}
 
-\item{\code{provider_id}}{provider_id
-description get person}
+\item{\code{provider_id}}{provider_id}
 }
 \if{html}{\out{</div>}}
 }
@@ -3301,6 +3338,7 @@ description get person}
 \if{html}{\out{<a id="method-wbWorkbook-get_person"></a>}}
 \if{latex}{\out{\hypertarget{method-wbWorkbook-get_person}{}}}
 \subsection{Method \code{get_person()}}{
+description get person
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_person(name = NULL)}\if{html}{\out{</div>}}
 }
@@ -3309,6 +3347,60 @@ description get person}
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{name}}{name}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-get_active_sheet"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-get_active_sheet}{}}}
+\subsection{Method \code{get_active_sheet()}}{
+description get active sheet
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_active_sheet()}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-set_active_sheet"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-set_active_sheet}{}}}
+\subsection{Method \code{set_active_sheet()}}{
+description set active sheet
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$set_active_sheet(sheet = current_sheet())}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{a worksheet}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-get_selected"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-get_selected}{}}}
+\subsection{Method \code{get_selected()}}{
+description get selected sheets
+description set selected sheet
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_selected()}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-set_selected"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-set_selected}{}}}
+\subsection{Method \code{set_selected()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$set_selected(sheet = current_sheet())}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{a worksheet}
 }
 \if{html}{\out{</div>}}
 }

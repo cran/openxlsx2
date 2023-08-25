@@ -251,19 +251,20 @@ test_that("wb_add_filter(), wb_remove_filter() is a wrapper", {
 
 # wb_grid_lines() ---------------------------------------------------------
 
-test_that("wb_grid_lines() is a wrapper", {
+test_that("wb_set_grid_lines() is a wrapper", {
   wb <- wb_workbook()$add_worksheet("a")
-  expect_wrapper("grid_lines", wb = wb, params = list(sheet = 1, show = TRUE))
+  expect_wrapper("set_grid_lines", wb = wb, params = list(sheet = 1, show = TRUE))
 })
 
 # wb_add_named_region(), wb_remove_named_region() -------------------------
 
-test_that("wb_add_named_region(), wb_remove_named_region() are wrappers", {
+test_that("wb_add_named_region(), wb_remove_named_region() wb_get_named_regions() are wrappers", {
   wb <- wb_workbook()$add_worksheet("a")
   params <- list(sheet = 1, dims = "A1", name = "cool")
   expect_wrapper("add_named_region", wb = wb, params = params)
   # now add the named region so that we can remove it
   wb$add_named_region(sheet = 1, dims = "A1", name = "cool")
+  expect_wrapper("get_named_regions", wb = wb)
   expect_wrapper("remove_named_region", wb = wb, params = list(name = "cool"))
 })
 
@@ -375,7 +376,16 @@ test_that("wb_add_comment() is a wrapper", {
     wb = wb,
     params = list(comment = c1, dims = "A1")
   )
+  opt <- getOption("openxlsx2.creator")
+  options("openxlsx2.creator" = "user")
+  wb <- wb_workbook()$add_worksheet()
 
+  expect_wrapper(
+    "add_comment",
+    wb = wb,
+    params = list(comment = "a new comment", dims = "A1")
+  )
+  options("openxlsx2.creator" = opt)
 })
 
 # wb_remove_comment() -----------------------------------------------------

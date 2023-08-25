@@ -12,7 +12,7 @@
 
 
 
-<title>openxlsx2 style manual</title>
+<title>Add styling to a workbook</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -336,7 +336,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">openxlsx2 style manual</h1>
+<h1 class="title toc-ignore">Add styling to a workbook</h1>
 
 
 
@@ -384,7 +384,7 @@ The example below, with increased column width.
 <span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>    <span class="at">right_color =</span> border_col, <span class="at">right_border =</span> border_sty,</span>
 <span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a>    <span class="at">inner_hcolor =</span> border_col, <span class="at">inner_hgrid =</span> border_sty</span>
 <span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a>  <span class="fu">wb_add_fill</span>(<span class="at">dims =</span> dims_mat_header, <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;#FF334E6F&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a>  <span class="fu">wb_add_fill</span>(<span class="at">dims =</span> dims_mat_header, <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;FF334E6F&quot;</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a>  <span class="fu">wb_add_font</span>(<span class="at">dims =</span> dims_mat_header, <span class="at">name =</span> <span class="st">&quot;Arial&quot;</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>, <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;white&quot;</span>), <span class="at">size =</span> <span class="dv">20</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a>  <span class="fu">wb_add_cell_style</span>(<span class="at">dims =</span> dims_mat_header, <span class="at">horizontal =</span> <span class="st">&quot;center&quot;</span>, <span class="at">textRotation =</span> <span class="dv">45</span>)</span>
 <span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a></span>
@@ -415,7 +415,7 @@ The example below, with increased column width.
 <span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a></span>
 <span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co"># create a border style and assign it to the workbook</span></span>
 <span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>black <span class="ot">&lt;-</span> <span class="fu">wb_color</span>(<span class="st">&quot;black&quot;</span>)</span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co"># same as wb_color(&quot;black&quot;) or  wb_color(hex = &quot;#FF000000&quot;) or wb_color(&quot;FF000000&quot;)</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co"># same as wb_color(&quot;black&quot;) or  wb_color(hex = &quot;FF000000&quot;) or wb_color(&quot;FF000000&quot;)</span></span>
 <span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>new_border <span class="ot">&lt;-</span> <span class="fu">create_border</span>(</span>
 <span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>  <span class="at">bottom =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">bottom_color =</span> black,</span>
 <span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>  <span class="at">top =</span> <span class="st">&quot;thin&quot;</span>, <span class="at">top_color =</span> black,</span>
@@ -426,7 +426,7 @@ The example below, with increased column width.
 <span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a></span>
 <span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a></span>
 <span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co"># create a fill style and assign it to the workbook</span></span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>new_fill <span class="ot">&lt;-</span> <span class="fu">create_fill</span>(<span class="at">patternType =</span> <span class="st">&quot;solid&quot;</span>, <span class="at">fgColor =</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;#FF334E6F&quot;</span>))</span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>new_fill <span class="ot">&lt;-</span> <span class="fu">create_fill</span>(<span class="at">patternType =</span> <span class="st">&quot;solid&quot;</span>, <span class="at">fgColor =</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;FF334E6F&quot;</span>))</span>
 <span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>wb<span class="sc">$</span>styles_mgr<span class="sc">$</span><span class="fu">add</span>(new_fill, <span class="st">&quot;new_fill&quot;</span>)</span>
 <span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a></span>
 <span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a><span class="co"># create a font style and assign it to the workbook</span></span>
@@ -481,7 +481,7 @@ The example below, with increased column width.
 <span id="cb2-75"><a href="#cb2-75" tabindex="-1"></a>  <span class="st">&quot;sheetPr&quot;</span>,</span>
 <span id="cb2-76"><a href="#cb2-76" tabindex="-1"></a>  <span class="at">xml_children =</span> <span class="fu">xml_node_create</span>(</span>
 <span id="cb2-77"><a href="#cb2-77" tabindex="-1"></a>    <span class="st">&quot;tabColor&quot;</span>,</span>
-<span id="cb2-78"><a href="#cb2-78" tabindex="-1"></a>    <span class="at">xml_attributes =</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;#FF00FF00&quot;</span>)</span>
+<span id="cb2-78"><a href="#cb2-78" tabindex="-1"></a>    <span class="at">xml_attributes =</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;FF00FF00&quot;</span>)</span>
 <span id="cb2-79"><a href="#cb2-79" tabindex="-1"></a>  )</span>
 <span id="cb2-80"><a href="#cb2-80" tabindex="-1"></a>)</span>
 <span id="cb2-81"><a href="#cb2-81" tabindex="-1"></a></span>
@@ -595,7 +595,7 @@ selected R classes.</p>
 <span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_border</span>(</span>
 <span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>  <span class="at">dims =</span> <span class="st">&quot;A2:K33&quot;</span>,</span>
 <span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a>  <span class="at">inner_vgrid =</span> <span class="st">&quot;thin&quot;</span>,</span>
-<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>  <span class="at">inner_vcolor =</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;#FF808080&quot;</span>)</span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>  <span class="at">inner_vcolor =</span> <span class="fu">wb_color</span>(<span class="at">hex =</span> <span class="st">&quot;FF808080&quot;</span>)</span>
 <span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a>  )</span>
 <span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a><span class="co"># no inner grid</span></span>
 <span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&quot;S4&quot;</span>, <span class="at">grid_lines =</span> <span class="cn">FALSE</span>)<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> mtcars)</span>

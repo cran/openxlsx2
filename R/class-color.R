@@ -1,4 +1,6 @@
-#' Create a new wbColour object
+#' Helper to create a color
+#'
+#' Creates a `wbColour` object.
 #' @param name A name of a color known to R
 #' @param auto A boolean.
 #' @param indexed An indexed color values.
@@ -17,6 +19,7 @@ wb_color <- function(
   ) {
 
   if (!is.null(name)) hex <-  validate_color(name)
+  if (!is.null(hex))  hex <-  validate_color(hex)
 
   z <- c(
     auto    = as_xml_attr(auto),

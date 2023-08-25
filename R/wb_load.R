@@ -1,28 +1,29 @@
-#' @name wb_load
-#' @title Load an existing .xlsx file
+#' Load an existing .xlsx file
+#'
+#' `wb_load()` returns a [wbWorkbook] object conserving styles and
+#' formatting of the original input file.
+#'
+#' A warning is displayed if an xml namespace for main is found in the xlsx file.
+#' Certain xlsx files created by third-party applications contain a namespace
+#' (usually `x`). This namespace is not required for the file to work in spreadsheet
+#' software and is not expected by `openxlsx2`. Therefore it is removed when the
+#' file is loaded into a workbook. Removal is generally expected to be safe,
+#' but the feature is still experimental.
+#'
 #' @param file A path to an existing .xlsx or .xlsm file
 #' @param sheet optional sheet parameter. if this is applied, only the selected
-#' sheet will be loaded.
+#'   sheet will be loaded.
 #' @param data_only mode to import if only a data frame should be returned. This
-#' strips the wbWorkbook to a bare minimum.
+#'   strips the `wbWorkbook` to a bare minimum.
 #' @param calc_chain optionally you can keep the calculation chain intact. This
-#' is used by spreadsheet software to identify the order in which formulas are
-#' evaluated. Removing the calculation chain is considered harmless. The calc
-#' chain will be created upon the next time the worksheet is loaded in
-#' spreadsheet software. Keeping it, might only speed loading time in said
-#' software.
+#'   is used by spreadsheet software to identify the order in which formulas are
+#'   evaluated. Removing the calculation chain is considered harmless. The calc
+#'   chain will be created upon the next time the worksheet is loaded in
+#'   spreadsheet software. Keeping it, might only speed loading time in said
+#'   software.
 #' @param ... additional arguments
-#' @description  wb_load returns a workbook object conserving styles and
-#' formatting of the original .xlsx file.
-#' @details A warning is displayed if an xml namespace for main is found in the
-#' xlsx file. Certain xlsx files created by third-party applications contain a
-#' namespace (usually `x`). This namespace is not required for the file to work
-#' in spreadsheet software and is not expected by `openxlsx2`. Therefore it is
-#' removed when the file is loaded into a workbook. Removal is generally
-#' expected to be safe, but the feature is still experimental.
-#' @return Workbook object.
+#' @return A Workbook object.
 #' @export
-#' @seealso [wb_remove_worksheet()]
 #' @examples
 #' ## load existing workbook from package folder
 #' wb <- wb_load(file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2"))
@@ -65,6 +66,7 @@ wb_load <- function(
   xmlFiles <- xmlFiles[ordr]
 
   wb <- wb_workbook()
+  wb$path <- file
 
   grep_xml <- function(pattern, perl = TRUE, value = TRUE, ...) {
     # targets xmlFiles; has presents
@@ -216,12 +218,8 @@ wb_load <- function(
   }
 
   ##
-  chartSheetRIds <- NULL
   if (!data_only && length(chartSheetsXML)) {
     workbookRelsXML <- grep("chartsheets/sheet", workbookRelsXML, fixed = TRUE, value = TRUE)
-
-    chartSheetRIds <- unlist(getId(workbookRelsXML))
-    chartsheet_rId_mapping <- unlist(regmatches(workbookRelsXML, gregexpr("sheet[0-9]+\\.xml", workbookRelsXML, perl = TRUE, ignore.case = TRUE)))
 
     sheetNo <- as.integer(regmatches(chartSheetsXML, regexpr("(?<=sheet)[0-9]+(?=\\.xml)", chartSheetsXML, perl = TRUE)))
     chartSheetsXML <- chartSheetsXML[order(sheetNo)]
@@ -229,10 +227,7 @@ wb_load <- function(
     chartSheetsRelsXML <- grep_xml("xl/chartsheets/_rels")
     sheetNo2 <- as.integer(regmatches(chartSheetsRelsXML, regexpr("(?<=sheet)[0-9]+(?=\\.xml\\.rels)", chartSheetsRelsXML, perl = TRUE)))
     chartSheetsRelsXML <- chartSheetsRelsXML[order(sheetNo2)]
-
-    chartSheetsRelsDir <- dirname(chartSheetsRelsXML[1])
   }
-
 
   ## xl\
   ## xl\workbook
@@ -308,7 +303,7 @@ wb_load <- function(
       } else if (sheets$typ[i] == "worksheet") {
         content_type <- read_xml(ContentTypesXML)
         override <- xml_attr(content_type, "Types", "Override")
-        overrideAttr <- as.data.frame(do.call("rbind", override))
+        overrideAttr <- as.data.frame(do.call("rbind", override), stringsAsFactors = FALSE)
         xmls <- basename(unlist(overrideAttr$PartName))
         drawings <- grep("drawing", xmls, value = TRUE)
         wb$add_worksheet(sheets$name[i], visible = is_visible[i], has_drawing = !is.na(drawings[i]))
@@ -348,7 +343,7 @@ wb_load <- function(
     }
 
     workbookPr <- xml_node(workbook_xml, "workbook", "workbookPr")
-    if (!data_only && length(workbookPr)) {
+    if (length(workbookPr)) { # needed for date1904 detection
       wb$workbook$workbookPr <- workbookPr
     }
 
@@ -649,7 +644,7 @@ wb_load <- function(
     sheet <- import_sheets
     if (is.na(sheet)) {
       stop("No such sheet in the workbook. Workbook contains:\n",
-           paste(names(wb$get_sheet_names()), collapse = "\n"))
+           paste(names(wb$get_sheet_names(escape = TRUE)), collapse = "\n"))
     }
   }
 
@@ -810,10 +805,8 @@ wb_load <- function(
 
       for (i in seq_len(nSheets)) {
         if (sheets$typ[i] == "chartsheet") {
-          ind <- which(chartSheetRIds == sheets$`r:id`[i])
-          rels_file <- file.path(chartSheetsRelsDir, paste0(chartsheet_rId_mapping[ind], ".rels"))
+          rels_file <- file.path(xmlDir, "xl", "chartsheets", "_rels", paste0(file_names[i], ".rels"))
         } else {
-          ind <- sheets$`r:id`[i]
           rels_file <- file.path(xmlDir, "xl", "worksheets", "_rels", paste0(file_names[i], ".rels"))
         }
         if (file.exists(rels_file)) {
@@ -840,7 +833,7 @@ wb_load <- function(
         # we do not ship this binary blob, therefore spreadsheet software may
         # stumble over this non existent reference. In the future we might want
         # to check if the references are valid pre file saving.
-        sel_row <- !grepl("printerSettings", basename(xml_relship$Target))
+        sel_row <- !grepl("printerSettings", basename2(xml_relship$Target))
         sel_col <- c("Id", "Type", "Target", "TargetMode")
         # return as xml
         xml <- df_to_xml("Relationship", xml_relship[sel_row, sel_col])
@@ -851,15 +844,6 @@ wb_load <- function(
     })
 
     wb$worksheets_rels <- xml
-
-    xml <- lapply(seq_along(allRels), function(i) {
-      if (haveRels[i]) {
-        xml <- xml_node(allRels[[i]], "Relationships", "Relationship")
-      } else {
-        xml <- character()
-      }
-      return(xml)
-    })
 
     for (ws in seq_along(wb$worksheets)) {
 
@@ -876,7 +860,7 @@ wb_load <- function(
 
       if (ncol(wb_rels)) {
         # since target can be any hyperlink, we have to expect various things here like uint64
-        wb_rels$tid <- suppressWarnings(as.integer(gsub("\\D+", "", basename(wb_rels$Target))))
+        wb_rels$tid <- suppressWarnings(as.integer(gsub("\\D+", "", basename2(wb_rels$Target))))
         wb_rels$typ <- basename(wb_rels$Type)
 
         cmmts <- wb_rels$tid[wb_rels$typ == "comments"]
@@ -955,13 +939,6 @@ wb_load <- function(
       tables_xml <- vapply(tablesXML, FUN = read_xml, pointer = FALSE, FUN.VALUE = NA_character_)
       tabs <- rbindlist(xml_attr(tables_xml, "table"))
 
-      wb$append("Content_Types", sprintf('<Override PartName="/xl/tables/table%s.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>', nrow(wb$tables)))
-
-      # # TODO When does this happen?
-      # if (length(tabs["displayName"]) != length(tablesXML)) {
-      #   tabs[["displayName"]] <- paste0("Table", seq_along(tablesXML))
-      # }
-
       wb$tables <- data.frame(
         tab_name = tabs[["displayName"]],
         tab_sheet = tableSheets,
@@ -971,10 +948,7 @@ wb_load <- function(
         stringsAsFactors = FALSE
       )
 
-      # ## relabel ids
-      # for (i in seq_len(nrow(wb$tables))) {
-      #   wb$tables$tab_xml[i] <- xml_attr_mod(wb$tables$tab_xml[i], xml_attributes = c(id = as.character(i + 2)))
-      # }
+      wb$append("Content_Types", sprintf('<Override PartName="/xl/tables/table%s.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>', nrow(wb$tables)))
 
       ## every worksheet containing a table, has a table part. this references
       ## the display name, so that we know which tables are still around.
@@ -1124,10 +1098,10 @@ wb_load <- function(
     }
 
     ## Threaded comments
-    if (length(threadCommentsXML) > 0) {
+    if (any(length(threadCommentsXML) > 0)) {
 
-      if (lengths(threadCommentsXML)) {
-        wb$threadComments <- lapply(threadCommentsXML, read_xml, pointer = FALSE)
+      if (any(lengths(threadCommentsXML))) {
+        wb$threadComments <- lapply(threadCommentsXML, function(x) xml_node(x, "ThreadedComments", "threadedComment"))
       }
 
       wb$append(
@@ -1152,8 +1126,20 @@ wb_load <- function(
 
     ## Embedded docx
     if (length(embeddings) > 0) {
-      # TODO only valid for docx. need to check xls and doc?
-      wb$append("Content_Types", '<Default Extension="docx" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>')
+
+      # get the embedded files extensions
+      files <- unique(gsub(".+\\.(\\w+)$", "\\1", embeddings))
+
+      # get the required ContentTypes
+      content_type <- read_xml(ContentTypesXML)
+      extensions <- rbindlist(xml_attr(content_type, "Types", "Default"))
+      extensions <- extensions[extensions$Extension %in% files, ]
+
+      # append the content types
+      default <- sprintf('<Default Extension="%s" ContentType="%s"/>',
+                         extensions$Extension, extensions$ContentType)
+      wb$append("Content_Types", default)
+
       wb$embeddings <- embeddings
     }
 

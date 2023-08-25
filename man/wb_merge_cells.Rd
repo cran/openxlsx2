@@ -3,71 +3,90 @@
 \name{wb_merge_cells}
 \alias{wb_merge_cells}
 \alias{wb_unmerge_cells}
-\title{Worksheet cell merging}
+\title{Merge cells within a worksheet}
 \usage{
-wb_merge_cells(wb, sheet = current_sheet(), dims = NULL, ...)
+wb_merge_cells(wb, sheet = current_sheet(), dims = NULL, solve = FALSE, ...)
 
 wb_unmerge_cells(wb, sheet = current_sheet(), dims = NULL, ...)
 }
 \arguments{
-\item{wb}{A workbook object}
+\item{wb}{A Workbook object}
 
 \item{sheet}{A name or index of a worksheet}
 
 \item{dims}{worksheet cells}
 
+\item{solve}{logical if intersecting merges should be solved}
+
 \item{...}{additional arguments}
 }
 \description{
-Merge cells within a worksheet
+Worksheet cell merging
 }
 \details{
-As merged region must be rectangular, only min and max of cols and
-rows are used.
+If using the deprecated arguments \code{rows} and \code{cols} with a merged region must be rectangular,
+only min and max of \code{cols} and \code{rows} are used.
 }
 \examples{
 # Create a new workbook
-wb <- wb_workbook()
-
-# Add a worksheets
-wb$add_worksheet("Sheet 1")
-wb$add_worksheet("Sheet 2")
+wb <- wb_workbook()$add_worksheet()
 
 # Merge cells: Row 2 column C to F (3:6)
-wb <- wb_merge_cells(wb, "Sheet 1", cols = 2, rows = 3:6)
+wb <- wb_merge_cells(wb, dims = "C3:F6")
 
 # Merge cells:Rows 10 to 20 columns A to J (1:10)
-wb <- wb_merge_cells(wb, 1, cols = 1:10, rows = 10:20)
+wb <- wb_merge_cells(wb, dims = wb_dims(rows = 10:20, cols = 1:10))
 
-# Intersecting merges
-wb <- wb_merge_cells(wb, 2, cols = 1:10, rows = 1)
-wb <- wb_merge_cells(wb, 2, cols = 5:10, rows = 2)
-wb <- wb_merge_cells(wb, 2, cols = c(1, 10), rows = 12) # equivalent to 1:10
-try(wb_merge_cells(wb, 2, cols = 1, rows = c(1,10)))    # intersects existing merge
+wb$add_worksheet()
 
-# remove merged cells
-wb <- wb_unmerge_cells(wb, 2, cols = 1, rows = 1)  # removes any intersecting merges
-wb <- wb_merge_cells(wb, 2, cols = 1, rows = 1:10) # Now this works
+## Intersecting merges
+wb <- wb_merge_cells(wb, dims = wb_dims(cols = 1:10, rows = 1))
+wb <- wb_merge_cells(wb, dims = wb_dims(cols = 5:10, rows = 2))
+wb <- wb_merge_cells(wb, dims = wb_dims(cols = 1:10, rows = 12))
+try(wb_merge_cells(wb, dims = "A1:A10"))
+
+## remove merged cells
+# removes any intersecting merges
+wb <- wb_unmerge_cells(wb, dims = wb_dims(cols = 1, rows = 1))
+wb <- wb_merge_cells(wb, dims = "A1:A10")
+
+# or let us decide how to solve this
+wb <- wb_merge_cells(wb, dims = "A1:A10", solve = TRUE)
 
 }
 \seealso{
 Other workbook wrappers: 
+\code{\link{base_font-wb}},
+\code{\link{col_widths-wb}},
+\code{\link{creators-wb}},
+\code{\link{grouping-wb}},
+\code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
 \code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_worksheet}()},
-\code{\link{wb_base_font}},
 \code{\link{wb_clone_worksheet}()},
-\code{\link{wb_col_widths}},
 \code{\link{wb_copy_cells}()},
-\code{\link{wb_creators}},
 \code{\link{wb_freeze_pane}()},
-\code{\link{wb_grouping}},
 \code{\link{wb_save}()},
 \code{\link{wb_set_last_modified_by}()},
-\code{\link{wb_set_row_heights}()},
 \code{\link{wb_workbook}()}
+
+Other worksheet content functions: 
+\code{\link{col_widths-wb}},
+\code{\link{filter-wb}},
+\code{\link{grouping-wb}},
+\code{\link{named_region-wb}},
+\code{\link{row_heights-wb}},
+\code{\link{wb_add_conditional_formatting}()},
+\code{\link{wb_add_data_table}()},
+\code{\link{wb_add_data}()},
+\code{\link{wb_add_formula}()},
+\code{\link{wb_add_pivot_table}()},
+\code{\link{wb_add_thread}()},
+\code{\link{wb_freeze_pane}()}
 }
 \concept{workbook wrappers}
+\concept{worksheet content functions}

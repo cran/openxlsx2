@@ -10,77 +10,40 @@
 #' @param text display text
 #' @param file Excel file name to point to. If NULL hyperlink is internal.
 #' @examples
-#'
-#' ## Writing internal hyperlinks
-#' wb <- wb_workbook()
-#' wb$add_worksheet("Sheet1")
-#' wb$add_worksheet("Sheet2")
-#' wb$add_worksheet("Sheet 3")
-#' wb$add_data(sheet = 3, x = iris)
-#'
-#' ## External Hyperlink
-#' x <- c("https://www.google.com", "https://www.google.com.au")
-#' names(x) <- c("google", "google Aus")
-#' class(x) <- "hyperlink"
-#'
-#' wb$add_data(sheet = 1, x = x, startCol = 10)
-#'
+#' wb <- wb_workbook()$
+#'   add_worksheet("Sheet1")$add_worksheet("Sheet2")$add_worksheet("Sheet3")
 #'
 #' ## Internal Hyperlink - create hyperlink formula manually
-#' write_formula(
-#'   wb, "Sheet1",
-#'   x = '=HYPERLINK(\"#Sheet2!B3\", "Text to Display - Link to Sheet2")',
-#'   startCol = 3
-#' )
+#' x <- '=HYPERLINK(\"#Sheet2!B3\", "Text to Display - Link to Sheet2")'
+#' wb$add_formula(sheet = "Sheet1", x = x, dims = "A1")
 #'
 #' ## Internal - No text to display using create_hyperlink() function
-#' write_formula(
-#'   wb, "Sheet1",
-#'   startRow = 1,
-#'   x = create_hyperlink(sheet = "Sheet 3", row = 1, col = 2)
-#' )
+#' x <- create_hyperlink(sheet = "Sheet3", row = 1, col = 2)
+#' wb$add_formula(sheet = "Sheet1", x = x, dims = "A2")
 #'
 #' ## Internal - Text to display
-#' write_formula(
-#'   wb, "Sheet1",
-#'   startRow = 2,
-#'   x = create_hyperlink(
-#'     sheet = "Sheet 3", row = 1, col = 2,
-#'     text = "Link to Sheet 3"
-#'   )
-#' )
+#' x <- create_hyperlink(sheet = "Sheet3", row = 1, col = 2,text = "Link to Sheet 3")
+#' wb$add_formula(sheet = "Sheet1", x = x, dims = "A3")
 #'
 #' ## Link to file - No text to display
-#' write_formula(
-#'   wb, "Sheet1",
-#'   startRow = 4,
-#'   x = create_hyperlink(
-#'     sheet = "testing", row = 3, col = 10,
-#'     file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
-#'   )
-#' )
+#' fl <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
+#' x <- create_hyperlink(sheet = "Sheet1", row = 3, col = 10, file = fl)
+#' wb$add_formula(sheet = "Sheet1", x = x, dims = "A4")
 #'
 #' ## Link to file - Text to display
-#' write_formula(
-#'   wb, "Sheet1",
-#'   startRow = 3,
-#'   x = create_hyperlink(
-#'     sheet = "testing", row = 3, col = 10,
-#'     file = system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2"),
-#'     text = "Link to File."
-#'   )
-#' )
+#' fl <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
+#' x <- create_hyperlink(sheet = "Sheet2", row = 3, col = 10, file = fl, text = "Link to File.")
+#' wb$add_formula(sheet = "Sheet1", x = x, dims = "A5")
 #'
 #' ## Link to external file - Text to display
-#' write_formula(
-#'   wb, "Sheet1",
-#'   startRow = 10, startCol = 1,
-#'   x = '=HYPERLINK("[C:/Users]", "Link to an external file")'
-#' )
+#' x <- '=HYPERLINK("[C:/Users]", "Link to an external file")'
+#' wb$add_formula(sheet = "Sheet1", x = x, dims = "A6")
 #'
-#' ## Link to internal file
-#' x = create_hyperlink(text = "test.png", file = "D:/somepath/somepicture.png")
-#' write_formula(wb, "Sheet1", startRow = 11, startCol = 1, x = x)
+#' x <- create_hyperlink(text = "test.png", file = "D:/somepath/somepicture.png")
+#' wb$add_formula(x = x, dims = "A7")
+#'
+#' # if (interactive()) wb$open()
+#'
 #' @export
 create_hyperlink <- function(sheet, row = 1, col = 1, text = NULL, file = NULL) {
   if (missing(sheet)) {
@@ -114,43 +77,7 @@ create_hyperlink <- function(sheet, row = 1, col = 1, text = NULL, file = NULL) 
 
 getId <- function(x) reg_match0(x, '(?<= Id=")[0-9A-Za-z]+')
 
-# `validateColor()` ------------------------------------------------------------
-#' Validate the color input
-#'
-#' @param color color
-#' @param errorMsg Error message
-#' @noRd
-validateColor <- function(color, errorMsg = "Invalid color!") {
-  color <- check_valid_color(color)
-
-  if (isFALSE(color)) {
-    stop(errorMsg)
-  }
-
-  color
-}
-
-check_valid_color <- function(color) {
-  # Not proud of this.  Returns FALSE if not a vaild, otherwise  cleans up.
-  # Probably not the best, but working within the functions we alreayd have.
-  if (is.null(color)) {
-    color <- "black"
-  }
-
-  validColors <- colors()
-
-  if (any(color %in% validColors)) {
-    color[color %in% validColors] <- col2hex(color[color %in% validColors])
-  }
-
-  if (all(grepl("^#[A-Fa-f0-9]{6}$", color))) {
-    gsub("^#", "FF", toupper(color))
-  } else {
-    FALSE
-  }
-}
-
-# `col2hex()` ------------------------------------------------------------------
+# `col2hex()` -----------------------------------------------------------------
 #' Convert rgb to hex
 #'
 #' @param my.col my.col
@@ -159,11 +86,48 @@ col2hex <- function(my.col) {
   rgb(t(col2rgb(my.col)), maxColorValue = 255)
 }
 
+# validate color --------------------------------------------------------------
+#' Validate and convert color. Returns ARGB string
+#' @param color input string (something like color(), "00000", "#000000", "00000000" or "#00000000")
+#' @param or_null logical for use in assert
+#' @param envir parent frame for use in assert
+#' @param msg return message
+#' @noRd
+validate_color <- function(color = NULL, or_null = FALSE, envir = parent.frame(), msg = NULL) {
+  sx <- as.character(substitute(color, envir))
+
+  if (identical(color, "none") && or_null) {
+    return(NULL)
+  }
+
+  # returns black
+  if (is.null(color)) {
+    if (or_null) return(NULL)
+    return("FF000000")
+  }
+
+  if (any(ind <- color %in% grDevices::colors())) {
+    color[ind] <- col2hex(color[ind])
+  }
+
+  # remove any # from color strings
+  color <- gsub("^#", "", toupper(color))
+
+  ## create a total size of 8 in ARGB format
+  color <- stringi::stri_pad_left(str = color, width = 8, pad = "F")
+
+  if (any(!grepl("[A-F0-9]{8}$", color))) {
+    if (is.null(msg)) msg <- sprintf("`%s` ['%s'] is not a valid color", sx, color)
+    stop(simpleError(msg))
+  }
+
+  color
+}
 
 ## header and footer replacements ----------------------------------------------
 headerFooterSub <- function(x) {
   if (!is.null(x)) {
-    x <- replace_illegal_chars(x)
+    x <- replace_legal_chars(x)
     x <- gsub("\\[Page\\]", "P", x)
     x <- gsub("\\[Pages\\]", "N", x)
     x <- gsub("\\[Date\\]", "D", x)
@@ -173,7 +137,7 @@ headerFooterSub <- function(x) {
     x <- gsub("\\[Tab\\]", "A", x)
   }
 
-  return(x)
+  x
 }
 
 
@@ -390,12 +354,15 @@ hashPassword <- function(password) {
   format(as.hexmode(hash), upper.case = TRUE)
 }
 
-#' create sparklines used in `add_sparline()`
-#' @details the colors are all predefined to be rgb. Maybe theme colors can be
+#' Create sparklines object
+#'
+#' Create a sparkline to be added a workbook with [wb_add_sparklines()]
+#'
+#' Colors are all predefined to be rgb. Maybe theme colors can be
 #' used too.
 #' @param sheet sheet
-#' @param dims dims
-#' @param sqref sqref
+#' @param dims Cell range of cells used to create the sparklines
+#' @param sqref Cell range of the destination of the sparklines.
 #' @param type type
 #' @param negative negative
 #' @param displayEmptyCellsAs displayEmptyCellsAs
@@ -412,6 +379,7 @@ hashPassword <- function(password) {
 #' @param colorLast colorLast
 #' @param colorHigh colorHigh
 #' @param colorLow colorLow
+#' @return A string containing XML code
 #' @examples
 #' # create sparklineGroup
 #' sparklines <- c(
@@ -451,6 +419,7 @@ create_sparklines <- function(
     colorHigh = wb_color(hex = "FFD00000"),
     colorLow = wb_color(hex = "FFD00000")
 ) {
+  # TODO change arguments to snake case?
 
   assert_class(dims, "character")
   assert_class(sqref, "character")
@@ -476,7 +445,7 @@ create_sparklines <- function(
       first = first,
       last = last,
       negative = negative,
-      "xr2:uid" = sprintf("{6F57B887-24F1-C14A-942C-%s}", random_string(length = 12, pattern = "[A-Z0-9]"))
+      "xr2:uid" = sprintf("{6F57B887-24F1-C14A-942C-%s}", random_string(length = 12, pattern = "[A-F0-9]"))
     ),
     xml_children = c(
       xml_node_create("x14:colorSeries", xml_attributes = colorSeries),
@@ -1211,4 +1180,142 @@ st_guid <- function() {
 #' @noRd
 st_userid <- function() {
   random_string(length = 16, pattern = "[a-z0-9]")
+}
+
+# solve merge helpers -----------------------------------------------------
+
+#' check side
+#' @param x a logical string
+#' @name sidehelper
+#' @noRd
+fullsided <- function(x) {
+  x[1] && x[length(x)]
+}
+
+#' @rdname sidehelper
+#' @noRd
+onesided <- function(x) {
+  (x[1] && !x[length(x)]) || (!x[1] && x[length(x)])
+}
+
+
+#' @rdname sidehelper
+#' @noRd
+twosided <- function(x) {
+  if (any(x)) (!x[1] && !x[length(x)])
+  else FALSE
+}
+
+#' @rdname sidehelper
+#' @noRd
+top_half <- function(x) {
+  if (twosided(x)) {
+    out <- rep(FALSE, length(x))
+    out[seq_len(which(x == TRUE)[1] - 1L)] <- TRUE
+    return(out)
+  } else {
+    stop("not twosided")
+  }
+}
+
+#' @rdname sidehelper
+#' @noRd
+bottom_half <- function(x) {
+  if (twosided(x)) {
+    out <- rep(TRUE, length(x))
+    out[seq_len(rev(which(x == TRUE))[1])] <- FALSE
+    return(out)
+  } else {
+    stop("not twosided")
+  }
+}
+
+#' merge solver. split exisisting merge into pieces
+#' @param have current merged cells
+#' @param want newly merged cells
+#' @noRd
+solve_merge <- function(have, want) {
+
+  got <- dims_to_dataframe(have, fill = TRUE)
+  new <- dims_to_dataframe(want, fill = TRUE)
+
+  cols_overlap <- colnames(got) %in% colnames(new)
+  rows_overlap <- rownames(got) %in% rownames(new)
+
+  # no overlap at all
+  if (!any(cols_overlap) || !any(rows_overlap)) {
+    return(have)
+  }
+
+  # return pieces of the old
+  pieces <- list()
+
+  # new overlaps old completely
+  if (fullsided(cols_overlap) && fullsided(rows_overlap)) {
+    return(NA_character_)
+  }
+
+  # all columns are overlapped onesided
+  if (fullsided(cols_overlap) && onesided(rows_overlap)) {
+    pieces[[1]] <- got[!rows_overlap, drop = FALSE]
+  }
+
+  # all columns are overlapped twosided
+  if (fullsided(cols_overlap) && twosided(rows_overlap)) {
+    pieces[[1]] <- got[top_half(rows_overlap), drop = FALSE]
+    pieces[[2]] <- got[bottom_half(rows_overlap), drop = FALSE]
+  }
+
+  # all rows are overlapped onesided
+  if (onesided(cols_overlap) && fullsided(rows_overlap)) {
+    pieces[[1]] <- got[, !cols_overlap, drop = FALSE]
+  }
+
+  # all rows are overlapped twosided
+  if (twosided(cols_overlap) && fullsided(rows_overlap)) {
+    pieces[[1]] <- got[, top_half(cols_overlap), drop = FALSE]
+    pieces[[2]] <- got[, bottom_half(cols_overlap), drop = FALSE]
+  }
+
+  # new is part of old
+  if (onesided(cols_overlap) && onesided(rows_overlap)) {
+    pieces[[1]] <- got[!rows_overlap, cols_overlap, drop = FALSE]
+    pieces[[2]] <- got[, !cols_overlap, drop = FALSE]
+  }
+
+  if (onesided(cols_overlap) && twosided(rows_overlap)) {
+    pieces[[1]] <- got[top_half(rows_overlap), cols_overlap, drop = FALSE]
+    pieces[[2]] <- got[bottom_half(rows_overlap), cols_overlap, drop = FALSE]
+    pieces[[3]] <- got[, !cols_overlap, drop = FALSE]
+  }
+
+  if (twosided(cols_overlap) && onesided(rows_overlap)) {
+    pieces[[1]] <- got[rows_overlap, top_half(cols_overlap), drop = FALSE]
+    pieces[[2]] <- got[rows_overlap, bottom_half(cols_overlap), drop = FALSE]
+    pieces[[3]] <- got[!rows_overlap, , drop = FALSE]
+  }
+
+  if (twosided(cols_overlap) && twosided(rows_overlap)) {
+    pieces[[1]] <- got[, top_half(cols_overlap), drop = FALSE]
+    pieces[[2]] <- got[, bottom_half(cols_overlap), drop = FALSE]
+    pieces[[3]] <- got[top_half(rows_overlap), cols_overlap, drop = FALSE]
+    pieces[[4]] <- got[bottom_half(rows_overlap), cols_overlap, drop = FALSE]
+  }
+
+  vapply(pieces, dataframe_to_dims, NA_character_)
+}
+
+#' get the basename
+#' on windows [basename()] only handles strings up to 255 characters, but we
+#' can have longer strings when loading file systems
+#' @param path a character string
+#' @keywords internal
+#' @noRd
+basename2 <- function(path) {
+  is_to_long <- vapply(path, to_long, NA)
+  if (any(is_to_long)) {
+    return(gsub(".*[\\/]", "", path))
+  } else {
+    return(basename(path))
+  }
 }

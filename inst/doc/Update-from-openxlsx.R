@@ -46,7 +46,7 @@ wb <- wb_load(file = file)
 
 ## ----new_style----------------------------------------------------------------
 # openxlsx2 chained
-border_color <- wb_color(hex = "#4F81BD")
+border_color <- wb_color(hex = "4F81BD")
 wb <- wb_workbook(creator = "My name here")$
   add_worksheet("Expenditure", grid_lines = FALSE)$
   add_data(x = USPersonalExpenditure, row_names = TRUE)$

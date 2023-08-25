@@ -1,15 +1,15 @@
-#' Open a Microsoft Excel file (xls/xlsx) or an openxlsx2 wbWorkbook
+#' Open an xlsx file or a `wbWorkbook` object
 #'
 #' @description
 #' This function tries to open a Microsoft Excel (xls/xlsx) file or,
-#' an openxlsx2 wbWorkbook with the proper application, in a portable manner.
+#' an [openxlsx2::wbWorkbook] with the proper application, in a portable manner.
 #'
 #' On Windows it uses `base::shell.exec()` (Windows only function) to
 #' determine the appropriate program.
 #'
-#' In Mac (c) it uses system default handlers, given the file type.
+#' On Mac, (c) it uses system default handlers, given the file type.
 #'
-#' In Linux it searches (via `which`) for available xls/xlsx reader
+#' On Linux, it searches (via `which`) for available xls/xlsx reader
 #' applications (unless `options('openxlsx2.excelApp')` is set to the app bin
 #' path), and if it finds anything, sets `options('openxlsx2.excelApp')` to the
 #' program chosen by the user via a menu (if many are present, otherwise it
@@ -17,33 +17,34 @@
 #' Libreoffice/Openoffice (`soffice` bin), Gnumeric (`gnumeric`) and Calligra
 #' Sheets (`calligrasheets`).
 #'
-#' @param x A path to the Excel (xls/xlsx) file or Workbook object.
+#' @param x A path to the Excel (xls/xlsx) file or wbWorkbook object.
 #' @param interactive If `FALSE` will throw a warning and not open the path.
 #'   This can be manually set to `TRUE`, otherwise when `NA` (default) uses the
 #'   value returned from [base::interactive()]
 #' @examples
 #' \donttest{
 #' if (interactive()) {
-#'   xlsxFile <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
-#'   xl_open(xlsxFile)
+#'   xlsx_file <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
+#'   xl_open(xlsx_file)
 #'
 #'   # (not yet saved) Workbook example
 #'   wb <- wb_workbook()
 #'   x <- mtcars[1:6, ]
 #'   wb$add_worksheet("Cars")
-#'   wb$add_data("Cars", x, startCol = 2, startRow = 3, rowNames = TRUE)
+#'   wb$add_data("Cars", x, start_col = 2, start_row = 3, row_names = TRUE)
 #'   xl_open(wb)
 #' }
 #' }
 #' @export
 xl_open <- function(x, interactive = NA) {
+  # The only function to accept a workbook or a file.
   UseMethod("xl_open")
 }
 
 #' @rdname xl_open
 #' @export
 xl_open.wbWorkbook <- function(x, interactive = NA) {
-  stopifnot(R6::is.R6(x))
+  assert_workbook(x)
   has_macros <- isTRUE(length(x$vbaProject) > 0)
   xl_open(x$clone()$save(temp_xlsx(macros = has_macros))$path, interactive = interactive)
 }
@@ -60,7 +61,7 @@ xl_open.default <- function(x, interactive = NA) {
   # nocov end
 
   if (!isTRUE(interactive)) {
-    warning("will not open file when not interactive")
+    warning("will not open file when not interactive", call. = FALSE)
     return()
   }
 
@@ -81,6 +82,8 @@ xl_open.default <- function(x, interactive = NA) {
       shell.exec(file) # nolint
     },
     Darwin = {
+      # system2('/Applications/LibreOffice.app/Contents/MacOS/soffice', shQuote(file), wait = FALSE)
+      # system2('open', paste0("-a numbers", shQuote(file)))
       system2('open', shQuote(file))
     },
     stop("Operating system not handled: ", toString(userSystem))

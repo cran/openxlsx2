@@ -12,7 +12,7 @@
 
 
 
-<title>openxlsx2 formulas manual</title>
+<title>Add formulas to a workbook</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -336,7 +336,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">openxlsx2 formulas manual</h1>
+<h1 class="title toc-ignore">Add formulas to a workbook</h1>
 
 
 
@@ -755,31 +755,37 @@ Row],[total_COGS]]</td>
 <span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&quot;sum_examples&quot;</span>)</span>
 <span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a></span>
 <span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="do">### Note: dataTable formula do not need to be used inside of dataTables. dataTable formula are for referencing the data within the dataTable.</span></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>sum_examples <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>    <span class="at">description =</span> <span class="fu">c</span>(<span class="st">&quot;sum_sales_price&quot;</span>, <span class="st">&quot;sum_product_Price_Quantity&quot;</span>),</span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>    <span class="at">formula =</span> <span class="fu">c</span>(</span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>      <span class="st">&quot;sum(daily_sales[[#Data],[sales_price]])&quot;</span>,</span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>      <span class="st">&quot;sum(daily_sales[[#Data],[sales_price]] * daily_sales[[#Data],[sales_quantity]])&quot;</span></span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>    )</span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>  )</span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a><span class="fu">class</span>(sum_examples<span class="sc">$</span>formula) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">class</span>(sum_examples<span class="sc">$</span>formula), <span class="st">&quot;formula&quot;</span>)</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="do">### Note: dataTable formula do not need to be used inside of dataTables. dataTable formula are for referencing the data within the dataTable.</span></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>sum_examples <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>  <span class="at">description =</span> <span class="fu">c</span>(<span class="st">&quot;sum_sales_price&quot;</span>, <span class="st">&quot;sum_product_Price_Quantity&quot;</span>),</span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>  <span class="at">formula =</span> <span class="fu">c</span>(<span class="st">&quot;&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>)</span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a></span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> sum_examples)</span>
 <span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a></span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> sum_examples)</span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a></span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a><span class="do">#### dataTable referencing</span></span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&quot;dt_references&quot;</span>)</span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a></span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a><span class="do">### Adding the headers by themselves.</span></span>
-<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_formula</span>(</span>
-<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a>  <span class="at">x =</span> <span class="st">&quot;daily_sales[[#Headers],[sales_price]:[total_gross_profit]]&quot;</span>,</span>
-<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a>)</span>
-<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a></span>
-<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a><span class="do">### Adding the raw data by reference and selecting them directly.</span></span>
-<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_formula</span>(</span>
-<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a>  <span class="at">x =</span> <span class="st">&quot;daily_sales[[#Data],[sales_price]:[total_gross_profit]]&quot;</span>,</span>
-<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a>  <span class="at">start_row =</span> <span class="dv">2</span></span>
-<span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a>)</span>
-<span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
+<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a><span class="co"># add formulas</span></span>
+<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;sum(daily_sales[[#Data],[sales_price]])&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;B2&quot;</span>)</span>
+<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;sum(daily_sales[[#Data],[sales_price]] * daily_sales[[#Data],[sales_quantity]])&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;B3&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a></span>
+<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a><span class="do">#### dataTable referencing</span></span>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&quot;dt_references&quot;</span>)</span>
+<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a></span>
+<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a><span class="do">### Adding the headers by themselves.</span></span>
+<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_formula</span>(</span>
+<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a>  <span class="at">x =</span> <span class="st">&quot;daily_sales[[#Headers],[sales_price]:[total_gross_profit]]&quot;</span>,</span>
+<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a>  <span class="at">dims =</span> <span class="st">&quot;A1:G1&quot;</span>,</span>
+<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a>  <span class="at">array =</span> <span class="cn">TRUE</span></span>
+<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a>)</span>
+<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a></span>
+<span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a><span class="do">### Adding the raw data by reference and selecting them directly.</span></span>
+<span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">add_formula</span>(</span>
+<span id="cb15-30"><a href="#cb15-30" tabindex="-1"></a>  <span class="at">x =</span> <span class="st">&quot;daily_sales[[#Data],[sales_price]:[total_gross_profit]]&quot;</span>,</span>
+<span id="cb15-31"><a href="#cb15-31" tabindex="-1"></a>  <span class="at">start_row =</span> <span class="dv">2</span>,</span>
+<span id="cb15-32"><a href="#cb15-32" tabindex="-1"></a>  <span class="at">dims =</span> <span class="st">&quot;A2:G4&quot;</span>,</span>
+<span id="cb15-33"><a href="#cb15-33" tabindex="-1"></a>  <span class="at">array =</span> <span class="cn">TRUE</span></span>
+<span id="cb15-34"><a href="#cb15-34" tabindex="-1"></a>)</span>
+<span id="cb15-35"><a href="#cb15-35" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
 </div>
 </div>
 <div class="footnotes footnotes-end-of-document">

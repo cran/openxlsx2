@@ -10,8 +10,8 @@ library(openxlsx2)
 
 ## -----------------------------------------------------------------------------
 wb <- wb_workbook()
-wb$add_dxfs_style(name = "negStyle", font_color = wb_color(hex = "#FF9C0006"), bg_fill = wb_color(hex = "#FFFFC7CE"))
-wb$add_dxfs_style(name = "posStyle", font_color = wb_color(hex = "#FF006100"), bg_fill = wb_color(hex = "#FFC6EFCE"))
+wb$add_dxfs_style(name = "negStyle", font_color = wb_color(hex = "FF9C0006"), bg_fill = wb_color(hex = "FFFFC7CE"))
+wb$add_dxfs_style(name = "posStyle", font_color = wb_color(hex = "FF006100"), bg_fill = wb_color(hex = "FFC6EFCE"))
 
 ## ----echo=FALSE, warning=FALSE------------------------------------------------
 knitr::include_graphics("img/cf_cells.jpg")

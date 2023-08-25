@@ -2,7 +2,7 @@
 % Please edit documentation in R/class-workbook-wrappers.R
 \name{wb_save}
 \alias{wb_save}
-\title{Save Workbook to file}
+\title{Save a workbook to file}
 \usage{
 wb_save(wb, file = NULL, overwrite = TRUE, path = NULL)
 }
@@ -11,15 +11,15 @@ wb_save(wb, file = NULL, overwrite = TRUE, path = NULL)
 
 \item{file}{A path to save the workbook to}
 
-\item{overwrite}{If \code{FALSE}, will not overwrite when \code{path} exists}
+\item{overwrite}{If \code{FALSE}, will not overwrite when \code{file} already exists.}
 
-\item{path}{Deprecated argument previously used for file. Please use file in new code.}
+\item{path}{Deprecated argument. Please use \code{file} in new code.}
 }
 \value{
 the \code{wbWorkbook} object, invisibly
 }
 \description{
-Save Workbook to file
+Save a workbook to file
 }
 \examples{
 ## Create a new workbook and add a worksheet
@@ -33,22 +33,22 @@ wb_save(wb, file = temp_xlsx(), overwrite = TRUE)
 }
 \seealso{
 Other workbook wrappers: 
+\code{\link{base_font-wb}},
+\code{\link{col_widths-wb}},
+\code{\link{creators-wb}},
+\code{\link{grouping-wb}},
+\code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
 \code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_worksheet}()},
-\code{\link{wb_base_font}},
 \code{\link{wb_clone_worksheet}()},
-\code{\link{wb_col_widths}},
 \code{\link{wb_copy_cells}()},
-\code{\link{wb_creators}},
 \code{\link{wb_freeze_pane}()},
-\code{\link{wb_grouping}},
 \code{\link{wb_merge_cells}()},
 \code{\link{wb_set_last_modified_by}()},
-\code{\link{wb_set_row_heights}()},
 \code{\link{wb_workbook}()}
 }
 \concept{workbook wrappers}

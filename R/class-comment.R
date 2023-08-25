@@ -35,8 +35,7 @@ wbComment <- R6::R6Class(
     #' @param width Width of the comment in ... units
     #' @param height Height of comment in ... units
     #' @return a `wbComment` object
-    initialize = function(text, author, style, visible = TRUE, width = 2, height = 4) {
-      # TODO this needs the validations that the comment wrappers have
+    initialize = function(text, author, style, visible, width, height) {
       self$text <- text
       self$author <- author
       self$style <- style
@@ -76,69 +75,61 @@ wbComment <- R6::R6Class(
     }
   )
 )
+# Comment creation wrappers ----------------------------------------------------------------
 
+# TODO wb_comment() should leverage wbComment$new() more
 
-# wrappers ----------------------------------------------------------------
-
-# TODO create_comment() should leverage wbComment$new() more
-# TODO write_comment() should leverage wbWorkbook$addComment() more
-# TODO remove_comment() should leverage wbWorkbook$remove_comment() more
-
-#' Create, write and remove comments
+#' Helper to create a comment object
 #'
-#' The comment functions (create, write and remove) allow the
-#' modification of comments. In newer spreadsheet software they are called
-#' notes, while they are called comments in openxml. Modification of what
-#' newer spreadsheet software now calls comment is possible via
-#' [wb_add_thread()].
+#' Creates a `wbComment` object. Use with [wb_add_comment()] to add to a worksheet location.
 #'
-#' @param text Comment text. Character vector.
-#' @param author Author of comment. A string.
+#' @param text Comment text. Character vector. or a [fmt_txt()] string.
+#' @param author Author of comment. A string. By default, will look at `options("openxlsx2.creator")`.
+#'   Otherwise, will check the system username.
 #' @param style A Style object or list of style objects the same length as comment vector.
-#' @param visible `TRUE` or `FALSE`. Is comment visible?
+#' @param visible Is comment visible? Default: `FALSE`.
 #' @param width Textbox integer width in number of cells
 #' @param height Textbox integer height in number of cells
+#'
+#' @return A `wbComment` object
 #' @export
-#' @rdname comment
 #' @examples
 #' wb <- wb_workbook()
 #' wb$add_worksheet("Sheet 1")
 #'
 #' # write comment without author
-#' c1 <- create_comment(text = "this is a comment", author = "")
+#' c1 <- wb_comment(text = "this is a comment", author = "", visible = TRUE)
 #' wb$add_comment(dims = "B10", comment = c1)
 #'
 #' # Write another comment with author information
-#' c2 <- create_comment(text = "this is another comment", author = "Marco Polo")
+#' c2 <- wb_comment(text = "this is another comment", author = "Marco Polo")
 #' wb$add_comment(sheet = 1, dims = "C10", comment = c2)
 #'
 #' # write a styled comment with system author
 #' s1 <- create_font(b = "true", color = wb_color(hex = "FFFF0000"), sz = "12")
 #' s2 <- create_font(color = wb_color(hex = "FF000000"), sz = "9")
-#' c3 <- create_comment(text = c("This Part Bold red\n\n", "This part black"), style = c(s1, s2))
+#' c3 <- wb_comment(text = c("This Part Bold red\n\n", "This part black"), style = c(s1, s2))
 #'
 #' wb$add_comment(sheet = 1, dims = wb_dims(3, 6), comment = c3)
-#'
-#' # remove the first comment c1
-#' wb$remove_comment(1, dims = "B10")
-create_comment <- function(text,
-  author = Sys.info()[["user"]],
-  style = NULL,
-  visible = TRUE,
-  width = 2,
-  height = 4) {
-
-  # TODO move this to wbComment$new(); this could then be replaced with
-  # wb_comment()
-
+wb_comment <- function(text = NULL,
+                       style = NULL,
+                       visible = FALSE,
+                       author = getOption("openxlsx2.creator"),
+                       width = 2,
+                       height = 4) {
+  # Code copied from the wbWorkbook
+  author <- author %||% Sys.getenv("USERNAME")
+  text <- text %||% ""
   assert_class(author, "character")
   assert_class(text, "character")
-  assert_class(width, "numeric")
-  assert_class(height, "numeric")
+  assert_class(width, c("numeric", "integer"))
+  assert_class(height, c("numeric", "integer"))
   assert_class(visible, "logical")
 
   if (length(visible) > 1) stop("visible must be a single logical")
   if (length(author) > 1) stop("author) must be a single character")
+  if (length(width) > 1) stop("width must be a single integer")
+  if (length(height) > 1) stop("height must be a single integer")
 
   width <- round(width)
   height <- round(height)
@@ -169,24 +160,47 @@ create_comment <- function(text,
     )
   }
 
-  invisible(wbComment$new(text = text, author = author, style = style, visible = visible, width = width[1], height = height[1]))
+  invisible(wbComment$new(text = text, author = author, style = style, width = width, height = height, visible = visible))
+}
+
+#' Create a comment
+#'
+#' Use [wb_comment()] in new code. See [openxlsx2-deprecated]
+#'
+#' @inheritParams wb_comment
+#' @param author A string, by default, will use "user"
+#' @param visible Default: `TRUE`. Is the comment visible by default?
+#' @keywords internal
+#' @returns a `wbComment` object
+#' @export
+create_comment <- function(text,
+  author = Sys.info()[["user"]],
+  style = NULL,
+  visible = TRUE,
+  width = 2,
+  height = 4) {
+  #
+  if (getOption("openxlsx2.soon_deprecated", default = FALSE)) {
+    .Deprecated("wb_comment()", old = "create_comment()")
+  }
+  wb_comment(text = text, author = author, style = style, visible = visible, width = width[1], height = height[1])
 }
 
 #' Internal comment functions
 #'
-#' Users are advised to use [wb_add_comment()] and [wb_remove_comment()]
+#' Users are advised to use [wb_add_comment()] and [wb_remove_comment()].
+#' This function is used internally by openxlsx2. It will stop exporting it at
+#' some point in the future. Use the replacement function at your earliest convenience.
 #' @name comment_internal
 NULL
 
 #' @rdname comment_internal
-#' @param wb A workbook object
-#' @param sheet A vector of names or indices of worksheets
-#' @param col Column a column number of letter. For `remove_comment` this can be a range.
-#' @param row A row number. For `remove_comment` this can be a range.
-#' @param comment A Comment object. See [create_comment()].
-#' @param dims worksheet cell "A1"
+#' @inheritParams wb_add_comment
+#' @param comment An object created by [create_comment()]
+#' @param row,col Row and column of the cell
 #' @keywords internal
 #' @export
+#' @inherit wb_add_comment examples
 write_comment <- function(
     wb,
     sheet,
@@ -282,7 +296,7 @@ write_comment <- function(
         sprintf(
           '<Relationship Id="rId%s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing" Target="../drawings/vmlDrawing%s.vml"/>',
           next_rid,
-          sheet
+          next_id
         )
       )
 
@@ -389,9 +403,7 @@ remove_comment <- function(
 
 }
 
-wb_comment <- function(text = character(), author = character(), style = character()) {
-  wbComment$new(text = text, author = author, style = style)
-}
+
 
 as_fmt_txt <- function(x) {
   vapply(x, function(y) {
@@ -402,16 +414,19 @@ as_fmt_txt <- function(x) {
 }
 
 wb_get_comment <- function(wb, sheet = current_sheet(), dims = "A1") {
+
   sheet_id <- wb$validate_sheet(sheet)
+  cmmt <- wb$worksheets[[sheet_id]]$relships$comments
+
   cmts <- list()
-  if (length(wb$comments) >= sheet_id) {
-    cmts <- as.data.frame(do.call("rbind", wb$comments[[sheet_id]]))
+  if (length(cmmt) && length(wb$comments) <= cmmt) {
+    cmts <- as.data.frame(do.call("rbind", wb$comments[[cmmt]]))
     if (!is.null(dims)) cmts <- cmts[cmts$ref == dims, ]
     # print(cmts)
     cmts <- cmts[c("ref", "author", "comment")]
     if (nrow(cmts)) {
       cmts$comment <- as_fmt_txt(cmts$comment)
-      cmts$sheet_id <- sheet_id
+      cmts$cmmt_id <- cmmt
     }
   }
   cmts
@@ -420,10 +435,11 @@ wb_get_comment <- function(wb, sheet = current_sheet(), dims = "A1") {
 wb_get_thread <- function(wb, sheet = current_sheet(), dims = "A1") {
 
   sheet <- wb$validate_sheet(sheet)
+  thrd <- wb$worksheets[[sheet]]$relships$threadedComment
 
   tc <- cbind(
-    rbindlist(xml_attr(wb$threadComments[[sheet]], "threadedComment")),
-    text = xml_value(wb$threadComments[[sheet]], "threadedComment", "text")
+    rbindlist(xml_attr(wb$threadComments[[thrd]], "threadedComment")),
+    text = xml_value(wb$threadComments[[thrd]], "threadedComment", "text")
   )
 
   if (!is.null(dims)) {
