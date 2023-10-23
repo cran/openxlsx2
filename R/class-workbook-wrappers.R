@@ -11,7 +11,7 @@
 #' "Savon", "Slice", "Vapor Trail", "View", "Wisp", "Wood Type"
 #'
 #' @param creator Creator of the workbook (your name). Defaults to login username or `options("openxlsx2.creator")` if set.
-#' @param title,subject,category Workbook property, a string.
+#' @param title,subject,category,keywords,comments,manager,company Workbook property, a string.
 #' @param datetime_created The time of the workbook is created
 #' @param theme Optional theme identified by string or number.
 #'   See **Details** for options.
@@ -39,6 +39,10 @@ wb_workbook <- function(
   category         = NULL,
   datetime_created = Sys.time(),
   theme            = NULL,
+  keywords         = NULL,
+  comments         = NULL,
+  manager          = NULL,
+  company          = NULL,
   ...
 ) {
   wbWorkbook$new(
@@ -48,6 +52,10 @@ wb_workbook <- function(
     category         = category,
     datetime_created = datetime_created,
     theme            = theme,
+    keywords         = keywords,
+    comments         = comments,
+    manager          = manager,
+    company          = company,
     ...              = ...
   )
 }
@@ -309,6 +317,8 @@ wb_add_data_table <- function(
 #' @param data The column name(s) of `x` used as data
 #' @param fun A vector of functions to be used with `data`
 #' @param params A list of parameters to modify pivot table creation.
+#' @param pivot_table An optional name for the pivot table
+#' @param slicer a character object with names used as slicer
 #' @seealso [wb_data()]
 #' @examples
 #' wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = mtcars)
@@ -332,30 +342,87 @@ wb_add_pivot_table <- function(
     cols,
     data,
     fun,
-    params
+    params,
+    pivot_table,
+    slicer
 ) {
   assert_workbook(wb)
-  if (missing(filter)) filter <- substitute()
-  if (missing(rows))   rows   <- substitute()
-  if (missing(cols))   cols   <- substitute()
-  if (missing(data))   data   <- substitute()
-  if (missing(fun))    fun    <- substitute()
-  if (missing(params)) params <- substitute()
+  if (missing(filter))      filter <- substitute()
+  if (missing(rows))        rows   <- substitute()
+  if (missing(cols))        cols   <- substitute()
+  if (missing(data))        data   <- substitute()
+  if (missing(fun))         fun    <- substitute()
+  if (missing(params))      params <- substitute()
+  if (missing(pivot_table)) pivot_table <- substitute()
+  if (missing(slicer))      slicer <- substitute()
 
   wb$clone()$add_pivot_table(
-    x      = x,
-    sheet  = sheet,
-    dims   = dims,
-    filter = filter,
-    rows   = rows,
-    cols   = cols,
-    data   = data,
-    fun    = fun,
-    params = params
+    x           = x,
+    sheet       = sheet,
+    dims        = dims,
+    filter      = filter,
+    rows        = rows,
+    cols        = cols,
+    data        = data,
+    fun         = fun,
+    params      = params,
+    pivot_table = pivot_table,
+    slicer      = slicer
   )
 
 }
 
+#' Add a slicer to a pivot table
+#'
+#' Add a slicer to a previously created pivot table. This function is still experimental and might be changed/improved in upcoming releases.
+#'
+#' @param wb A Workbook object containing a #' worksheet.
+#' @param x A `data.frame` that inherits the [`wb_data`][wb_data()] class.
+#' @param sheet A worksheet containing a #'
+#' @param dims The worksheet cell where the pivot table is placed
+#' @param pivot_table the name of a pivot table on the selected sheet
+#' @param slicer a variable used as slicer for the pivot table
+#' @param params a list of parameters to modify pivot table creation
+#' @family workbook wrappers
+#' @family worksheet content functions
+#' @details This assumes that the slicer variable initialization has happened before. Unfortunately, it is unlikely that we can guarantee this for loaded workbooks, and we *strictly* discourage users from attempting this. If the variable has not been initialized properly, this may cause the spreadsheet software to crash.
+#'
+#' For the time being, the slicer needs to be placed on the slide with the pivot table.
+#' @examples
+#' wb <- wb_workbook() %>%
+#'   wb_add_worksheet() %>% wb_add_data(x = mtcars)
+#'
+#' df <- wb_data(wb, sheet = 1)
+#'
+#' wb <- wb %>%
+#'   wb_add_pivot_table(
+#'     df, dims = "A3", slicer = "vs", rows = "cyl", cols = "gear", data = "disp",
+#'     pivot_table = "mtcars"
+#'   ) %>%
+#'   wb_add_slicer(x = df, slicer = "vs", pivot_table = "mtcars")
+#' @export
+wb_add_slicer <- function(
+    wb,
+    x,
+    dims        = "A1",
+    sheet       = current_sheet(),
+    pivot_table,
+    slicer,
+    params
+) {
+  assert_workbook(wb)
+  if (missing(params)) params <- substitute()
+
+  wb$clone()$add_slicer(
+    x           = x,
+    sheet       = sheet,
+    dims        = dims,
+    pivot_table = pivot_table,
+    slicer      = slicer,
+    params      = params
+  )
+
+}
 
 #' Add a formula to a cell range in a worksheet
 #'
@@ -726,9 +793,17 @@ wb_add_worksheet <- function(
 #' formulas, charts, pivot tables, etc. may not be updated. Some elements like
 #' named ranges and slicers cannot be cloned yet.
 #'
+#' Cloning from another workbook is still an experimental feature and might not
+#' work reliably. Cloning data, media, charts and tables should work. Slicers
+#' and pivot tables as well as everything everything relying on dxfs styles
+#' (e.g. custom table styles and conditional formatting) is currently not
+#' implemented.
+#' Formula references are not updated to reflect interactions between workbooks.
+#'
 #' @param wb A `wbWorkbook` object
 #' @param old Name of existing worksheet to copy
 #' @param new Name of the new worksheet to create
+#' @param from (optional) Workbook to clone old from
 #' @return The `wbWorkbook` object, invisibly.
 #'
 #' @export
@@ -743,9 +818,26 @@ wb_add_worksheet <- function(
 #' wb$clone_worksheet("Sheet 1", new = "Sheet 2")
 #' # Take advantage of waiver functions
 #' wb$clone_worksheet(old = "Sheet 1")
-wb_clone_worksheet <- function(wb, old = current_sheet(), new = next_sheet()) {
+#'
+#' ## cloning from another workbook
+#'
+#' # create a workbook
+#' wb <- wb_workbook()$
+#' add_worksheet("NOT_SUM")$
+#'   add_data(x = head(iris))$
+#'   add_fill(dims = "A1:B2", color = wb_color("yellow"))$
+#'   add_border(dims = "B2:C3")
+#'
+#' # we will clone this styled chart into another workbook
+#' fl <- system.file("extdata", "oxlsx2_sheet.xlsx", package = "openxlsx2")
+#' wb_from <- wb_load(fl)
+#'
+#' # clone styles and shared strings
+#' wb$clone_worksheet(old = "SUM", new = "SUM", from = wb_from)
+#'
+wb_clone_worksheet <- function(wb, old = current_sheet(), new = next_sheet(), from = NULL) {
   assert_workbook(wb)
-  wb$clone()$clone_worksheet(old = old, new = new)
+  wb$clone()$clone_worksheet(old = old, new = new, from = from)
 }
 
 # worksheets --------------------------------------------------------------
@@ -839,6 +931,7 @@ NULL
 #' @export
 wb_set_row_heights <- function(wb, sheet = current_sheet(), rows, heights = NULL, hidden = FALSE) {
   assert_workbook(wb)
+  assert_class(heights, c("numeric", "integer"), or_null = TRUE, arg_nm = "heights")
   wb$clone()$set_row_heights(sheet = sheet, rows, heights, hidden)
 }
 #' @rdname row_heights-wb
@@ -1344,74 +1437,76 @@ wb_set_header_footer <- function(
 #' @export
 #' @details
 #' `paper_size` is an integer corresponding to:
-#' \itemize{
-#' \item{**1**}{ Letter paper (8.5 in. by 11 in.)}
-#' \item{**2**}{ Letter small paper (8.5 in. by 11 in.)}
-#' \item{**3**}{ Tabloid paper (11 in. by 17 in.)}
-#' \item{**4**}{ Ledger paper (17 in. by 11 in.)}
-#' \item{**5**}{ Legal paper (8.5 in. by 14 in.)}
-#' \item{**6**}{ Statement paper (5.5 in. by 8.5 in.)}
-#' \item{**7**}{ Executive paper (7.25 in. by 10.5 in.)}
-#' \item{**8**}{ A3 paper (297 mm by 420 mm)}
-#' \item{**9**}{ A4 paper (210 mm by 297 mm)}
-#' \item{**10**}{ A4 small paper (210 mm by 297 mm)}
-#' \item{**11**}{ A5 paper (148 mm by 210 mm)}
-#' \item{**12**}{ B4 paper (250 mm by 353 mm)}
-#' \item{**13**}{ B5 paper (176 mm by 250 mm)}
-#' \item{**14**}{ Folio paper (8.5 in. by 13 in.)}
-#' \item{**15**}{ Quarto paper (215 mm by 275 mm)}
-#' \item{**16**}{ Standard paper (10 in. by 14 in.)}
-#' \item{**17**}{ Standard paper (11 in. by 17 in.)}
-#' \item{**18**}{ Note paper (8.5 in. by 11 in.)}
-#' \item{**19**}{ #9 envelope (3.875 in. by 8.875 in.)}
-#' \item{**20**}{ #10 envelope (4.125 in. by 9.5 in.)}
-#' \item{**21**}{ #11 envelope (4.5 in. by 10.375 in.)}
-#' \item{**22**}{ #12 envelope (4.75 in. by 11 in.)}
-#' \item{**23**}{ #14 envelope (5 in. by 11.5 in.)}
-#' \item{**24**}{ C paper (17 in. by 22 in.)}
-#' \item{**25**}{ D paper (22 in. by 34 in.)}
-#' \item{**26**}{ E paper (34 in. by 44 in.)}
-#' \item{**27**}{ DL envelope (110 mm by 220 mm)}
-#' \item{**28**}{ C5 envelope (162 mm by 229 mm)}
-#' \item{**29**}{ C3 envelope (324 mm by 458 mm)}
-#' \item{**30**}{ C4 envelope (229 mm by 324 mm)}
-#' \item{**31**}{ C6 envelope (114 mm by 162 mm)}
-#' \item{**32**}{ C65 envelope (114 mm by 229 mm)}
-#' \item{**33**}{ B4 envelope (250 mm by 353 mm)}
-#' \item{**34**}{ B5 envelope (176 mm by 250 mm)}
-#' \item{**35**}{ B6 envelope (176 mm by 125 mm)}
-#' \item{**36**}{ Italy envelope (110 mm by 230 mm)}
-#' \item{**37**}{ Monarch envelope (3.875 in. by 7.5 in.).}
-#' \item{**38**}{ 6 3/4 envelope (3.625 in. by 6.5 in.)}
-#' \item{**39**}{ US standard fanfold (14.875 in. by 11 in.)}
-#' \item{**40**}{ German standard fanfold (8.5 in. by 12 in.)}
-#' \item{**41**}{ German legal fanfold (8.5 in. by 13 in.)}
-#' \item{**42**}{ ISO B4 (250 mm by 353 mm)}
-#' \item{**43**}{ Japanese double postcard (200 mm by 148 mm)}
-#' \item{**44**}{ Standard paper (9 in. by 11 in.)}
-#' \item{**45**}{ Standard paper (10 in. by 11 in.)}
-#' \item{**46**}{ Standard paper (15 in. by 11 in.)}
-#' \item{**47**}{ Invite envelope (220 mm by 220 mm)}
-#' \item{**50**}{ Letter extra paper (9.275 in. by 12 in.)}
-#' \item{**51**}{ Legal extra paper (9.275 in. by 15 in.)}
-#' \item{**52**}{ Tabloid extra paper (11.69 in. by 18 in.)}
-#' \item{**53**}{ A4 extra paper (236 mm by 322 mm)}
-#' \item{**54**}{ Letter transverse paper (8.275 in. by 11 in.)}
-#' \item{**55**}{ A4 transverse paper (210 mm by 297 mm)}
-#' \item{**56**}{ Letter extra transverse paper (9.275 in. by 12 in.)}
-#' \item{**57**}{ SuperA/SuperA/A4 paper (227 mm by 356 mm)}
-#' \item{**58**}{ SuperB/SuperB/A3 paper (305 mm by 487 mm)}
-#' \item{**59**}{ Letter plus paper (8.5 in. by 12.69 in.)}
-#' \item{**60**}{ A4 plus paper (210 mm by 330 mm)}
-#' \item{**61**}{ A5 transverse paper (148 mm by 210 mm)}
-#' \item{**62**}{ JIS B5 transverse paper (182 mm by 257 mm)}
-#' \item{**63**}{ A3 extra paper (322 mm by 445 mm)}
-#' \item{**64**}{ A5 extra paper (174 mm by 235 mm)}
-#' \item{**65**}{ ISO B5 extra paper (201 mm by 276 mm)}
-#' \item{**66**}{ A2 paper (420 mm by 594 mm)}
-#' \item{**67**}{ A3 transverse paper (297 mm by 420 mm)}
-#' \item{**68**}{ A3 extra transverse paper (322 mm by 445 mm)}
-#' }
+#'
+#'  | size   | "paper type"                                         |
+#'  |--------|------------------------------------------------------|
+#'  | 1      | Letter paper (8.5 in. by 11 in.)                     |
+#'  | 2      |  Letter small paper (8.5 in. by 11 in.)              |
+#'  | 3      |  Tabloid paper (11 in. by 17 in.)                    |
+#'  | 4      |  Ledger paper (17 in. by 11 in.)                     |
+#'  | 5      |  Legal paper (8.5 in. by 14 in.)                     |
+#'  | 6      |  Statement paper (5.5 in. by 8.5 in.)                |
+#'  | 7      |  Executive paper (7.25 in. by 10.5 in.)              |
+#'  | 8      |  A3 paper (297 mm by 420 mm)                         |
+#'  | 9      |  A4 paper (210 mm by 297 mm)                         |
+#'  | 10     |  A4 small paper (210 mm by 297 mm)                   |
+#'  | 11     |  A5 paper (148 mm by 210 mm)                         |
+#'  | 12     |  B4 paper (250 mm by 353 mm)                         |
+#'  | 13     |  B5 paper (176 mm by 250 mm)                         |
+#'  | 14     |  Folio paper (8.5 in. by 13 in.)                     |
+#'  | 15     |  Quarto paper (215 mm by 275 mm)                     |
+#'  | 16     |  Standard paper (10 in. by 14 in.)                   |
+#'  | 17     |  Standard paper (11 in. by 17 in.)                   |
+#'  | 18     |  Note paper (8.5 in. by 11 in.)                      |
+#'  | 19     |  #9 envelope (3.875 in. by 8.875 in.)                |
+#'  | 20     |  #10 envelope (4.125 in. by 9.5 in.)                 |
+#'  | 21     |  #11 envelope (4.5 in. by 10.375 in.)                |
+#'  | 22     |  #12 envelope (4.75 in. by 11 in.)                   |
+#'  | 23     |  #14 envelope (5 in. by 11.5 in.)                    |
+#'  | 24     |  C paper (17 in. by 22 in.)                          |
+#'  | 25     |  D paper (22 in. by 34 in.)                          |
+#'  | 26     |  E paper (34 in. by 44 in.)                          |
+#'  | 27     |  DL envelope (110 mm by 220 mm)                      |
+#'  | 28     |  C5 envelope (162 mm by 229 mm)                      |
+#'  | 29     |  C3 envelope (324 mm by 458 mm)                      |
+#'  | 30     |  C4 envelope (229 mm by 324 mm)                      |
+#'  | 31     |  C6 envelope (114 mm by 162 mm)                      |
+#'  | 32     |  C65 envelope (114 mm by 229 mm)                     |
+#'  | 33     |  B4 envelope (250 mm by 353 mm)                      |
+#'  | 34     |  B5 envelope (176 mm by 250 mm)                      |
+#'  | 35     |  B6 envelope (176 mm by 125 mm)                      |
+#'  | 36     |  Italy envelope (110 mm by 230 mm)                   |
+#'  | 37     |  Monarch envelope (3.875 in. by 7.5 in.)             |
+#'  | 38     |  6 3/4 envelope (3.625 in. by 6.5 in.)               |
+#'  | 39     |  US standard fanfold (14.875 in. by 11 in.)          |
+#'  | 40     |  German standard fanfold (8.5 in. by 12 in.)         |
+#'  | 41     |  German legal fanfold (8.5 in. by 13 in.)            |
+#'  | 42     |  ISO B4 (250 mm by 353 mm)                           |
+#'  | 43     |  Japanese double postcard (200 mm by 148 mm)         |
+#'  | 44     |  Standard paper (9 in. by 11 in.)                    |
+#'  | 45     |  Standard paper (10 in. by 11 in.)                   |
+#'  | 46     |  Standard paper (15 in. by 11 in.)                   |
+#'  | 47     |  Invite envelope (220 mm by 220 mm)                  |
+#'  | 50     |  Letter extra paper (9.275 in. by 12 in.)            |
+#'  | 51     |  Legal extra paper (9.275 in. by 15 in.)             |
+#'  | 52     |  Tabloid extra paper (11.69 in. by 18 in.)           |
+#'  | 53     |  A4 extra paper (236 mm by 322 mm)                   |
+#'  | 54     |  Letter transverse paper (8.275 in. by 11 in.)       |
+#'  | 55     |  A4 transverse paper (210 mm by 297 mm)              |
+#'  | 56     |  Letter extra transverse paper (9.275 in. by 12 in.) |
+#'  | 57     |  SuperA/SuperA/A4 paper (227 mm by 356 mm)           |
+#'  | 58     |  SuperB/SuperB/A3 paper (305 mm by 487 mm)           |
+#'  | 59     |  Letter plus paper (8.5 in. by 12.69 in.)            |
+#'  | 60     |  A4 plus paper (210 mm by 330 mm)                    |
+#'  | 61     |  A5 transverse paper (148 mm by 210 mm)              |
+#'  | 62     |  JIS B5 transverse paper (182 mm by 257 mm)          |
+#'  | 63     |  A3 extra paper (322 mm by 445 mm)                   |
+#'  | 64     |  A5 extra paper (174 mm by 235 mm)                   |
+#'  | 65     |  ISO B5 extra paper (201 mm by 276 mm)               |
+#'  | 66     |  A2 paper (420 mm by 594 mm)                         |
+#'  | 67     |  A3 transverse paper (297 mm by 420 mm)              |
+#'  | 68     |  A3 extra transverse paper (322 mm by 445 mm)        |
+#'
 #' @examples
 #' wb <- wb_workbook()
 #' wb$add_worksheet("S1")
@@ -1545,7 +1640,7 @@ wb_protect_worksheet <- function(
 #' @param lock_structure Whether the workbook structure should be locked
 #' @param lock_windows Whether the window position of the spreadsheet should be
 #'   locked
-#' @param type Lock type (see details)
+#' @param type Lock type (see **Details**)
 #' @param file_sharing Whether to enable a popup requesting the unlock password
 #'   is prompted
 #' @param username The username for the `file_sharing` popup
@@ -1556,12 +1651,10 @@ wb_protect_worksheet <- function(
 #' @details
 #' Lock types:
 #'
-#' \describe{
-#'   \item{`1` }{xlsx with password (default)}
-#'   \item{`2` }{xlsx recommends read-only}
-#'   \item{`4` }{xlsx enforces read-only}
-#'   \item{`8` }{xlsx is locked for annotation}
-#' }
+#' * `1`  xlsx with password (default)
+#' * `2` xlsx recommends read-only
+#' * `4` xlsx enforces read-only
+#' * `8` xlsx is locked for annotation
 #'
 #' @export
 #' @examples
@@ -1703,15 +1796,15 @@ wb_set_order <- function(wb, sheets) {
 #' @param sheet A name or index of a worksheet
 #' @param dims Worksheet cell range of the region ("A1:D4").
 #' @param name Name for region. A character vector of length 1. Note that region
-#'   names musts be case-insensitive unique.
+#'   names must be case-insensitive unique.
 #' @param overwrite Boolean. Overwrite if exists? Default to `FALSE`.
 #' @param local_sheet If `TRUE` the named region will be local for this sheet
 #' @param comment description text for named region
 #' @param hidden Should the named region be hidden?
 #' @param custom_menu,description,is_function,function_group_id,help,local_name,publish_to_server,status_bar,vb_procedure,workbook_parameter,xml Unknown XML feature
 #' @param ... additional arguments
+#' @returns A workbook, invisibly.
 #' @family worksheet content functions
-#' @seealso [wb_get_named_regions()]
 #' @examples
 #' ## create named regions
 #' wb <- wb_workbook()
@@ -2121,8 +2214,6 @@ wb_remove_tables <- function(wb, sheet = current_sheet(), table, remove_data = T
 #' wb <- wb_group_rows(wb, "AirPass", 4:8, collapsed = TRUE) # group years 1951-1955
 #' wb <- wb_group_rows(wb, "AirPass", 9:13)                  # group years 1956-1960
 #'
-#' wb$createCols("AirPass", 13)
-#'
 #' wb <- wb_group_cols(wb, "AirPass", 2:4, collapsed = TRUE)
 #' wb <- wb_group_cols(wb, "AirPass", 5:7, collapsed = TRUE)
 #' wb <- wb_group_cols(wb, "AirPass", 8:10, collapsed = TRUE)
@@ -2173,8 +2264,6 @@ wb_ungroup_cols <- function(wb, sheet = current_sheet(), cols) {
 #' wb$add_worksheet("AirPass")
 #' wb$add_data("AirPass", t2, rowNames = TRUE)
 #'
-#' wb$createCols("AirPass", 13)
-#'
 #' wb$group_cols("AirPass", cols = grp_cols)
 #' wb$group_rows("AirPass", rows = grp_rows)
 wb_group_rows <- function(wb, sheet = current_sheet(), rows, collapsed = FALSE, levels = NULL) {
@@ -2196,6 +2285,63 @@ wb_ungroup_rows <- function(wb, sheet = current_sheet(), rows) {
 
 
 # creators ----------------------------------------------------------------
+
+#' Modify workbook properties
+#'
+#' This function is useful for workbooks that are loaded. It can be used to set the
+#' workbook `title`, `subject` and `category` field. Use [wb_workbook()]
+#' to easily set these properties with a new workbook.
+#'
+#' To set properties, the following XML core properties are used.
+#' - title = dc:title
+#' - subject = dc:subject
+#' - creator = dc:creator
+#' - keywords = cp:keywords
+#' - comments = dc:description
+#' - modifier = cp:lastModifiedBy
+#' - datetime_created = dcterms:created
+#' - datetime_modified = dcterms:modified
+#' - category = cp:category
+#'
+#' In addition, manager and company are used.
+#' @name properties-wb
+#' @param wb A Workbook object
+#' @param modifier A character string indicating who was the last person to modify the workbook
+#' @seealso [wb_workbook()]
+#' @inheritParams wb_workbook
+#' @return A wbWorkbook object, invisibly.
+#' @export
+#'
+#' @examples
+#' file <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
+#' wb <- wb_load(file)
+#' wb$get_properties()
+#'
+#' # Add a title to properties
+#' wb$set_properties(title = "my title")
+#' wb$get_properties()
+wb_get_properties <- function(wb) {
+  assert_workbook(wb)
+  wb$get_properties()
+}
+
+#' @rdname properties-wb
+#' @export
+wb_set_properties <- function(wb, creator = NULL, title = NULL, subject = NULL, category = NULL, datetime_created = Sys.time(), modifier = NULL, keywords = NULL, comments = NULL, manager = NULL, company = NULL) {
+  assert_workbook(wb)
+  wb$clone()$set_properties(
+    creator           = creator,
+    title             = title,
+    subject           = subject,
+    category          = category,
+    datetime_created  = datetime_created,
+    modifier          = modifier,
+    keywords          = keywords,
+    comments          = comments,
+    manager           = manager,
+    company           = company
+  )
+}
 
 #' Modify creators of a workbook
 #'
@@ -2251,9 +2397,8 @@ wb_remove_creators <- function(wb, creators) {
 #' @export
 wb_get_creators <- function(wb) {
   assert_workbook(wb)
-  wb[["creator"]]
+  strsplit(wb$get_properties()[["creator"]], ";")[[1]]
 }
-
 
 
 # names -------------------------------------------------------------------
@@ -2507,7 +2652,7 @@ wb_set_cell_style <- function(wb, sheet = current_sheet(), dims, style) {
   wb$clone(deep = TRUE)$set_cell_style(sheet, dims, style)
 }
 
-#' Modify borders in a cell region
+#' Modify borders in a cell region of a worksheet
 #'
 #' wb wrapper to create borders for cell regions.
 #' @param wb A `wbWorkbook`
@@ -2539,6 +2684,32 @@ wb_set_cell_style <- function(wb, sheet = current_sheet(), dims, style) {
 #'  left_color = wb_color(hex = "FFFFFF00"), right_color = wb_color(hex = "FFFF7F00"),
 #'  bottom_color = wb_color(hex = "FFFF0000"))
 #' wb <- wb_add_border(wb, 1, dims = "D28:E28")
+#'
+#' # With chaining
+#'
+#' wb <- wb_workbook()
+#' wb$add_worksheet("S1")$add_data("S1", mtcars)
+#' wb$add_border(1, dims = "A1:K1",
+#'  left_border = NULL, right_border = NULL,
+#'  top_border = NULL, bottom_border = "double")
+#' wb$add_border(1, dims = "A5",
+#'  left_border = "dotted", right_border = "dotted",
+#'  top_border = "hair", bottom_border = "thick")
+#' wb$add_border(1, dims = "C2:C5")
+#' wb$add_border(1, dims = "G2:H3")
+#' wb$add_border(1, dims = "G12:H13",
+#'  left_color = wb_color(hex = "FF9400D3"), right_color = wb_color(hex = "FF4B0082"),
+#'  top_color = wb_color(hex = "FF0000FF"), bottom_color = wb_color(hex = "FF00FF00"))
+#' wb$add_border(1, dims = "A20:C23")
+#' wb$add_border(1, dims = "B12:D14",
+#'  left_color = wb_color(hex = "FFFFFF00"), right_color = wb_color(hex = "FFFF7F00"),
+#'  bottom_color = wb_color(hex = "FFFF0000"))
+#' wb$add_border(1, dims = "D28:E28")
+#' # if (interactive()) wb$open()
+#'
+#' wb <- wb_workbook()
+#' wb$add_worksheet("S1")$add_data("S1", mtcars)
+#' wb$add_border(1, dims = "A2:K33", inner_vgrid = "thin", inner_vcolor = c(rgb="FF808080"))
 #' @family styles
 #' @export
 wb_add_border <- function(
@@ -2672,6 +2843,9 @@ wb_add_fill <- function(
 #' @examples
 #'  wb <- wb_workbook() %>% wb_add_worksheet("S1") %>% wb_add_data("S1", mtcars)
 #'  wb %>% wb_add_font("S1", "A1:K1", name = "Arial", color = wb_color(theme = "4"))
+#' # With chaining
+#'  wb <- wb_workbook()$add_worksheet("S1")$add_data("S1", mtcars)
+#'  wb$add_font("S1", "A1:K1", name = "Arial", color = wb_color(theme = "4"))
 #' @return A `wbWorkbook`, invisibly
 #' @family styles
 #' @export
@@ -2726,15 +2900,18 @@ wb_add_font <- function(
 #' Add number formatting to a cell region. You can use a number format created
 #' by [create_numfmt()].
 #'
+#' The list of number formats ID is located in the **Details** section of [create_cell_style()].
 #' @param wb A Workbook
 #' @param sheet the worksheet
 #' @param dims the cell range
 #' @param numfmt either an id or a character
 #' @examples
-#'  wb <- wb_workbook() %>% wb_add_worksheet("S1") %>% wb_add_data("S1", mtcars)
-#'  wb %>% wb_add_numfmt("S1", dims = "F1:F33", numfmt = "#.0")
+#' wb <- wb_workbook() %>% wb_add_worksheet("S1") %>% wb_add_data("S1", mtcars)
+#' wb %>% wb_add_numfmt("S1", dims = "F1:F33", numfmt = "#.0")
+#' # Chaining
+#' wb <- wb_workbook()$add_worksheet("S1")$add_data("S1", mtcars)
+#' wb$add_numfmt("S1", "A1:A33", numfmt = 1)
 #' @return The `wbWorkbook` object, invisibly.
-#' @seealso [create_numfmt()]
 #' @family styles
 #' @export
 
@@ -2787,20 +2964,25 @@ wb_add_numfmt <- function(
 #' @param xf_id xf ID to apply
 #' @param ... additional arguments
 #' @examples
-#'  wb <-
-#'    wb_workbook() %>%
-#'    wb_add_worksheet("S1") %>%
-#'    wb_add_data("S1", x = mtcars)
+#' wb <- wb_workbook() %>%
+#'   wb_add_worksheet("S1") %>%
+#'   wb_add_data("S1", x = mtcars)
 #'
-#'  wb %>%
-#'    wb_add_cell_style(
-#'      "S1",
-#'      dims = "A1:K1",
-#'      text_rotation = "45",
-#'      horizontal = "center",
-#'      vertical = "center",
-#'      wrap_text = "1"
-#'    )
+#' wb %>%
+#'   wb_add_cell_style(
+#'     dims = "A1:K1",
+#'     text_rotation = "45",
+#'     horizontal = "center",
+#'     vertical = "center",
+#'     wrap_text = "1"
+#' )
+#' # Chaining
+#' wb <- wb_workbook()$add_worksheet("S1")$add_data(x = mtcars)
+#' wb$add_cell_style(dims = "A1:K1",
+#'                   text_rotation = "45",
+#'                   horizontal = "center",
+#'                   vertical = "center",
+#'                   wrap_text = "1")
 #' @return The `wbWorkbook` object, invisibly
 #' @family styles
 #' @export
@@ -3043,7 +3225,7 @@ wb_remove_comment <- function(
 #' Adds a person to a workbook, so that they can be the author of threaded
 #' comments in a workbook with [wb_add_thread()]
 #'
-#' @name wb_person
+#' @name person-wb
 #' @param wb a Workbook
 #' @param name the name of the person to display.
 #' @param id (optional) the display id
@@ -3068,7 +3250,7 @@ wb_add_person <- function(
   )
 }
 
-#' @rdname wb_person
+#' @rdname person-wb
 #' @export
 wb_get_person <- function(wb, name = NULL) {
   assert_workbook(wb)
@@ -3095,7 +3277,7 @@ wb_get_person <- function(wb, name = NULL) {
 #'   `getOption("openxlsx2.thread_id")` if set.
 #' @param reply Is the comment a reply? (default `FALSE`)
 #' @param resolve Should the comment be resolved? (default `FALSE`)
-#' @seealso [wb_add_comment()] [wb_person]
+#' @seealso [wb_add_comment()] [`person-wb`]
 #' @family worksheet content functions
 #' @examples
 #' wb <- wb_workbook()$add_worksheet()

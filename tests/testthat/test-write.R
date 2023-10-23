@@ -311,7 +311,8 @@ test_that("writeData() forces evaluation of x (#264)", {
 test_that("write character numerics with a correct cell style", {
 
   ## current default
-  options("openxlsx2.string_nums" = 0)
+  op <- options("openxlsx2.string_nums" = 0)
+  on.exit(options(op), add = TRUE)
 
   wb <- wb_workbook() %>%
     wb_add_worksheet() %>%
@@ -484,6 +485,74 @@ test_that("writing pivot with escaped characters works", {
 
 })
 
+test_that("writing slicers works", {
+
+  wb <- wb_workbook() %>%
+    ### Sheet 1
+    wb_add_worksheet() %>%
+    wb_add_data(x = mtcars)
+
+  df <- wb_data(wb, sheet = 1)
+
+  varname <- c("vs", "drat")
+
+  ### Sheet 2
+  wb$
+    # first pivot
+    add_pivot_table(
+      df, dims = "A3", slicer = varname, rows = "cyl", cols = "gear", data = "disp",
+      pivot_table = "mtcars"
+    )$
+    add_slicer(x = df, sheet = current_sheet(), slicer = "vs", pivot_table = "mtcars")$
+    add_slicer(x = df, dims = "B18:D24", sheet = current_sheet(), slicer = "drat", pivot_table = "mtcars",
+               params = list(columnCount = 5))$
+    # second pivot
+    add_pivot_table(
+      df, dims = "G3", sheet = current_sheet(), slicer = varname, rows = "gear", cols = "carb", data = "mpg",
+      pivot_table = "mtcars2"
+    )$
+    add_slicer(x = df, dims = "G12:I16", slicer = "vs", pivot_table = "mtcars2",
+               params = list(sortOrder = "descending", caption = "Wow!"))
+
+  ### Sheet 3
+  wb$
+    add_pivot_table(
+      df, dims = "A3", slicer = varname, rows = "gear", cols = "carb", data = "mpg",
+      pivot_table = "mtcars3"
+    )$
+    add_slicer(x = df, dims = "A12:D16", slicer = "vs", pivot_table = "mtcars3")
+
+  # test a few conditions
+  expect_equal(2L, length(wb$slicers))
+  expect_equal(4L, length(wb$slicerCaches))
+  expect_equal(xml_node_name(wb$workbook$extLst, "extLst", "ext"), "x14:slicerCaches")
+  expect_equal(1L, wb$worksheets[[2]]$relships$slicer)
+  expect_equal(2L, wb$worksheets[[3]]$relships$slicer)
+  expect_equal(25L, grep("slicer2.xml", wb$Content_Types))
+
+  ## test error
+  wb <- wb_workbook() %>%
+  wb_add_worksheet() %>%
+    wb_add_data(x = mtcars)
+
+  df <- wb_data(wb, sheet = 1)
+
+  varname <- c("vs", "drat")
+
+  wb$
+    # first pivot
+    add_pivot_table(
+      df, dims = "A3", rows = "cyl", cols = "gear", data = "disp",
+      params = list(name = "mtcars")
+    )
+
+  expect_error(
+    wb$add_slicer(x = df, sheet = current_sheet(), slicer = "vs", pivot_table = "mtcars"),
+    "slicer was not initialized in pivot table!"
+  )
+
+})
+
 test_that("writing na.strings = NULL works", {
 
   # write na.strings = na_strings()
@@ -595,8 +664,11 @@ test_that("writing in specific encoding works", {
   loc <- Sys.getlocale("LC_CTYPE")
   Sys.setlocale("LC_CTYPE", "")
 
-  options("openxlsx2.force_utf8_encoding" = TRUE)
-  options("openxlsx2.native_encoding" = "CP1251")
+  op <- options(
+    "openxlsx2.force_utf8_encoding" = TRUE,
+    "openxlsx2.native_encoding" = "CP1251"
+  )
+  on.exit(options(op), add = TRUE)
 
   # a cyrillic string: https://github.com/JanMarvin/openxlsx2/issues/640
   enc_str <- as.raw(c(0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2, 0xd0, 0xb3, 0xd0,
@@ -626,5 +698,20 @@ test_that("writing in specific encoding works", {
   expect_equal(exp, got)
 
   Sys.setlocale("LC_CTYPE", loc)
+
+})
+
+test_that("writing NULL works silently", {
+
+  tmp <- temp_xlsx()
+  x <- NULL
+
+  expect_silent(write_xlsx(x, tmp))
+
+  expect_silent(wb_workbook()$add_worksheet()$add_data(x = x))
+
+  wb <- wb_workbook()$add_worksheet()
+  wb2 <- wb_add_data(wb, x = x)
+  expect_equal(wb, wb2)
 
 })

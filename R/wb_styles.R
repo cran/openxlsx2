@@ -78,23 +78,20 @@ import_styles <- function(x) {
 #' Helper to create a border
 #' @description
 #' Border styles can any of the following: "thin", "thick", "slantDashDot", "none", "mediumDashed", "mediumDashDot", "medium", "hair", "double", "dotted", "dashed", "dashedDotDot", "dashDot"
-#' Border colors are of the following type: c(rgb="FF000000")
+#' Border colors can be created with [wb_color()]
+#' @seealso [wb_add_border()]
 #' @param diagonal_down x
 #' @param diagonal_up x
 #' @param outline x
 #' @param bottom X
-#' @param bottom_color X
+#' @param bottom_color,diagonal_color,left_color,right_color,top_color a color created with [wb_color()]
 #' @param diagonal X
-#' @param diagonal_color X,
 #' @param end x,
 #' @param horizontal x
 #' @param left x
-#' @param left_color x
 #' @param right x
-#' @param right_color x
 #' @param start x
 #' @param top x
-#' @param top_color x
 #' @param vertical x
 #' @param ... x
 #'
@@ -168,8 +165,9 @@ create_border <- function(
 }
 
 #' create number format
-#' @param numFmtId an id
+#' @param numFmtId an id, the list can be found in the **Details** of [create_cell_style()]
 #' @param formatCode a format code
+#' @seealso [wb_add_numfmt()]
 #' @export
 create_numfmt <- function(numFmtId, formatCode) {
 
@@ -200,6 +198,7 @@ create_numfmt <- function(numFmtId, formatCode) {
 #' @param u underline
 #' @param vert_align vertical alignment
 #' @param ... ...
+#' @seealso [wb_add_font()]
 #' @examples
 #' font <- create_font()
 #' # openxml has the alpha value leading
@@ -327,6 +326,7 @@ create_font <- function(
 #' @param bgColor hex8 color with alpha, red, green, blue only for patternFill
 #' @param fgColor hex8 color with alpha, red, green, blue only for patternFill
 #' @param ... ...
+#' @seealso [wb_add_fill()]
 #'
 #' @export
 create_fill <- function(
@@ -371,7 +371,7 @@ create_fill <- function(
 # TODO can be further generalized with additional xf attributes and children
 #' Helper to create a cell style
 #'
-#' create_cell_style with [wb_add_cell_style()]
+#' Create_cell_style with [wb_add_cell_style()]
 #' @param border_id dummy
 #' @param fill_id dummy
 #' @param font_id dummy
@@ -610,7 +610,7 @@ set_cellstyle <- function(
   if (!is.null(pivotButton))       z$pivotButton       <- as_xml_attr(pivotButton)
   if (!is.null(quotePrefix))       z$quotePrefix       <- as_xml_attr(quotePrefix)
   if (!is.null(readingOrder))      z$readingOrder      <- as_xml_attr(readingOrder)
-  if (!is.null(relativeIndent))    zz$relativeIndent   <- as_xml_attr(relativeIndent)
+  if (!is.null(relativeIndent))    z$relativeIndent    <- as_xml_attr(relativeIndent)
   if (!is.null(shrinkToFit))       z$shrinkToFit       <- as_xml_attr(shrinkToFit)
   if (!is.null(textRotation))      z$textRotation      <- as_xml_attr(textRotation)
   if (!is.null(vertical))          z$vertical          <- as_xml_attr(vertical)
@@ -661,7 +661,7 @@ get_cell_styles <- function(wb, sheet, cell) {
 #' assigned to a workbook to use them
 #'
 #' @details
-#' It is possible to override border_color and border_style with {left, right, top, bottom}_color, {left, right, top, bottom}_style.
+#' It is possible to override border_color and border_style with \{left, right, top, bottom\}_color, \{left, right, top, bottom\}_style.
 #'
 #' @seealso [wb_add_style()]
 # TODO maybe font_name,font_size could be documented together.

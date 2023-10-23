@@ -11,13 +11,17 @@ wb_workbook(
   category = NULL,
   datetime_created = Sys.time(),
   theme = NULL,
+  keywords = NULL,
+  comments = NULL,
+  manager = NULL,
+  company = NULL,
   ...
 )
 }
 \arguments{
 \item{creator}{Creator of the workbook (your name). Defaults to login username or \code{options("openxlsx2.creator")} if set.}
 
-\item{title, subject, category}{Workbook property, a string.}
+\item{title, subject, category, keywords, comments, manager, company}{Workbook property, a string.}
 
 \item{datetime_created}{The time of the workbook is created}
 
@@ -64,6 +68,7 @@ Other workbook wrappers:
 \code{\link{wb_add_data}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
+\code{\link{wb_add_slicer}()},
 \code{\link{wb_add_worksheet}()},
 \code{\link{wb_clone_worksheet}()},
 \code{\link{wb_copy_cells}()},

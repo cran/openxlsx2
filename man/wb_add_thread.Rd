@@ -56,7 +56,7 @@ wb <- wb \%>\%
   wb_add_thread(dims = "A1", comment = "so cool", person_id = pid, reply = TRUE)
 }
 \seealso{
-\code{\link[=wb_add_comment]{wb_add_comment()}} \link{wb_person}
+\code{\link[=wb_add_comment]{wb_add_comment()}} \code{\link{person-wb}}
 
 Other worksheet content functions: 
 \code{\link{col_widths-wb}},
@@ -69,6 +69,7 @@ Other worksheet content functions:
 \code{\link{wb_add_data}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
+\code{\link{wb_add_slicer}()},
 \code{\link{wb_freeze_pane}()},
 \code{\link{wb_merge_cells}()}
 }

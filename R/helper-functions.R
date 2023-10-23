@@ -488,14 +488,14 @@ distinct <- function(x) {
   unis[dups == FALSE]
 }
 
-cacheFields <- function(wbdata, filter, rows, cols, data) {
+cacheFields <- function(wbdata, filter, rows, cols, data, slicer) {
   sapply(
     names(wbdata),
     function(x) {
 
       dat <- wbdata[[x]]
 
-      vars <- c(filter, rows, cols, data)
+      vars <- c(filter, rows, cols, data, slicer)
 
       is_vars <- x %in% vars
       is_data <- x %in% data &&
@@ -604,7 +604,7 @@ cacheFields <- function(wbdata, filter, rows, cols, data) {
   )
 }
 
-pivot_def_xml <- function(wbdata, filter, rows, cols, data) {
+pivot_def_xml <- function(wbdata, filter, rows, cols, data, slicer, pcid) {
 
   ref   <- dataframe_to_dims(attr(wbdata, "dims"))
   sheet <- attr(wbdata, "sheet")
@@ -614,8 +614,13 @@ pivot_def_xml <- function(wbdata, filter, rows, cols, data) {
     sprintf('<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" mc:Ignorable="xr" r:id="rId1" refreshedBy="openxlsx2" invalid="1" refreshOnLoad="1" refreshedDate="1" createdVersion="8" refreshedVersion="8" minRefreshableVersion="3" recordCount="%s">', nrow(wbdata)),
     '<cacheSource type="worksheet"><worksheetSource ref="', ref, '" sheet="', sheet, '"/></cacheSource>',
     '<cacheFields count="', count, '">',
-    paste0(cacheFields(wbdata, filter, rows, cols, data), collapse = ""),
+    paste0(cacheFields(wbdata, filter, rows, cols, data, slicer), collapse = ""),
     '</cacheFields>',
+    '<extLst>',
+    '<ext xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" uri="{725AE2AE-9491-48be-B2B4-4EB974FC3084}">',
+    sprintf('<x14:pivotCacheDefinition pivotCacheId="%s"/>', pcid),
+    '</ext>',
+    '</extLst>',
     '</pivotCacheDefinition>'
   )
 }
@@ -632,24 +637,51 @@ pivot_def_rel <- function(n) sprintf("<Relationships xmlns=\"http://schemas.open
 
 pivot_xml_rels <- function(n) sprintf("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition\" Target=\"../pivotCache/pivotCacheDefinition%s.xml\"/></Relationships>", n)
 
-get_items <- function(data, x) {
+get_items <- function(data, x, item_order, slicer = FALSE) {
   x <- abs(x)
-  item <- sapply(
-    c(order(distinct(data[[x]])) - 1L, "default"),
-    # # TODO this sets the order of the pivot elements
-    # c(seq_along(unique(data[[x]])) - 1L, "default"),
-    function(val) {
-      if (val == "default")
-        xml_node_create("item", xml_attributes = c(t = val))
-      else
-        xml_node_create("item", xml_attributes = c(x = val))
-    },
-    USE.NAMES = FALSE
-  )
+
+  # check length, otherwise a certain spreadsheet software simply dies
+  if (!is.null(item_order) && (length(item_order) != length(distinct(data[[x]])))) {
+    msg <- sprintf(
+      "Length of sort order for '%s' does not match required length. Is %s, needs %s.\nCheck `openxlsx2:::distinct()` for the correct length. Resetting.",
+      names(data[x]), length(item_order), length(distinct(data[[x]]))
+    )
+    warning(msg)
+    item_order <- NULL
+  }
+
+  item_order <- if (is.null(item_order)) {
+    order(distinct(data[[x]]))
+  }
+
+  if (slicer) {
+    item <- sapply(
+      as.character(item_order - 1L),
+      function(val) {
+          xml_node_create("i", xml_attributes = c(x = val, s = "1"))
+      },
+      USE.NAMES = FALSE
+    )
+  } else {
+    item <- sapply(
+      c(item_order - 1L, "default"),
+      # # TODO this sets the order of the pivot elements
+      # c(seq_along(unique(data[[x]])) - 1L, "default"),
+      function(val) {
+        if (val == "default")
+          xml_node_create("item", xml_attributes = c(t = val))
+        else
+          xml_node_create("item", xml_attributes = c(x = val))
+      },
+      USE.NAMES = FALSE
+    )
+  }
+
   items <- xml_node_create(
     "items",
     xml_attributes = c(count = as.character(length(item))), xml_children = item
   )
+
   items
 }
 
@@ -788,11 +820,15 @@ create_pivot_table <- function(
       "pivotField",
       xml_attributes = attrs)
 
+    sort_item <- params$sort_item
+
     if (i %in% c(filter_pos, rows_pos, cols_pos)) {
+      nms <- names(x[i])
+      sort_itm <- sort_item[[nms]]
       tmp <- xml_node_create(
         "pivotField",
         xml_attributes = attrs,
-        xml_children = paste0(paste0(get_items(x, i), collapse = ""), autoSortScope))
+        xml_children = paste0(paste0(get_items(x, i, sort_itm), collapse = ""), autoSortScope))
     }
 
     pivotField <- c(pivotField, tmp)
@@ -884,9 +920,9 @@ create_pivot_table <- function(
     )
   )
 
-  name <- "PivotStyleLight16"
-  if (!is.null(params$name))
-    name <- params$name
+  table_style <- "PivotStyleLight16"
+  if (!is.null(params$table_style))
+    table_style <- params$table_style
 
   dataCaption <- "Values"
   if (!is.null(params$dataCaption))
@@ -915,7 +951,7 @@ create_pivot_table <- function(
   pivotTableStyleInfo <- xml_node_create(
     "pivotTableStyleInfo",
     xml_attributes = c(
-      name           = name,
+      name           = table_style,
       showRowHeaders = showRowHeaders,
       showColHeaders = showColHeaders,
       showRowStripes = showRowStripes,
@@ -986,6 +1022,10 @@ create_pivot_table <- function(
   if (!is.null(params$applyWidthHeightFormats))
     applyWidthHeightFormats <- params$applyWidthHeightFormats
 
+  pivot_table_name <- sprintf("PivotTable%s", n)
+  if (!is.null(params$name))
+    pivot_table_name <- params$name
+
   xml_node_create(
     "pivotTableDefinition",
     xml_attributes = c(
@@ -993,7 +1033,7 @@ create_pivot_table <- function(
       `xmlns:mc`              = "http://schemas.openxmlformats.org/markup-compatibility/2006",
       `mc:Ignorable`          = "xr",
       `xmlns:xr`              = "http://schemas.microsoft.com/office/spreadsheetml/2014/revision",
-      name                    = sprintf("PivotTable%s", n),
+      name                    = pivot_table_name,
       cacheId                 = as.character(n),
       applyNumberFormats      = applyNumberFormats,
       applyBorderFormats      = applyBorderFormats,
@@ -1160,6 +1200,18 @@ to_string <- function(x) {
   chr
 }
 
+# get the next free relationship id
+get_next_id <- function(x) {
+  if (length(x)) {
+    rlshp <- rbindlist(xml_attr(x, "Relationship"))
+    rlshp$id <- as.integer(gsub("\\D+", "", rlshp$Id))
+    next_id <- paste0("rId", max(rlshp$id) + 1L)
+  } else {
+    next_id <- "rId1"
+  }
+  next_id
+}
+
 #' create a guid string
 #' @keywords internal
 #' @noRd
@@ -1318,4 +1370,177 @@ basename2 <- function(path) {
   } else {
     return(basename(path))
   }
+}
+
+## get cell styles for a worksheet
+get_cellstyle <- function(wb, sheet = current_sheet(), dims) {
+
+  st_ids <- NULL
+  if (missing(dims)) {
+    st_ids <- styles_on_sheet(wb = wb, sheet = sheet) %>% as.character()
+    xf_ids <- match(st_ids, wb$styles_mgr$xf$id)
+    xf_xml <- wb$styles_mgr$styles$cellXfs[xf_ids]
+  } else {
+    xf_xml <- get_cell_styles(wb = wb, sheet = sheet, cell = dims)
+  }
+
+  # returns NA if no style found
+  if (all(is.na(xf_xml))) return(NULL)
+
+  lst_out <- vector("list", length = length(xf_xml))
+
+  for (i in seq_along(xf_xml)) {
+
+    if (is.na(xf_xml[[i]])) next
+    xf_df <- read_xf(read_xml(xf_xml[[i]]))
+
+    border_id <- which(wb$styles_mgr$border$id == xf_df$borderId)
+    fill_id   <- which(wb$styles_mgr$fill$id == xf_df$fillId)
+    font_id   <- which(wb$styles_mgr$font$id == xf_df$fontId)
+    numFmt_id <- which(wb$styles_mgr$numfmt$id == xf_df$numFmtId)
+
+    border_xml <- wb$styles_mgr$styles$borders[border_id]
+    fill_xml   <- wb$styles_mgr$styles$fills[fill_id]
+    font_xml   <- wb$styles_mgr$styles$fonts[font_id]
+    numfmt_xml <- wb$styles_mgr$styles$numFmts[numFmt_id]
+
+    out <- list(
+      xf_df,
+      border_xml,
+      fill_xml,
+      font_xml,
+      numfmt_xml
+    )
+    names(out) <- c("xf_df", "border_xml", "fill_xml", "font_xml", "numfmt_xml")
+    lst_out[[i]] <- out
+
+  }
+
+  attr(lst_out, "st_ids") <- st_ids
+
+  lst_out
+}
+
+## apply cell styles to a worksheet and return reference ids
+set_cellstyles <- function(wb, style) {
+
+  session_ids <- random_string(n = length(style))
+
+  for (i in seq_along(style)) {
+    session_id <- session_ids[i]
+
+    has_border <- FALSE
+    if (length(style[[i]]$border_xml)) {
+      has_border <- TRUE
+      wb$styles_mgr$add(style[[i]]$border_xml, session_id)
+    }
+
+    has_fill <- FALSE
+    if (length(style[[i]]$fill_xml) && style[[i]]$fill_xml != wb$styles_mgr$styles$fills[1]) {
+      has_fill <- TRUE
+      wb$styles_mgr$add(style[[i]]$fill_xml, session_id)
+    }
+
+    has_font <- FALSE
+    if (length(style[[i]]$font_xml) && style[[i]]$font_xml != wb$styles_mgr$styles$fonts[1]) {
+      has_font <- TRUE
+      wb$styles_mgr$add(style[[i]]$font_xml, session_id)
+    }
+
+    has_numfmt <- FALSE
+    if (length(style[[i]]$numfmt_xml)) {
+      has_numfmt <- TRUE
+      numfmt_xml <- style[[i]]$numfmt_xml
+      # assuming all numfmts with ids >= 164.
+      # We have to create unique numfmt ids when cloning numfmts. Otherwise one
+      # ids could point to more than one format code and the output would look
+      # broken.
+      fmtCode <- xml_attr(numfmt_xml, "numFmt")[[1]][["formatCode"]]
+      next_id <- max(163L, as.integer(wb$styles_mgr$get_numfmt()$id)) + 1L
+      numfmt_xml <- create_numfmt(numFmtId = next_id, formatCode = fmtCode)
+
+      wb$styles_mgr$add(numfmt_xml, session_id)
+    }
+
+    ## create new xf_df. This has to reference updated style ids
+    xf_df <- style[[i]]$xf_df
+
+    if (has_border)
+      xf_df$borderId <- wb$styles_mgr$get_border_id(session_id)
+
+    if (has_fill)
+      xf_df$fillId <- wb$styles_mgr$get_fill_id(session_id)
+
+    if (has_font)
+      xf_df$fontId <- wb$styles_mgr$get_font_id(session_id)
+
+    if (has_numfmt)
+      xf_df$numFmtId <- wb$styles_mgr$get_numfmt_id(session_id)
+
+    xf_xml <- write_xf(xf_df) # can be NULL
+
+    if (length(xf_xml))
+      wb$styles_mgr$add(xf_xml, session_id)
+  }
+
+  # return updated style id
+  st_ids <- wb$styles_mgr$get_xf_id(session_ids)
+
+  if (!is.null(attr(style, "st_ids"))) {
+    names(st_ids) <- attr(style, "st_ids")
+  }
+
+  st_ids
+}
+
+clone_shared_strings <- function(wb_old, old, wb_new, new) {
+
+  empty <- structure(list(), uniqueCount = 0)
+
+  # old has no shared strings
+  if (identical(wb_old$sharedStrings, empty)) {
+    return(NULL)
+  }
+
+  if (identical(wb_new$sharedStrings, empty)) {
+
+    wb_new$append(
+      "Content_Types",
+      "<Override PartName=\"/xl/sharedStrings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml\"/>"
+    )
+
+    wb_new$append(
+      "workbook.xml.rels",
+      "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>"
+    )
+
+  }
+
+  sheet_id <- wb_old$validate_sheet(old)
+  cc <- wb_old$worksheets[[sheet_id]]$sheet_data$cc
+  sst_ids  <- as.integer(cc$v[cc$c_t == "s"]) + 1
+  sst_uni  <- sort(unique(sst_ids))
+  sst_old <- wb_old$sharedStrings[sst_uni]
+
+  old_len <- length(as.character(wb_new$sharedStrings))
+
+  wb_new$sharedStrings <- c(as.character(wb_new$sharedStrings), sst_old)
+  sst  <- xml_node_create("sst", xml_children = wb_new$sharedStrings)
+  text <- xml_si_to_txt(read_xml(sst))
+  attr(wb_new$sharedStrings, "uniqueCount") <- as.character(length(text))
+  attr(wb_new$sharedStrings, "text") <- text
+
+
+  sheet_id <- wb_new$validate_sheet(new)
+  cc <- wb_new$worksheets[[sheet_id]]$sheet_data$cc
+  # order ids and add new offset
+  ids <- as.integer(cc$v[cc$c_t == "s"]) + 1L
+  new_ids <- match(ids, sst_uni) + old_len - 1L
+  new_ids <- as.character(new_ids)
+  new_ids[is.na(new_ids)] <- ""
+  cc$v[cc$c_t == "s"] <- new_ids
+  wb_new$worksheets[[sheet_id]]$sheet_data$cc <- cc
+
+  # print(sprintf("cloned: %s", length(new_ids)))
+
 }

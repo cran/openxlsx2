@@ -131,8 +131,10 @@ test_that("wb_add_comment", {
 
 test_that("wb_add_comment() works without supplying a wbComment object.", {
   # Do not alter the workspace
-  opt <- getOption("openxlsx2.creator")
-  options("openxlsx2.creator" = "user")
+
+  op <- options("openxlsx2.creator" = "user")
+  on.exit(options(op), add = TRUE)
+
   # Using the new default values of wb_comment() (options("openxlsx2.creators))
   wb <- wb_workbook()$add_worksheet()$add_comment(comment = "this is a comment", dims = "A1")
 
@@ -147,7 +149,6 @@ test_that("wb_add_comment() works without supplying a wbComment object.", {
   wb3 <- wb_workbook()$add_worksheet()$add_comment(comment = "this is a comment")
   expect_equal(wb$comments, wb3$comments)
 
-  options("openxlsx2.creator" = opt)
 })
 
 
@@ -248,7 +249,8 @@ test_that("threaded comments work", {
     done = c("0", "")
   )
   got <- wb_get_thread(wb)[, -1]
-  expect_equal(exp, got)
+  # somehow the row ordering differs for parallel and non-parallel testthat runs
+  expect_equal(exp[order(got$displayName), ], got, ignore_attr = TRUE)
 
   exp <- "[Threaded comment]\n\nYour spreadsheet software allows you to read this threaded comment; however, any edits to it will get removed if the file is opened in a newer version of a certain spreadsheet software.\n\nComment: wow it works!\nReplie:fascinating"
   got <- wb_get_comment(wb)$comment

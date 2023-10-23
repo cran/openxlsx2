@@ -76,10 +76,10 @@ file <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 # loading the file into the workbook
 wb <- wb_load(file = file)
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  write_xlsx(x = mtcars, file = "mtcars.xlsx")
 
-## ---- eval = FALSE------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------
 #  # replace the existing file
 #  wb$save("mtcars.xlsx")
 #  

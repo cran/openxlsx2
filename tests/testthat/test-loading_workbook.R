@@ -345,7 +345,9 @@ test_that("loading slicers works", {
   expect_equal(exp[-8], got)
 
 
-  options("openxlsx2.disableFullCalcOnLoad" = TRUE)
+  op <- options("openxlsx2.disableFullCalcOnLoad" = TRUE)
+  on.exit(options(op), add = TRUE)
+
   wb <- wb_load(file = fl, calc_chain = TRUE)
 
   exp <- "<calcPr calcId=\"152511\"/>"
@@ -396,4 +398,45 @@ test_that("sheetView is not switched", {
   got <- wb$worksheets[[2]]$sheetViews
   expect_equal(exp, got)
 
+})
+
+test_that("Loading a workbook with property preserves it.", {
+  wb <- wb_workbook(title = "x", creator = "y", subject = "z", category = "aa", keywords = "ab", comments = "ac", manager = "ad", company = "ae")$add_worksheet()
+  tmp <- temp_xlsx()
+  wb$save(file = tmp)
+
+  wb2 <- wb_load(tmp)
+  exp <- c(
+    `title` = "x", `subject` = "z", `creator` = "y", `keywords` = "ab",
+    `comments` = "ac",
+    `modifier` = "y", `category` = "aa",
+    manager = "ad", company = "ae"
+  )
+  sel <- names(exp) # ignore creation date
+  got <- wb2$get_properties()
+  expect_equal(exp, got[sel])
+
+  wb2$set_properties(title = "xyz")
+  expect_equal(wb2$get_properties()[["title"]], "xyz")
+
+  wb2$set_properties(subject = "aaa")
+  expect_equal(wb2$get_properties()[["subject"]], "aaa")
+
+  wb2$set_properties(creator = "bbb")
+  expect_equal(wb2$get_properties()[["creator"]], "bbb")
+
+  wb2$set_properties(keywords = "ccc")
+  expect_equal(wb2$get_properties()[["keywords"]], "ccc")
+
+  wb2$set_properties(comments = "ddd")
+  expect_equal(wb2$get_properties()[["comments"]], "ddd")
+
+  wb2$set_properties(category = "eee")
+  expect_equal(wb2$get_properties()[["category"]], "eee")
+
+  wb2$set_properties(manager = "fff")
+  expect_equal(wb2$get_properties()[["manager"]], "fff")
+
+  wb2$set_properties(company = "ggg")
+  expect_equal(wb2$get_properties()[["company"]], "ggg")
 })

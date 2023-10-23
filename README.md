@@ -49,9 +49,9 @@ install.packages('openxlsx2')
 ## Introduction
 
 `openxlsx2` aims to be the swiss knife for working with the openxml
-spreadsheet formats xlsx and xlsm (other formats of other spreadsheet
-software are not supported). We offer two different variants how to work
-with `openxlsx2`.
+spreadsheet formats xlsx, xlsm and (limited) xlsb (other formats of
+other spreadsheet software are not supported). We offer two different
+variants how to work with `openxlsx2`.
 
 - The first one is to simply work with R objects. It is possible to read
   ([`read_xlsx()`](https://janmarvin.github.io/openxlsx2/reference/read_xlsx.html))
@@ -113,7 +113,7 @@ wb
 #> A Workbook object.
 #>  
 #> Worksheets:
-#>  Sheets: Sheet1 Sheet2 
+#>  Sheets: Sheet1, Sheet2 
 #>  Write order: 1, 2
 
 # read a data frame
@@ -166,4 +166,4 @@ This package is licensed under the MIT license and is based on
 [`openxlsx`](https://github.com/ycphs/openxlsx) (by Alexander Walker and
 Philipp Schauberger; COPYRIGHT 2014-2022) and
 [`pugixml`](https://github.com/zeux/pugixml) (by Arseny Kapoulkine;
-COPYRIGHT 2006-2022). Both released under the MIT license.
+COPYRIGHT 2006-2023). Both released under the MIT license.

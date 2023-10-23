@@ -69,6 +69,7 @@ colorMarkers
 colorNegative
 colorSeries
 colour
+cp
 ctrlProps
 customXml
 darkDown
@@ -83,7 +84,9 @@ dashedDotDot
 databar
 datetime
 datetimes
+dcterms
 de
+decrypt
 df
 displayEmptyCellsAs
 docx
@@ -122,11 +125,11 @@ greatful
 gridLines
 hasDrawing
 hdpi
-headFoot
 headerRow
 hms
 lastColumn
 lastHeaderCell
+lastModifiedBy
 lastTotalCell
 lessThan
 lessThanOrEqual
@@ -220,7 +223,6 @@ tableStyle
 tablename
 textLength
 th
-threadComments
 totalRow
 totalsRowCount
 twoCellAnchor
@@ -248,6 +250,7 @@ xWindow
 xf
 xl
 xls
+xlsb
 xlsm
 xlsx
 yWindow

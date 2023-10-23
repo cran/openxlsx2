@@ -44,8 +44,7 @@ test_that("wb_to_df() is a wrapper", {
 test_that("wb_load() is a wrapper", {
   tmp_xlsx <- temp_xlsx()
   wb_workbook()$add_worksheet()$add_data(x = iris)$save(tmp_xlsx)
-  expect_wrapper("load", params = list(file = tmp_xlsx), ignore_wb = TRUE,
-                 ignore_fields = "datetimeCreated")
+  expect_wrapper("load", params = list(file = tmp_xlsx), ignore_wb = TRUE)
 })
 
 # wb_save() ---------------------------------------------------------------
@@ -123,17 +122,31 @@ test_that("wb_group_cols(), wb_ungroup_cols() are wrapper", {
   expect_wrapper("ungroup_cols", wb = wb, params = params)
 })
 
-# wb_set_creators() -----------------------------------------------------------
+# wb_set_creators() ------------------------------------------------------------
 
 test_that("wb_set_creators() is a wrapper", {
   expect_wrapper("set_creators", params = list(creators = "myself"))
 })
 
-# wb_remove_creators() --------------------------------------------------------
+# wb_remove_creators() ---------------------------------------------------------
 
 test_that("wb_remove_creators() is a wrapper", {
   wb <- wb_workbook(creator = "myself")
   expect_wrapper("remove_creators", wb = wb, params = list(creators = "myself"))
+})
+
+# wb_set_properties() ----------------------------------------------------------
+
+test_that("wb_set_properties() is a wrapper", {
+  wb <- wb_workbook(subject = "xyz")
+  expect_wrapper("set_properties", wb = wb, params = list(subject = "a new subject"))
+})
+
+# wb_set_properties() ---------------------------------------------------------
+
+test_that("wb_get_properties() is a wrapper", {
+  wb <- wb_workbook(subject = "xyz")
+  expect_wrapper("get_properties", wb = wb)
 })
 
 # wb_set_last_modified_by() ---------------------------------------------------
@@ -169,7 +182,6 @@ test_that("wb_set_bookview() is a wrapper", {
 test_that("wb_set_header_footer() is a wrapper", {
   wb <- wb_workbook(creator = "myself")$add_worksheet("a")
   expect_wrapper("set_header_footer", wb = wb, params = list(sheet = "a"))
-
 })
 
 # wb_set_col_widths(), wb_remove_col_widths() -----------------------------
@@ -193,7 +205,8 @@ test_that("wb_add_image() is a wrapper", {
 test_that("wb_add_plot() is a wrapper", {
 
   # workaround: this filename is inserted to the wrapper function
-  options("openxlsx2.temp_png" = tempfile(pattern = "figureImage", fileext = ".png"))
+  op <- options("openxlsx2.temp_png" = tempfile(pattern = "figureImage", fileext = ".png"))
+  on.exit(options(op), add = TRUE)
 
   # create a device we can dev.copy() from
   grDevices::pdf(NULL) # do not create "Rplots.pdf"
@@ -348,6 +361,13 @@ test_that("wb_add_pivot_table() is a wrapper", {
   expect_wrapper("add_pivot_table", wb = wb, params = list(x = df, data = "disp"))
 })
 
+test_that("wb_add_slicer() is a wrapper", {
+  wb <- wb_workbook()$add_worksheet()$add_data(x = mtcars)
+  df <- wb_data(wb)
+  wb$add_pivot_table(x = df, data = "disp", slicer = "vs", pivot_table = "pivot1")
+  expect_wrapper("add_slicer", wb = wb, params = list(x = df, slicer = "vs", pivot_table = "pivot1"))
+})
+
 test_that("wb_add_formula() is a wrapper", {
   wb <- wb_workbook()$add_worksheet(1)
   expect_wrapper("add_formula",    wb = wb, params = list(sheet = 1, x = "=TODAY()"))
@@ -376,8 +396,10 @@ test_that("wb_add_comment() is a wrapper", {
     wb = wb,
     params = list(comment = c1, dims = "A1")
   )
-  opt <- getOption("openxlsx2.creator")
-  options("openxlsx2.creator" = "user")
+
+  op <- options("openxlsx2.creator" = "user")
+  on.exit(options(op), add = TRUE)
+
   wb <- wb_workbook()$add_worksheet()
 
   expect_wrapper(
@@ -385,7 +407,7 @@ test_that("wb_add_comment() is a wrapper", {
     wb = wb,
     params = list(comment = "a new comment", dims = "A1")
   )
-  options("openxlsx2.creator" = opt)
+
 })
 
 # wb_remove_comment() -----------------------------------------------------
