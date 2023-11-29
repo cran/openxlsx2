@@ -637,41 +637,57 @@ pivot_def_rel <- function(n) sprintf("<Relationships xmlns=\"http://schemas.open
 
 pivot_xml_rels <- function(n) sprintf("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition\" Target=\"../pivotCache/pivotCacheDefinition%s.xml\"/></Relationships>", n)
 
-get_items <- function(data, x, item_order, slicer = FALSE) {
+get_items <- function(data, x, item_order, slicer = FALSE, choose = NULL) {
   x <- abs(x)
 
+  dat <- distinct(data[[x]])
+
   # check length, otherwise a certain spreadsheet software simply dies
-  if (!is.null(item_order) && (length(item_order) != length(distinct(data[[x]])))) {
+  if (!is.null(item_order) && (length(item_order) != length(dat))) {
     msg <- sprintf(
       "Length of sort order for '%s' does not match required length. Is %s, needs %s.\nCheck `openxlsx2:::distinct()` for the correct length. Resetting.",
-      names(data[x]), length(item_order), length(distinct(data[[x]]))
+      names(data[x]), length(item_order), length(dat)
     )
     warning(msg)
     item_order <- NULL
   }
 
-  item_order <- if (is.null(item_order)) {
-    order(distinct(data[[x]]))
+  if (is.null(item_order)) {
+    item_order <- order(dat)
+  } else if (is.character(item_order)) {
+    item_order <- match(dat, item_order)
+  }
+
+  if (!is.null(choose)) {
+    # change order
+    choose <- eval(parse(text = choose), data.frame(x = dat))[item_order]
+    hide <- as_xml_attr(!choose)
+    sele <- as_xml_attr(choose)
+  } else {
+    hide <- NULL
+    sele <- rep("1", length(dat))
   }
 
   if (slicer) {
+    vals <- as.character(item_order - 1L)
     item <- sapply(
-      as.character(item_order - 1L),
+      seq_along(vals),
       function(val) {
-          xml_node_create("i", xml_attributes = c(x = val, s = "1"))
+          xml_node_create("i", xml_attributes = c(x = vals[val], s = sele[val]))
       },
       USE.NAMES = FALSE
     )
   } else {
+    vals <- c(item_order - 1L, "default")
     item <- sapply(
-      c(item_order - 1L, "default"),
+      seq_along(vals),
       # # TODO this sets the order of the pivot elements
       # c(seq_along(unique(data[[x]])) - 1L, "default"),
       function(val) {
-        if (val == "default")
-          xml_node_create("item", xml_attributes = c(t = val))
+        if (vals[val] == "default")
+          xml_node_create("item", xml_attributes = c(t = vals[val]))
         else
-          xml_node_create("item", xml_attributes = c(x = val))
+          xml_node_create("item", xml_attributes = c(x = vals[val], h = hide[val]))
       },
       USE.NAMES = FALSE
     )
@@ -758,6 +774,40 @@ create_pivot_table <- function(
   }
 
   pivotField <- NULL
+  arguments <- c(
+    "apply_alignment_formats", "apply_border_formats", "apply_font_formats",
+    "apply_number_formats", "apply_pattern_formats", "apply_width_height_formats",
+    "apply_width_height_formats", "asterisk_totals", "auto_format_id",
+    "chart_format", "col_grand_totals", "col_header_caption", "compact",
+    "compact", "choose", "compact_data", "custom_list_sort", "data_caption",
+    "data_on_rows", "data_position", "disable_field_list", "edit_data",
+    "enable_drill", "enable_field_properties", "enable_wizard", "error_caption",
+    "field_list_sort_ascending", "field_print_titles", "grand_total_caption",
+    "grid_drop_zones", "immersive", "indent", "item_print_titles",
+    "mdx_subqueries", "merge_item", "missing_caption", "multiple_field_filters",
+    "name", "no_style", "numfmt", "outline", "outline_data", "page_over_then_down",
+    "page_style", "page_wrap", "preserve_formatting", "print_drill",
+    "published", "row_grand_totals", "row_header_caption", "show_calc_mbrs",
+    "show_col_headers", "show_col_stripes", "show_data_as", "show_data_drop_down",
+    "show_data_tips", "show_drill", "show_drop_zones", "show_empty_col",
+    "show_empty_row", "show_error", "show_headers", "show_items",
+    "show_last_column", "show_member_property_tips", "show_missing",
+    "show_multiple_label", "show_row_headers", "show_row_stripes",
+    "sort_col", "sort_item", "sort_row", "subtotal_hidden_items",
+    "table_style", "tag", "use_auto_formatting", "vacated_style",
+    "visual_totals"
+  )
+  params <- standardize_case_names(params, arguments = arguments, return = TRUE)
+
+
+  compact <- ""
+  if (!is.null(params$compact))
+    compact <- params$compact
+
+  outline <- ""
+  if (!is.null(params$outline))
+    outline <- params$outline
+
   for (i in seq_along(x)) {
 
     dataField <- NULL
@@ -777,8 +827,8 @@ create_pivot_table <- function(
         if (!abs(sort) %in% seq_along(rows_pos))
           warning("invalid sort position found")
 
-       if (!abs(sort) == match(i, rows_pos))
-        sort <- NULL
+        if (!abs(sort) == match(i, rows_pos))
+          sort <- NULL
       }
     }
 
@@ -790,8 +840,8 @@ create_pivot_table <- function(
         if (!abs(sort) %in% seq_along(cols_pos))
           warning("invalid sort position found")
 
-       if (!abs(sort) == match(i, cols_pos))
-        sort <- NULL
+        if (!abs(sort) == match(i, cols_pos))
+          sort <- NULL
       }
     }
 
@@ -814,21 +864,31 @@ create_pivot_table <- function(
       else                  sort <- "ascending"
     }
 
-    attrs <- c(axis, dataField, showAll = "0", sortType = sort)
+    sort_item <- params$sort_item
+    choose    <- params$choose
+    multi     <- if (is.null(choose)) NULL else as_xml_attr(TRUE)
+
+    attrs <- c(
+      axis, dataField, showAll = "0", multipleItemSelectionAllowed = multi, sortType = sort,
+      compact = as_xml_attr(compact), outline = as_xml_attr(outline)
+    )
 
     tmp <- xml_node_create(
       "pivotField",
       xml_attributes = attrs)
 
-    sort_item <- params$sort_item
-
     if (i %in% c(filter_pos, rows_pos, cols_pos)) {
       nms <- names(x[i])
       sort_itm <- sort_item[[nms]]
+      if (!is.null(choose) && !is.na(choose[nms])) {
+        choo <- choose[nms]
+      } else {
+        choo <- NULL
+      }
       tmp <- xml_node_create(
         "pivotField",
         xml_attributes = attrs,
-        xml_children = paste0(paste0(get_items(x, i, sort_itm), collapse = ""), autoSortScope))
+        xml_children = paste0(paste0(get_items(x, i, sort_itm, FALSE, choo), collapse = ""), autoSortScope))
     }
 
     pivotField <- c(pivotField, tmp)
@@ -879,6 +939,11 @@ create_pivot_table <- function(
   if (use_data) {
 
     dataField <- NULL
+
+    show_data_as <- rep("", length(data))
+    if (!is.null(params$show_data_as))
+      show_data_as <- params$show_data_as
+
     for (i in seq_along(data)) {
 
       if (missing(fun)) fun <- NULL
@@ -888,12 +953,13 @@ create_pivot_table <- function(
         xml_node_create(
           "dataField",
           xml_attributes = c(
-            name      = sprintf("%s of %s", ifelse(is.null(fun[i]), "Sum", fun[i]), data[i]),
-            fld       = sprintf("%s", data_pos[i] - 1L),
-            subtotal  = fun[i],
-            baseField = "0",
-            baseItem  = "0",
-            numFmtId  = numfmts[i]
+            name       = sprintf("%s of %s", ifelse(is.null(fun[i]), "Sum", fun[i]), data[i]),
+            fld        = sprintf("%s", data_pos[i] - 1L),
+            showDataAs = as_xml_attr(ifelse(is.null(show_data_as[i]), "", show_data_as[i])),
+            subtotal   = fun[i],
+            baseField  = "0",
+            baseItem   = "0",
+            numFmtId   = numfmts[i]
           )
         )
       )
@@ -925,28 +991,28 @@ create_pivot_table <- function(
     table_style <- params$table_style
 
   dataCaption <- "Values"
-  if (!is.null(params$dataCaption))
-    dataCaption <- params$dataCaption
+  if (!is.null(params$data_caption))
+    dataCaption <- params$data_caption
 
   showRowHeaders <- "1"
-  if (!is.null(params$showRowHeaders))
-    showRowHeaders <- params$showRowHeaders
+  if (!is.null(params$show_row_headers))
+    showRowHeaders <- params$show_row_headers
 
   showColHeaders <- "1"
-  if (!is.null(params$showColHeaders))
-    showColHeaders <- params$showColHeaders
+  if (!is.null(params$show_col_headers))
+    showColHeaders <- params$show_col_headers
 
   showRowStripes <- "0"
-  if (!is.null(params$showRowStripes))
-    showRowStripes <- params$showRowStripes
+  if (!is.null(params$show_row_stripes))
+    showRowStripes <- params$show_row_stripes
 
   showColStripes <- "0"
-  if (!is.null(params$showColStripes))
-    showColStripes <- params$showColStripes
+  if (!is.null(params$show_col_stripes))
+    showColStripes <- params$show_col_stripes
 
   showLastColumn <- "1"
-  if (!is.null(params$showLastColumn))
-    showLastColumn <- params$showLastColumn
+  if (!is.null(params$show_last_column))
+    showLastColumn <- params$show_last_column
 
   pivotTableStyleInfo <- xml_node_create(
     "pivotTableStyleInfo",
@@ -960,17 +1026,6 @@ create_pivot_table <- function(
     )
   )
 
-  # extLst <- paste0(
-  #   '<extLst>',
-  #   '<ext xmlns:xpdl="http://schemas.microsoft.com/office/spreadsheetml/2016/pivotdefaultlayout" uri="{747A6164-185A-40DC-8AA5-F01512510D54}">',
-  #   '<xpdl:pivotTableDefinition16/>',
-  #   '</ext>',
-  #   '<ext xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" uri="{725AE2AE-9491-48be-B2B4-4EB974FC3084}">',
-  #   '<x14:pivotCacheDefinition/>',
-  #   '</ext>',
-  #   '</extLst>'
-  # )
-
   if (isTRUE(params$no_style))
     pivotTableStyleInfo <- ""
 
@@ -979,48 +1034,44 @@ create_pivot_table <- function(
     indent <- params$indent
 
   itemPrintTitles <- "1"
-  if (!is.null(params$itemPrintTitles))
-    itemPrintTitles <- params$itemPrintTitles
+  if (!is.null(params$item_print_titles))
+    itemPrintTitles <- params$item_print_titles
 
   multipleFieldFilters <- "0"
-  if (!is.null(params$multipleFieldFilters))
-    multipleFieldFilters <- params$multipleFieldFilters
-
-  outline <- "1"
-  if (!is.null(params$outline))
-    outline <- params$outline
+  if (!is.null(params$multiple_field_filters))
+    multipleFieldFilters <- params$multiple_field_filters
 
   outlineData <- "1"
-  if (!is.null(params$outlineData))
-    outlineData <- params$outlineData
+  if (!is.null(params$outline_data))
+    outlineData <- params$outline_data
 
   useAutoFormatting <- "1"
-  if (!is.null(params$useAutoFormatting))
-    useAutoFormatting <- params$useAutoFormatting
+  if (!is.null(params$use_auto_formatting))
+    useAutoFormatting <- params$use_auto_formatting
 
   applyAlignmentFormats <- "0"
-  if (!is.null(params$applyAlignmentFormats))
-    applyAlignmentFormats <- params$applyAlignmentFormats
+  if (!is.null(params$apply_alignment_formats))
+    applyAlignmentFormats <- params$apply_alignment_formats
 
   applyNumberFormats <- "0"
-  if (!is.null(params$applyNumberFormats))
-    applyNumberFormats <- params$applyNumberFormats
+  if (!is.null(params$apply_number_formats))
+    applyNumberFormats <- params$apply_number_formats
 
   applyBorderFormats <- "0"
-  if (!is.null(params$applyBorderFormats))
-    applyBorderFormats <- params$applyBorderFormats
+  if (!is.null(params$apply_border_formats))
+    applyBorderFormats <- params$apply_border_formats
 
   applyFontFormats <- "0"
-  if (!is.null(params$applyFontFormats))
-    applyFontFormats <- params$applyFontFormats
+  if (!is.null(params$apply_font_formats))
+    applyFontFormats <- params$apply_font_formats
 
   applyPatternFormats <- "0"
-  if (!is.null(params$applyPatternFormats))
-    applyPatternFormats <- params$applyPatternFormats
+  if (!is.null(params$apply_pattern_formats))
+    applyPatternFormats <- params$apply_pattern_formats
 
   applyWidthHeightFormats <- "1"
-  if (!is.null(params$applyWidthHeightFormats))
-    applyWidthHeightFormats <- params$applyWidthHeightFormats
+  if (!is.null(params$apply_width_height_formats))
+    applyWidthHeightFormats <- params$apply_width_height_formats
 
   pivot_table_name <- sprintf("PivotTable%s", n)
   if (!is.null(params$name))
@@ -1033,74 +1084,74 @@ create_pivot_table <- function(
       `xmlns:mc`              = "http://schemas.openxmlformats.org/markup-compatibility/2006",
       `mc:Ignorable`          = "xr",
       `xmlns:xr`              = "http://schemas.microsoft.com/office/spreadsheetml/2014/revision",
-      name                    = pivot_table_name,
-      cacheId                 = as.character(n),
-      applyNumberFormats      = applyNumberFormats,
-      applyBorderFormats      = applyBorderFormats,
-      applyFontFormats        = applyFontFormats,
-      applyPatternFormats     = applyPatternFormats,
-      applyAlignmentFormats   = applyAlignmentFormats,
-      applyWidthHeightFormats = applyWidthHeightFormats,
-      asteriskTotals          = params$asteriskTotals,
-      autoFormatId            = params$autoFormatId,
-      chartFormat             = params$chartFormat,
-      dataCaption             = dataCaption,
+      name                    = as_xml_attr(pivot_table_name),
+      cacheId                 = as_xml_attr(n),
+      applyNumberFormats      = as_xml_attr(applyNumberFormats),
+      applyBorderFormats      = as_xml_attr(applyBorderFormats),
+      applyFontFormats        = as_xml_attr(applyFontFormats),
+      applyPatternFormats     = as_xml_attr(applyPatternFormats),
+      applyAlignmentFormats   = as_xml_attr(applyAlignmentFormats),
+      applyWidthHeightFormats = as_xml_attr(applyWidthHeightFormats),
+      asteriskTotals          = as_xml_attr(params$asterisk_totals),
+      autoFormatId            = as_xml_attr(params$auto_format_id),
+      chartFormat             = as_xml_attr(params$chart_format),
+      dataCaption             = as_xml_attr(dataCaption),
       updatedVersion          = "8",
       minRefreshableVersion   = "3",
-      useAutoFormatting       = useAutoFormatting,
-      itemPrintTitles         = itemPrintTitles,
+      useAutoFormatting       = as_xml_attr(useAutoFormatting),
+      itemPrintTitles         = as_xml_attr(itemPrintTitles),
       createdVersion          = "8",
-      indent                  = indent,
-      outline                 = outline,
-      outlineData             = outlineData,
-      multipleFieldFilters    = multipleFieldFilters,
-      colGrandTotals          = params$colGrandTotals,
-      colHeaderCaption        = params$colHeaderCaption,
-      compact                 = params$compact,
-      compactData             = params$compactData,
-      customListSort          = params$customListSort,
-      dataOnRows              = params$dataOnRows,
-      dataPosition            = params$dataPosition,
-      disableFieldList        = params$disableFieldList,
-      editData                = params$editData,
-      enableDrill             = params$enableDrill,
-      enableFieldProperties   = params$enableFieldProperties,
-      enableWizard            = params$enableWizard,
-      errorCaption            = params$errorCaption,
-      fieldListSortAscending  = params$fieldListSortAscending,
-      fieldPrintTitles        = params$fieldPrintTitles,
-      grandTotalCaption       = params$grandTotalCaption,
-      gridDropZones           = params$gridDropZones,
-      immersive               = params$immersive,
-      mdxSubqueries           = params$mdxSubqueries,
-      missingCaption          = params$missingCaption,
-      mergeItem               = params$mergeItem,
-      pageOverThenDown        = params$pageOverThenDown,
-      pageStyle               = params$pageStyle,
-      pageWrap                = params$pageWrap,
+      indent                  = as_xml_attr(indent),
+      outline                 = as_xml_attr(outline),
+      outlineData             = as_xml_attr(outlineData),
+      multipleFieldFilters    = as_xml_attr(multipleFieldFilters),
+      colGrandTotals          = as_xml_attr(params$col_grand_totals),
+      colHeaderCaption        = as_xml_attr(params$col_header_caption),
+      compact                 = as_xml_attr(params$compact),
+      compactData             = as_xml_attr(params$compact_data),
+      customListSort          = as_xml_attr(params$custom_list_sort),
+      dataOnRows              = as_xml_attr(params$data_on_rows),
+      dataPosition            = as_xml_attr(params$data_position),
+      disableFieldList        = as_xml_attr(params$disable_field_list),
+      editData                = as_xml_attr(params$edit_data),
+      enableDrill             = as_xml_attr(params$enable_drill),
+      enableFieldProperties   = as_xml_attr(params$enable_field_properties),
+      enableWizard            = as_xml_attr(params$enable_wizard),
+      errorCaption            = as_xml_attr(params$error_caption),
+      fieldListSortAscending  = as_xml_attr(params$field_list_sort_ascending),
+      fieldPrintTitles        = as_xml_attr(params$field_print_titles),
+      grandTotalCaption       = as_xml_attr(params$grand_total_caption),
+      gridDropZones           = as_xml_attr(params$grid_drop_zones),
+      immersive               = as_xml_attr(params$immersive),
+      mdxSubqueries           = as_xml_attr(params$mdx_subqueries),
+      missingCaption          = as_xml_attr(params$missing_caption),
+      mergeItem               = as_xml_attr(params$merge_item),
+      pageOverThenDown        = as_xml_attr(params$page_over_then_down),
+      pageStyle               = as_xml_attr(params$page_style),
+      pageWrap                = as_xml_attr(params$page_wrap),
       # pivotTableStyle
-      preserveFormatting      = params$preserveFormatting,
-      printDrill              = params$printDrill,
-      published               = params$published,
-      rowGrandTotals          = params$rowGrandTotals,
-      rowHeaderCaption        = params$rowHeaderCaption,
-      showCalcMbrs            = params$showCalcMbrs,
-      showDataDropDown        = params$showDataDropDown,
-      showDataTips            = params$showDataTips,
-      showDrill               = params$showDrill,
-      showDropZones           = params$showDropZones,
-      showEmptyCol            = params$showEmptyCol,
-      showEmptyRow            = params$showEmptyRow,
-      showError               = params$showError,
-      showHeaders             = params$showHeaders,
-      showItems               = params$showItems,
-      showMemberPropertyTips  = params$showMemberPropertyTips,
-      showMissing             = params$showMissing,
-      showMultipleLabel       = params$showMultipleLabel,
-      subtotalHiddenItems     = params$subtotalHiddenItems,
-      tag                     = params$tag,
-      vacatedStyle            = params$vacatedStyle,
-      visualTotals            = params$visualTotals
+      preserveFormatting      = as_xml_attr(params$preserve_formatting),
+      printDrill              = as_xml_attr(params$print_drill),
+      published               = as_xml_attr(params$published),
+      rowGrandTotals          = as_xml_attr(params$row_grand_totals),
+      rowHeaderCaption        = as_xml_attr(params$row_header_caption),
+      showCalcMbrs            = as_xml_attr(params$show_calc_mbrs),
+      showDataDropDown        = as_xml_attr(params$show_data_drop_down),
+      showDataTips            = as_xml_attr(params$show_data_tips),
+      showDrill               = as_xml_attr(params$show_drill),
+      showDropZones           = as_xml_attr(params$show_drop_zones),
+      showEmptyCol            = as_xml_attr(params$show_empty_col),
+      showEmptyRow            = as_xml_attr(params$show_empty_row),
+      showError               = as_xml_attr(params$show_error),
+      showHeaders             = as_xml_attr(params$show_headers),
+      showItems               = as_xml_attr(params$show_items),
+      showMemberPropertyTips  = as_xml_attr(params$show_member_property_tips),
+      showMissing             = as_xml_attr(params$show_missing),
+      showMultipleLabel       = as_xml_attr(params$show_multiple_label),
+      subtotalHiddenItems     = as_xml_attr(params$subtotal_hidden_items),
+      tag                     = as_xml_attr(params$tag),
+      vacatedStyle            = as_xml_attr(params$vacated_style),
+      visualTotals            = as_xml_attr(params$visual_totals)
     ),
     # xr:uid="{375073AB-E7CA-C149-922E-A999C47476C1}"
     xml_children =  paste0(
@@ -1372,22 +1423,12 @@ basename2 <- function(path) {
   }
 }
 
-## get cell styles for a worksheet
-get_cellstyle <- function(wb, sheet = current_sheet(), dims) {
-
-  st_ids <- NULL
-  if (missing(dims)) {
-    st_ids <- styles_on_sheet(wb = wb, sheet = sheet) %>% as.character()
-    xf_ids <- match(st_ids, wb$styles_mgr$xf$id)
-    xf_xml <- wb$styles_mgr$styles$cellXfs[xf_ids]
-  } else {
-    xf_xml <- get_cell_styles(wb = wb, sheet = sheet, cell = dims)
-  }
-
+fetch_styles <- function(wb, xf_xml, st_ids) {
   # returns NA if no style found
   if (all(is.na(xf_xml))) return(NULL)
 
   lst_out <- vector("list", length = length(xf_xml))
+  names(lst_out) <- st_ids
 
   for (i in seq_along(xf_xml)) {
 
@@ -1416,9 +1457,57 @@ get_cellstyle <- function(wb, sheet = current_sheet(), dims) {
 
   }
 
+  # unique drops names
+  lst_out <- lst_out[!duplicated(lst_out)]
+
   attr(lst_out, "st_ids") <- st_ids
 
   lst_out
+}
+
+## get cell styles for a worksheet
+get_cellstyle <- function(wb, sheet = current_sheet(), dims) {
+
+  st_ids <- NULL
+  if (missing(dims)) {
+    st_ids <- styles_on_sheet(wb = wb, sheet = sheet) %>% as.character()
+    xf_ids <- match(st_ids, wb$styles_mgr$xf$id)
+    xf_xml <- wb$styles_mgr$styles$cellXfs[xf_ids]
+  } else {
+    xf_xml <- get_cell_styles(wb = wb, sheet = sheet, cell = dims)
+  }
+
+  fetch_styles(wb, xf_xml, st_ids)
+}
+
+get_colstyle <- function(wb, sheet = current_sheet()) {
+
+  st_ids <- NULL
+  if (length(wb$worksheets[[sheet]]$cols_attr)) {
+    cols <- wb$worksheets[[sheet]]$unfold_cols()
+    st_ids <- cols$s[cols$s != ""]
+    xf_ids <- match(st_ids, wb$styles_mgr$xf$id)
+    xf_xml <- wb$styles_mgr$styles$cellXfs[xf_ids]
+  } else {
+    xf_xml <- NA_character_
+  }
+
+  fetch_styles(wb, xf_xml, st_ids)
+}
+
+get_rowstyle <- function(wb, sheet = current_sheet()) {
+
+  st_ids <- NULL
+  if (!is.null(wb$worksheets[[sheet]]$sheet_data$row_attr)) {
+    rows <- wb$worksheets[[sheet]]$sheet_data$row_attr
+    st_ids <- rows$s[rows$s != ""]
+    xf_ids <- match(st_ids, wb$styles_mgr$xf$id)
+    xf_xml <- wb$styles_mgr$styles$cellXfs[xf_ids]
+  } else {
+    xf_xml <- NA_character_
+  }
+
+  fetch_styles(wb, xf_xml, st_ids)
 }
 
 ## apply cell styles to a worksheet and return reference ids
@@ -1487,7 +1576,11 @@ set_cellstyles <- function(wb, style) {
   st_ids <- wb$styles_mgr$get_xf_id(session_ids)
 
   if (!is.null(attr(style, "st_ids"))) {
-    names(st_ids) <- attr(style, "st_ids")
+    names(st_ids) <- names(style)
+    out <- attr(style, "st_ids")
+
+    want <- match(out, names(st_ids))
+    st_ids <- st_ids[want]
   }
 
   st_ids

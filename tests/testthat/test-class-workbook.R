@@ -1,3 +1,6 @@
+
+testsetup()
+
 test_that("Workbook class", {
   expect_null(assert_workbook(wb_workbook()))
 })
@@ -60,6 +63,30 @@ test_that("wb_set_col_widths", {
     "<col min=\"9\" max=\"9\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"17.211\"/>",
     "<col min=\"10\" max=\"10\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"18.211\"/>"
   )
+  got <- wb$worksheets[[1]]$cols_attr
+  expect_equal(exp, got)
+
+  wb <- wb_workbook()$add_worksheet()
+  wb$worksheets[[1]]$cols_attr <- c(
+    "<col min=\"1\" max=\"17\" width=\"30.77734375\" style=\"16\" customWidth=\"1\"/>",
+    "<col min=\"18\" max=\"16384\" width=\"8.88671875\" style=\"16\"/>"
+  )
+
+  expect_silent(wb$set_col_widths(cols = 19, width = 9))
+
+})
+
+test_that("option maxWidth works", {
+
+  op <- options("openxlsx2.maxWidth" = 6)
+  on.exit(options(op), add = TRUE)
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = data.frame(
+      x = paste0(letters, collapse = ""),
+      y = paste0(letters, collapse = "")
+  ))$set_col_widths(cols = 1:2, widths = "auto")
+
+  exp <- "<col min=\"1\" max=\"2\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"6\"/>"
   got <- wb$worksheets[[1]]$cols_attr
   expect_equal(exp, got)
 
@@ -775,10 +802,10 @@ test_that("numfmt in pivot tables works", {
                     filter = c("Location", "Status"), data = "Units")$
     add_pivot_table(df, dims = "A3", rows = "Plant",
                     filter = c("Location", "Status"), data = "Units",
-                    param = list(numfmts = c(formatCode = "#,###0"), sort_row = "ascending"))$
+                    param = list(numfmt = c(formatCode = "#,###0"), sort_row = "ascending"))$
     add_pivot_table(df, dims = "A3", rows = "Plant",
                     filter = c("Location", "Status"), data = "Units",
-                    param = list(numfmts = c(numfmt = 10), sort_row = "descending"))
+                    param = list(numfmt = c(numfmt = 10), sort_row = "descending"))
 
   exp <- c(
     "<dataField name=\"Sum of Units\" fld=\"3\" baseField=\"0\" baseItem=\"0\"/>",
@@ -821,7 +848,7 @@ test_that("numfmt in pivot tables works", {
   expect_error(
     wb$add_pivot_table(df, dims = "A3", rows = "cyl", cols = "gear",
                        data = c("vs", "am"),
-                       param = list(numfmts = c(numfmt = 10))),
+                       param = list(numfmt = c(numfmt = 10))),
     "length of numfmt and data does not match"
   )
 

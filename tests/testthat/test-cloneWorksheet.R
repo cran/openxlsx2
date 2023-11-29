@@ -105,6 +105,28 @@ test_that("copy cells", {
 
 })
 
+test_that("copy_cells works with hyperlinks and empty cells in transpose", {
+
+  fl <- testfile_path("Single_hyperlink.xlsx")
+  wb_in <- wb_load(fl)
+
+  dat <- wb_data(wb_in, 1, dims = "A1:B2", col_names = FALSE)
+  wb_in$copy_cells(data = dat, dims = "A3")
+
+  dat <- wb_data(wb_in, 1, dims = "A1:B3", col_names = FALSE)
+  wb_in$copy_cells(data = dat, dims = "D1", transpose = TRUE)
+
+  exp <- c("A1", "A3", "D1", "F1")
+  got <- vapply(wb_in$worksheets[[1]]$hyperlinks, function(x) x$ref, "")
+  expect_equal(exp, got)
+
+  cc <- wb_in$worksheets[[1]]$sheet_data$cc
+  exp <- rep("0", 4)
+  got <- cc$v[cc$r %in% c("A1", "A3", "D1", "F1")]
+  expect_equal(exp, got)
+
+})
+
 test_that("cloning comments works", {
 
   tmp <- temp_xlsx()
@@ -237,6 +259,55 @@ test_that("cloning from workbooks works", {
   wb$clone_worksheet(old = "testing", new = "test", from = wb_ex)
   exp <- c("NOT_SUM", "SUM", "SUM_clone", "SUM2", "tab", "tab (1)", "chart_1", "chart_2", "img", "img2", "test")
   got <- wb$get_sheet_names() %>% unname()
+  expect_equal(exp, got)
+
+})
+
+test_that("cloning column and row styles works", {
+
+  tmp <- temp_xlsx()
+
+  ### prepare a worksheet to clone from
+  wb <- wb_workbook()$
+    add_worksheet()$add_data(x = head(mtcars))$
+    add_worksheet()$add_data(x = head(iris))
+
+  new_fill <- create_fill(patternType = "solid", fgColor = wb_color(hex = "yellow"))
+
+  wb$styles_mgr$add(new_fill, "new_fill")
+  new_cellxfs <- create_cell_style(
+    num_fmt_id = 0,
+    fill_id = wb$styles_mgr$get_fill_id("new_fill")
+  )
+  wb$styles_mgr$add(new_cellxfs, "new_styles")
+
+  wb$worksheets[[1]]$sheet_data$row_attr[2, "customFormat"] <- "1"
+  wb$worksheets[[1]]$sheet_data$row_attr[2, "s"] <- wb$styles_mgr$get_xf_id("new_styles")
+
+  cols <- openxlsx2:::wb_create_columns(wb, sheet = 1, cols = seq_along(mtcars))
+  cols[cols$min == 11, "style"] <- "1"
+  wb$worksheets[[1]]$fold_cols(cols)
+
+  # otherwise the style color somehow is omitted in the data area
+  wb$set_cell_style(sheet = 1, dims = "A2:K2", style = wb$styles_mgr$get_xf_id("new_styles"))
+  wb$set_cell_style(sheet = 1, dims = "K1:K7", style = wb$styles_mgr$get_xf_id("new_styles"))
+
+  wb$save(tmp)
+  rm(wb, cols, new_cellxfs, new_fill)
+
+  ### clone the actual worksheet
+  wb_mtcars <- wb_load(tmp)
+
+  wb <- wb_workbook()$add_worksheet()
+  wb$clone_worksheet(old = "Sheet 1", "mtcars", from = wb_mtcars)
+  wb$clone_worksheet(old = "Sheet 2", "iris", from = wb_mtcars)
+
+  exp <- "<col min=\"11\" max=\"11\" style=\"2\" width=\"8.43\"/>"
+  got <- wb$worksheets[[2]]$cols_attr[2]
+  expect_equal(exp, got)
+
+  exp <- "3"
+  got <- wb$worksheets[[2]]$sheet_data$row_attr[2, "s"]
   expect_equal(exp, got)
 
 })

@@ -190,12 +190,12 @@ wbWorkbook <- R6::R6Class(
       self$Content_Types <- genBaseContent_Type()
 
       creator <- creator %||%
-        getOption("openxlsx2.creator") %||%
-        # USERNAME may only be present for windows
-        Sys.getenv("USERNAME", Sys.getenv("USER"))
+        getOption("openxlsx2.creator",
+                  default = Sys.getenv("USERNAME", unset = Sys.getenv("USER")))
+        # USERNAME is present for (Windows, Linux) "USER" is present for Mac
 
-      datetime_created <- getOption("openxlsx2.datetimeCreated") %||%
-        datetime_created
+      datetime_created <- getOption("openxlsx2.datetimeCreated", datetime_created)
+
 
       assert_class(creator,          "character")
       assert_class(title,            "character", or_null = TRUE)
@@ -1174,7 +1174,32 @@ wbWorkbook <- R6::R6Class(
           new_s   <- unname(new_sty[match(self$worksheets[[newSheetIndex]]$sheet_data$cc$c_s, names(new_sty))])
           new_s[is.na(new_s)] <- ""
           self$worksheets[[newSheetIndex]]$sheet_data$cc$c_s <- new_s
+          rm(style, new_s, new_sty)
         }
+
+        style   <- get_colstyle(from, sheet = old)
+        # only if styles are present
+        if (!is.null(style)) {
+          new_sty <- set_cellstyles(self, style = style)
+          cols    <- self$worksheets[[newSheetIndex]]$unfold_cols()
+          new_s   <- unname(new_sty[match(cols$style, names(new_sty))])
+          new_s[is.na(new_s)] <- ""
+          cols$style <- new_s
+          self$worksheets[[newSheetIndex]]$fold_cols(cols)
+          rm(style, new_s, new_sty)
+        }
+
+        style   <- get_rowstyle(from, sheet = old)
+        # only if styles are present
+        if (!is.null(style)) {
+          new_sty <- set_cellstyles(self, style = style)
+          new_s   <- unname(new_sty[match(self$worksheets[[newSheetIndex]]$sheet_data$row_attr$s, names(new_sty))])
+          new_s[is.na(new_s)] <- ""
+          self$worksheets[[newSheetIndex]]$sheet_data$row_attr$s <- new_s
+          rm(style, new_s, new_sty)
+        }
+
+        # TODO dxfs styles for (pivot) table styles and conditional formatting
 
         clone_shared_strings(from, old, self, newSheetIndex)
       }
@@ -1358,6 +1383,12 @@ wbWorkbook <- R6::R6Class(
       if (missing(pivot_table)) pivot_table <- NULL
       if (missing(params))      params <- NULL
 
+      if_not_missing <- function(x) if (missing(x)) NULL else as.character(x)
+
+      if (any(duplicated(c(if_not_missing(filter), if_not_missing(rows), if_not_missing(cols))))) {
+        stop("duplicated variable in filter, rows, and cols detected.")
+      }
+
       if (!missing(fun) && !missing(data)) {
         if (length(fun) < length(data)) {
           fun <- rep(fun[1], length(data))
@@ -1497,7 +1528,7 @@ wbWorkbook <- R6::R6Class(
       sel <- which(pt$name == pivot_table)
       cid <- pt$cacheId[sel]
 
-      uni_name <- paste0(slicer, cid)
+      uni_name <- paste0(stringi::stri_replace_all_fixed(slicer, ' ', '_'), cid)
 
       ### slicer_cache
       sortOrder <- NULL
@@ -1527,6 +1558,14 @@ wbWorkbook <- R6::R6Class(
         stop("slicer was not initialized in pivot table!")
       }
 
+      choose    <- params$choose
+
+      if (!is.null(choose) && !is.na(choose[slicer])) {
+        choo <- choose[slicer]
+      } else {
+        choo <- NULL
+      }
+
       tab_xml <- xml_node_create(
         "tabular",
         xml_attributes = c(
@@ -1535,7 +1574,7 @@ wbWorkbook <- R6::R6Class(
           showMissing  = showMissing,
           crossFilter  = crossFilter
         ),
-        xml_children = get_items(x, which(names(x) == slicer), NULL, slicer = TRUE)
+        xml_children = get_items(x, which(names(x) == slicer), NULL, slicer = TRUE, choose = choo)
       )
 
       slicer_cache <- read_xml(sprintf(
@@ -2846,6 +2885,7 @@ wbWorkbook <- R6::R6Class(
     #' @param as_value should a copy of the value be written
     #' @param as_ref should references to the cell be written
     #' @param transpose should the data be written transposed
+    #' @param ... additional arguments passed to add_data() if used with `as_value`
     #' @return The `wbWorksheet` object, invisibly
     copy_cells = function(
       sheet     = current_sheet(),
@@ -2853,10 +2893,14 @@ wbWorkbook <- R6::R6Class(
       data,
       as_value  = FALSE,
       as_ref    = FALSE,
-      transpose = FALSE
+      transpose = FALSE,
+      ...
     ) {
 
       assert_class(data, "wb_data")
+      from_sheet   <- attr(data, "sheet")
+      from_dims_df <- attr(data, "dims")
+
       sheet <- private$get_sheet_index(sheet)
 
       to_ncol <- ncol(data) - 1
@@ -2868,22 +2912,20 @@ wbWorkbook <- R6::R6Class(
       to_cols <- seq.int(start_col, start_col + to_ncol)
       to_rows <- seq.int(start_row, start_row + to_nrow)
 
-      to_dims    <- rowcol_to_dims(to_rows, to_cols)
-      to_dims_i  <- dims_to_dataframe(to_dims, fill = FALSE)
-      to_dims_f  <- dims_to_dataframe(to_dims, fill = TRUE)
-
       if (transpose) {
-        to_dims_i <- as.data.frame(t(to_dims_i))
-        to_dims_f  <- as.data.frame(t(to_dims_f))
+        to_cols <- seq.int(start_col, start_col + to_nrow)
+        to_rows <- seq.int(start_row, start_row + to_ncol)
+        from_dims_df <- as.data.frame(t(from_dims_df))
       }
 
-      to_dims_f <- unname(unlist(to_dims_f))
+      to_dims       <- rowcol_to_dims(to_rows, to_cols)
+      to_dims_df_i  <- dims_to_dataframe(to_dims, fill = FALSE)
+      to_dims_df_f  <- dims_to_dataframe(to_dims, fill = TRUE)
 
-      from_sheet <- attr(data, "sheet")
-      from_dims  <- attr(data, "dims")
+      to_dims_f <- unname(unlist(to_dims_df_f))
 
       from_sheet <- wb_validate_sheet(self, from_sheet)
-      from_dims  <- as.character(unlist(from_dims))
+      from_dims  <- as.character(unlist(from_dims_df))
       cc <- self$worksheets[[from_sheet]]$sheet_data$cc
 
       # TODO improve this. It should use v or inlineStr from cc
@@ -2894,7 +2936,7 @@ wbWorkbook <- R6::R6Class(
           data <- t(data)
         }
 
-        self$add_data(sheet = sheet, x = data, dims = to_dims_f[[1]], colNames = FALSE)
+        self$add_data(sheet = sheet, x = data, dims = to_dims_f[[1]], colNames = FALSE, ...)
 
         return(invisible(self))
       }
@@ -2913,13 +2955,45 @@ wbWorkbook <- R6::R6Class(
       if (as_ref) {
         from_sheet_name <- self$get_sheet_names(escape = TRUE)[[from_sheet]]
         to_cc[c("c_t", "c_cm", "c_ph", "c_vm", "v", "f", "f_t", "f_ref", "f_ca", "f_si", "is")] <- ""
-        to_cc[c("f")] <- paste0(shQuote(from_sheet_name, type = "sh"), "!", from_cells)
+        to_cc[c("f")] <- paste0(shQuote(from_sheet_name, type = "sh"), "!", from_dims)
       }
+
+      # uninitialized cells are NA_character_
+      to_cc[is.na(to_cc)] <- ""
 
       cc <- self$worksheets[[sheet]]$sheet_data$cc
       cc[match(to_dims_f, cc$r), ] <- to_cc
 
       self$worksheets[[sheet]]$sheet_data$cc <- cc
+
+      ### add hyperlinks ---
+      hyperlink_in_wb <- vapply(
+        self$worksheets[[from_sheet]]$hyperlinks,
+        function(x) x$ref,
+        NA_character_
+      )
+
+      if (any(sel <- hyperlink_in_wb %in% from_dims)) {
+
+        has_hl <- apply(from_dims_df, 2, function(x) x %in% hyperlink_in_wb)
+
+        old <- from_dims_df[has_hl]
+        new <- to_dims_df_f[has_hl]
+
+        for (hls in match(hyperlink_in_wb, old)) {
+
+          # prepare the updated link
+          hl <- self$worksheets[[from_sheet]]$hyperlinks[[hls]]$clone()
+          hl$ref <- new[which(old == hl$ref)]
+
+          # assign it
+          self$worksheets[[sheet]]$hyperlinks <- append(
+            self$worksheets[[sheet]]$hyperlinks,
+            hl
+          )
+        }
+
+      }
 
       invisible(self)
     },
@@ -4203,7 +4277,7 @@ wbWorkbook <- R6::R6Class(
         done <- as_xml_attr(resolve)
         if (reply) done <- NULL
 
-        ts <- getOption("openxlsx2.datetimeCreated") %||% Sys.time()
+        ts <- getOption("openxlsx2.datetimeCreated", default = Sys.time())
 
         tc <- xml_node_create(
           "threadedComment",
@@ -4677,6 +4751,12 @@ wbWorkbook <- R6::R6Class(
         imageNo <- 1L
       }
 
+      if (length(self$drawings_rels) >= sheet_drawing) {
+        next_id <- get_next_id(self$drawings_rels[[sheet_drawing]])
+      } else {
+        next_id <- "rId1"
+      }
+
       ## write file path to media slot to copy across on save
       tmp <- file
       names(tmp) <- stri_join("image", mediaNo, ".", imageType)
@@ -4688,7 +4768,7 @@ wbWorkbook <- R6::R6Class(
         '<xdr:absoluteAnchor>',
         pos,
         sprintf('<xdr:ext cx="%s" cy="%s"/>', width, height),
-        genBasePic(imageNo),
+        genBasePic(imageNo, next_id),
         "<xdr:clientData/>",
         "</xdr:absoluteAnchor>"
       )
@@ -4722,8 +4802,8 @@ wbWorkbook <- R6::R6Class(
       self$drawings_rels[[sheet_drawing]] <- c(
         old_drawings_rels,
         sprintf(
-          '<Relationship Id="rId%s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image%s.%s"/>',
-          imageNo,
+          '<Relationship Id="%s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image%s.%s"/>',
+          next_id,
           mediaNo,
           imageType
         )
@@ -5515,8 +5595,9 @@ wbWorkbook <- R6::R6Class(
       company          = NULL
     ) {
 
-      datetime_created <- getOption("openxlsx2.datetimeCreated") %||%
-        datetime_created
+      datetime_created <-
+        getOption("openxlsx2.datetimeCreated", datetime_created)
+
 
       core_dctitle <- "dc:title"
       core_subject <- "dc:subject"
@@ -6079,7 +6160,7 @@ wbWorkbook <- R6::R6Class(
       }
 
       localSheetId <- ""
-      if (local_sheet) localSheetId <- as.character(sheet)
+      if (local_sheet) localSheetId <- as.character(sheet - 1L)
 
       ## check name doesn't already exist
       ## named region

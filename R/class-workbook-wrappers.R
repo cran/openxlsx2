@@ -305,6 +305,9 @@ wb_add_data_table <- function(
 #' `fun` can be any of `AVERAGE`, `COUNT`, `COUNTA`, `MAX`, `MIN`,
 #' `PRODUCT`, `STDEV`, `STDEVP`, `SUM`, `VAR`, `VARP`.
 #'
+#' `show_data_as` can be any of `normal`, `difference`, `percent`, `percentDiff`,
+#' `runTotal`, `percentOfRow`, `percentOfCol`, `percentOfTotal`, `index`.
+#'
 #' The sheet will be empty unless it is opened in spreadsheet software.
 #'
 #' @param wb A Workbook object containing a #' worksheet.
@@ -521,6 +524,7 @@ wb_update_table <- function(wb, sheet = current_sheet(), dims = "A1", tabname) {
 #' @param as_value Should a copy of the value be written?
 #' @param as_ref Should references to the cell be written?
 #' @param transpose Should the data be written transposed?
+#' @param ... additional arguments passed to add_data() if used with `as_value`
 #' @examples
 #' wb <- wb_workbook()$
 #' add_worksheet()$
@@ -543,18 +547,20 @@ wb_copy_cells <- function(
     data,
     as_value  = FALSE,
     as_ref    = FALSE,
-    transpose = FALSE
+    transpose = FALSE,
+    ...
 ) {
   assert_workbook(wb)
   wb$
     clone(deep = TRUE)$
     copy_cells(
-      sheet = sheet,
-      dims = dims,
-      data = data,
-      as_value = as_value,
-      as_ref = as_ref,
-      transpose = transpose
+      sheet     = sheet,
+      dims      = dims,
+      data      = data,
+      as_value  = as_value,
+      as_ref    = as_ref,
+      transpose = transpose,
+      ...       = ...
     )
 }
 
