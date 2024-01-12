@@ -32,6 +32,7 @@ STDEV
 STDEVP
 Savon
 Schauberger
+SlicerStyleLight
 Sparklines
 SuperA
 SuperB
@@ -46,7 +47,6 @@ autocompletion
 bandedCols
 bandedRows
 bool
-calc
 calcChain
 calculatedColumn
 camelCase
@@ -127,6 +127,7 @@ hasDrawing
 hdpi
 headerRow
 hms
+jpeg
 lastColumn
 lastHeaderCell
 lastModifiedBy
@@ -154,6 +155,7 @@ notBetween
 notEqual
 numFmt
 numberStoredAsText
+numfmt
 numfmts
 oddFooter
 oddHeader
@@ -173,6 +175,7 @@ pivotDefinitions
 pivotDefinitionsRels
 pivotRecords
 pivotTables
+png
 posix
 posixt
 pre
@@ -226,6 +229,7 @@ textLength
 th
 totalRow
 totalsRowCount
+twoCell
 twoCellAnchor
 twoDigitTextYear
 unescaping

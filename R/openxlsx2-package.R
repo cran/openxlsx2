@@ -84,9 +84,12 @@
 #' * `options("openxlsx2.thread_id")` the default person id when adding a threaded comment
 #'   to a cell with [wb_add_thread()]
 #' * `options("openxlsx2.accountingFormat" = 4)`
+#' * `options("openxlsx2.currencyFormat" = 4)`
 #' * `options("openxlsx2.commaFormat" = 3)`
 #' * `options("openxlsx2.percentageFormat" = 10)`
 #' * `options("openxlsx2.scientificFormat" = 48)`
+#' * `options("openxlsx2.string_nums" = TRUE)` numerics in character columns
+#'    will be converted. `"1"` will be written as `1`
 #' @name openxlsx2_options
 NULL
 # matches enum celltype
@@ -106,7 +109,8 @@ openxlsx2_celltype <- c(
   factor         = 12,
   string_nums    = 13,
   cm_formula     = 14,
-  hms_time       = 15
+  hms_time       = 15,
+  currency       = 16
 )
 
 #' Deprecated functions in package *openxlsx2*

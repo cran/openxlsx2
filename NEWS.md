@@ -1,3 +1,31 @@
+# openxlsx2 1.3
+
+## Documentation improvement
+
+* Further tweaks to documentation and vignettes to make them more consistent.
+  * `wb_add_pivot_table()` / `wb_add_slicer()`
+  * `wb_load()`: `calc_chain` is no longer visible and the previous text that might have been misleading in regards of its use, has been replaced by a more detailed description of what are the consequences of keeping the calculation chain
+
+## New features
+
+* Allow further modifications of comments. The background can now be filled with a color or an image. [870](https://github.com/JanMarvin/openxlsx2/pull/870)
+
+* Added `wb_set_cell_style_across()` to apply a cell style to selected columns and rows. This allows unlocking cells to make use column and row properties of `wb_protect_worksheet()` which require additional cell styles (see issue 871 for a more detailed explanation). `wb_set_cell_style()` now accepts a cell dimension in the `style` argument. [873](https://github.com/JanMarvin/openxlsx2/pull/873)
+
+## Fixes
+
+* `wb_add_ignore_error()` now returns a `wbWorkbook`. [865](https://github.com/JanMarvin/openxlsx2/pull/865)
+
+* Deactivate the `is_hyperlink` check for non-dataframe objects in `wb_add_data()`. Internally, `vapply()` is applied to the input object, which is applied column-wise for a data frame and cell-wise for a matrix. This speeds up the writing of larger matrices considerably. [876](https://github.com/JanMarvin/openxlsx2/pull/876)
+
+* Column style `currency` is now correctly applied to numeric vectors. Previously it was not handled. This applies the built in spreadsheet style for currency presumably linked to the spreadsheet software locale. [879](https://github.com/JanMarvin/openxlsx2/pull/879)
+
+* `wb_to_df(col_names = FALSE)` no longer drops column names from logical vectors. Previously, column names were replaced by `NA`. Now the column name is returned as a cell value in a character column. [884](https://github.com/JanMarvin/openxlsx2/pull/884)
+
+
+***************************************************************************
+
+
 # openxlsx2 1.2
 
 ## New features
@@ -13,6 +41,7 @@
 * Improve copying cells in transpose mode and with hyperlinks. [850](https://github.com/JanMarvin/openxlsx2/pull/850)
 
 * Options `openxlsx2.maxWidth` and `openxlsx2.minWidth` are now respected as documented when setting column widths with `wb_set_col_widths()`. [847](https://github.com/JanMarvin/openxlsx2/issues/847)
+
 
 ***************************************************************************
 

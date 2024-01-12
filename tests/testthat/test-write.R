@@ -192,7 +192,7 @@ test_that("update cell(s)", {
 
   exp <- structure(
     list(c(7, NA, NA, NA, NA, 7),
-         c(NA, NA, TRUE, FALSE, TRUE, NA),
+         c("y", "z", "TRUE", "FALSE", "TRUE", NA),
          c(2, NA, 2.5, NA, NA, NA),
          c(7, 2, 3, NA, 5, NA)),
     names = c(NA, "x", "Var2", "Var3"),
@@ -713,5 +713,35 @@ test_that("writing NULL works silently", {
   wb <- wb_workbook()$add_worksheet()
   wb2 <- wb_add_data(wb, x = x)
   expect_equal(wb, wb2)
+
+})
+
+test_that("dimension limits work", {
+
+  max_c <- 16384
+  max_r <- 1048576
+
+  dims <- paste0(int2col(max_c), max_r)
+  expect_silent(
+    wb <- wb_workbook()$add_worksheet()$add_data(x = 1, dims = dims)
+  )
+
+  dims <- paste0(int2col(max_c), max_r + 1L)
+  expect_error(
+    wb_workbook()$add_worksheet()$add_data(x = 1, dims = dims),
+    "Dimensions exceed worksheet"
+  )
+
+  dims <- paste0(int2col(max_c + 1L), max_r)
+  expect_error(
+    wb_workbook()$add_worksheet()$add_data(x = 1, dims = dims),
+    "Dimensions exceed worksheet"
+  )
+
+  dims <- paste0(int2col(max_c + 1L), max_r + 1L)
+  expect_error(
+    wb_workbook()$add_worksheet()$add_data(x = 1, dims = dims),
+    "Dimensions exceed worksheet"
+  )
 
 })

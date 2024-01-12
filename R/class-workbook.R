@@ -1520,7 +1520,15 @@ wbWorkbook <- R6::R6Class(
         stop("x cannot be missing in add_slicer")
 
       assert_class(x, "wb_data")
-      if (missing(params)) params <- NULL
+      if (missing(params)) {
+        params <- NULL
+      } else {
+        arguments <- c(
+          "caption", "choose", "column_count", "cross_filter", "edit_as",
+          "row_height", "show_missing", "sort_order", "style"
+        )
+        params <- standardize_case_names(params, arguments = arguments, return = TRUE)
+      }
 
       sheet <- private$get_sheet_index(sheet)
 
@@ -1532,16 +1540,16 @@ wbWorkbook <- R6::R6Class(
 
       ### slicer_cache
       sortOrder <- NULL
-      if (!is.null(params$sortOrder))
-        sortOrder <- params$sortOrder
+      if (!is.null(params$sort_order))
+        sortOrder <- params$sort_order
 
       showMissing <- NULL
-      if (!is.null(params$showMissing))
-        showMissing <- params$showMissing
+      if (!is.null(params$show_missing))
+        showMissing <- params$show_missing
 
       crossFilter <- NULL
-      if (!is.null(params$crossFilter))
-        crossFilter <- params$crossFilter
+      if (!is.null(params$cross_filter))
+        crossFilter <- params$cross_filter
 
       # TODO we might be able to initialize the field from here. Something like
       # get_item(...) and insert it to the pivotDefinition
@@ -1613,12 +1621,12 @@ wbWorkbook <- R6::R6Class(
         caption <- params$caption
 
       row_height <- 230716
-      if (!is.null(params$rowHeight))
-        row_height <- params$rowHeight
+      if (!is.null(params$row_height))
+        row_height <- params$row_height
 
       column_count <- NULL
-      if (!is.null(params$columnCount))
-        column_count <- params$columnCount
+      if (!is.null(params$column_count))
+        column_count <- params$column_count
 
       style <- NULL
       if (!is.null(params$style))
@@ -1916,23 +1924,20 @@ wbWorkbook <- R6::R6Class(
     #' @description load workbook
     #' @param file file
     #' @param data_only data_only
-    #' @param calc_chain calc_chain
     #' @return The `wbWorkbook` object invisibly
     load = function(
       file,
       sheet,
       data_only  = FALSE,
-      calc_chain = FALSE,
       ...
     ) {
       # Is this required?
-      if (missing(file)) file <- substitute()
+      if (missing(file))  file  <- substitute()
       if (missing(sheet)) sheet <- substitute()
       self <- wb_load(
         file       = file,
         sheet      = sheet,
         data_only  = data_only,
-        calc_chain = calc_chain,
         ...        = ...
       )
       invisible(self)
@@ -4133,8 +4138,10 @@ wbWorkbook <- R6::R6Class(
         ...
     ) {
 
-      col <- list(...)[["col"]]
-      row <- list(...)[["row"]]
+      col   <- list(...)[["col"]]
+      row   <- list(...)[["row"]]
+      color <- list(...)[["color"]] %||% list(...)[["colour"]]
+      file  <- list(...)[["file"]]
 
       if (!is.null(row) && !is.null(col)) {
         .Deprecated(old = "col/row", new = "dims", package = "openxlsx2")
@@ -4145,11 +4152,16 @@ wbWorkbook <- R6::R6Class(
         comment <- wb_comment(text = comment, author = getOption("openxlsx2.creator"))
       }
 
+      if (!is.null(color) && !is_wbColour(color))
+        stop("color needs to be a wb_color()")
+
       write_comment(
         wb      = self,
         sheet   = sheet,
         comment = comment,
-        dims    = dims
+        dims    = dims,
+        color   = color,
+        file    = file
       ) # has no use: xy
 
       invisible(self)
@@ -4723,23 +4735,8 @@ wbWorkbook <- R6::R6Class(
 
       sheet <- private$get_sheet_index(sheet)
 
-      # TODO tools::file_ext() ...
-      imageType <- regmatches(file, gregexpr("\\.[a-zA-Z]*$", file))
-      imageType <- gsub("^\\.", "", imageType)
-      mediaNo <- length(self$media) + 1L
-
-      ## update Content_Types
-      if (!any(grepl(stri_join("image/", imageType), self$Content_Types))) {
-        self$Content_Types <-
-          unique(c(
-            sprintf(
-              '<Default Extension="%s" ContentType="image/%s"/>',
-              imageType,
-              imageType
-            ),
-            self$Content_Types
-          ))
-      }
+      private$add_media(file)
+      file <- names(self$media)[length(self$media)]
 
       if (length(self$worksheets[[sheet]]$relships$drawing)) {
         sheet_drawing <- self$worksheets[[sheet]]$relships$drawing
@@ -4756,11 +4753,6 @@ wbWorkbook <- R6::R6Class(
       } else {
         next_id <- "rId1"
       }
-
-      ## write file path to media slot to copy across on save
-      tmp <- file
-      names(tmp) <- stri_join("image", mediaNo, ".", imageType)
-      self$append("media", tmp)
 
       pos <- '<xdr:pos x="0" y="0" />'
 
@@ -4802,10 +4794,9 @@ wbWorkbook <- R6::R6Class(
       self$drawings_rels[[sheet_drawing]] <- c(
         old_drawings_rels,
         sprintf(
-          '<Relationship Id="%s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image%s.%s"/>',
+          '<Relationship Id="%s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/%s"/>',
           next_id,
-          mediaNo,
-          imageType
+          file
         )
       )
 
@@ -5059,7 +5050,7 @@ wbWorkbook <- R6::R6Class(
       } else {
         relship <- rbindlist(xml_attr(self$worksheets_rels[[sheet]], "Relationship"))
         relship$typ <- basename(relship$Type)
-        next_relship <- as.integer(gsub("\\D+", "", relship$Id)) + 1L
+        next_relship <- max(as.integer(gsub("\\D+", "", relship$Id))) + 1L
         has_no_drawing <- !any(relship$typ == "drawing")
       }
 
@@ -7124,6 +7115,11 @@ wbWorkbook <- R6::R6Class(
         dims <- dims_to_dataframe(dims, fill = TRUE)
       sheet <- private$get_sheet_index(sheet)
 
+      if (all(grepl("[A-Za-z]", style)))
+        styid <- self$get_cell_style(dims = style, sheet = sheet)
+      else
+        styid <- style
+
       private$do_cell_init(sheet, dims)
 
       # if a range is passed (e.g. "A1:B2") we need to get every cell
@@ -7131,7 +7127,58 @@ wbWorkbook <- R6::R6Class(
 
       sel <- self$worksheets[[sheet]]$sheet_data$cc$r %in% dims
 
-      self$worksheets[[sheet]]$sheet_data$cc$c_s[sel] <- style
+      self$worksheets[[sheet]]$sheet_data$cc$c_s[sel] <- styid
+
+      invisible(self)
+    },
+
+    #' @description set style across columns and/or rows
+    #' @param sheet sheet
+    #' @param style style
+    #' @param cols cols
+    #' @param rows rows
+    #' @return The `wbWorkbook` object
+    set_cell_style_across = function(sheet = current_sheet(), style, cols = NULL, rows = NULL) {
+
+      sheet <- private$get_sheet_index(sheet)
+      if (all(grepl("[A-Za-z]", style)))
+        styid <- self$get_cell_style(dims = style, sheet = sheet)
+      else
+        styid <- style
+
+      if (!is.null(rows)) {
+        if (is.character(rows)) # row2int
+          rows <- as.integer(dims_to_rowcol(rows)[[2]])
+
+        dims  <- wb_dims(rows, "A")
+        cells <- unname(unlist(dims_to_dataframe(dims, fill = TRUE)))
+        cc    <- self$worksheets[[sheet]]$sheet_data$cc
+
+        cells <- cells[!cells %in% cc$r]
+        if (length(cells) > 0) {
+          private$do_cell_init(sheet, dims)
+          self$set_cell_style(sheet = sheet, dims = cells, style = styid)
+        }
+
+        rows_df <- self$worksheets[[sheet]]$sheet_data$row_attr
+        sel     <- rows_df$r %in% as.character(rows)
+
+        rows_df$customFormat[sel] <- "1"
+        rows_df$s[sel]            <- styid
+        self$worksheets[[sheet]]$sheet_data$row_attr <- rows_df
+
+      }
+
+      if (!is.null(cols)) {
+
+        cols <- col2int(cols)
+
+        cols_df <- wb_create_columns(self, sheet, cols)
+        sel <- cols_df$min %in% as.character(cols)
+        cols_df$style[sel] <- styid
+        self$worksheets[[sheet]]$fold_cols(cols_df)
+
+      }
 
       invisible(self)
     },
@@ -7355,6 +7402,7 @@ wbWorkbook <- R6::R6Class(
         twoDigitTextYear   = two_digit_text_year,
         unlockedFormula    = unlocked_formula
       )
+      invisible(self)
     },
 
     #' @description add sheetview
@@ -7709,6 +7757,36 @@ wbWorkbook <- R6::R6Class(
       invisible(self)
     },
 
+    add_media = function(
+      file
+    ) {
+
+      # TODO tools::file_ext() ...
+      imageType <- regmatches(file, gregexpr("\\.[a-zA-Z]*$", file))
+      imageType <- gsub("^\\.", "", imageType)
+      mediaNo <- length(self$media) + 1L
+
+      ## update Content_Types
+      if (!any(grepl(stri_join("image/", imageType), self$Content_Types))) {
+        self$Content_Types <-
+          unique(c(
+            sprintf(
+              '<Default Extension="%s" ContentType="image/%s"/>',
+              imageType,
+              imageType
+            ),
+            self$Content_Types
+          ))
+      }
+
+      ## write file path to media slot to copy across on save
+      tmp <- file
+      names(tmp) <- stri_join("image", mediaNo, ".", imageType)
+      self$append("media", tmp)
+
+      invisible(self)
+    },
+
     get_drawingsref = function() {
       has_drawing <- which(grepl("drawings", self$worksheets_rels))
 
@@ -7750,7 +7828,7 @@ wbWorkbook <- R6::R6Class(
               fl = file.path(dir, sprintf("vmlDrawing%s.vml", i))
           )
 
-          if (!is.null(unlist(self$vml_rels)) && length(self$vml_rels) >= i && self$vml_rels[[i]] != "") {
+          if (!is.null(unlist(self$vml_rels)) && length(self$vml_rels) >= i && !all(self$vml_rels[[i]] == "")) {
             write_file(
               head = '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
               body = pxml(self$vml_rels[[i]]),
