@@ -6,7 +6,8 @@
 #' `theme` can be one of
 #' "Atlas", "Badge", "Berlin", "Celestial", "Crop", "Depth", "Droplet",
 #' "Facet", "Feathered", "Gallery", "Headlines", "Integral", "Ion",
-#' "Ion Boardroom", "Madison", "Main Event", "Mesh", "Office Theme",
+#' "Ion Boardroom", "LibreOffice", "Madison", "Main Event", "Mesh",
+#' "Office 2007 - 2010 Theme", "Office 2013 - 2022 Theme", "Office Theme",
 #' "Old Office Theme", "Organic", "Parallax", "Parcel", "Retrospect",
 #' "Savon", "Slice", "Vapor Trail", "View", "Wisp", "Wood Type"
 #'
@@ -120,8 +121,29 @@ wb_save <- function(wb, file = NULL, overwrite = TRUE, path = NULL) {
 #' and left to Excel to evaluate the formula when the file is opened in Excel.
 #' The string `"_openxlsx_NA"` is reserved for `openxlsx2`.
 #' If the data frame contains this string, the output will be broken.
-#' Many base classes are covered, though not all and far from all third-party classes.
+#'
+#' Supported classes are data frames, matrices and vectors of various types and
+#' everything that can be converted into a data frame with `as.data.frame()`.
+#' Everything else that the user wants to write should either be converted into
+#' a vector or data frame or written in vector or data frame segments. This
+#' includes base classes such as `table`, which were coerced internally in the
+#' predecessor of this package.
+#'
+#' Even vectors and data frames can consist of different classes. Many base
+#' classes are covered, though not all and far from all third-party classes.
 #' When data of an unknown class is written, it is handled with `as.character()`.
+#' It is not possible to write character nodes beginning with `<r>` or `<r/>`. Both
+#' are reserved for internal functions. If you need these. You have to wrap
+#' the input string in `fmt_txt()`.
+#'
+#' The columns of `x` with class Date/POSIXt, currency, accounting, hyperlink,
+#' percentage are automatically styled as dates, currency, accounting,
+#' hyperlinks, percentages respectively.
+#'
+#' Functions [wb_add_data()] and [wb_add_data_table()] behave quite similar. The
+#' distinction is that the latter creates a table in the worksheet that can be
+#' used for different kind of formulas and can be sorted independently, though
+#' is less flexible than basic cell regions.
 #' @family workbook wrappers
 #' @family worksheet content functions
 #' @return A `wbWorkbook`, invisibly.
@@ -220,13 +242,7 @@ wb_add_data <- function(
 #'
 #' Add data to a worksheet and format as an Excel table.
 #'
-#' The columns of `x` with class Date/POSIXt, currency, accounting, hyperlink,
-#' percentage are automatically styled as dates, currency, accounting, hyperlinks,
-#' percentages respectively.
-#'
-#' The string `"_openxlsx_NA"` is reserved for `openxlsx2`. If `x` contains this
-#' string, the output will be broken.
-#'
+#' @inherit wb_add_data details
 #' @inheritParams wb_add_data
 #' @param x A data frame
 #' @param table_style Any table style name or "none" (see `vignette("openxlsx2_style_manual")`)
@@ -326,6 +342,10 @@ wb_add_data_table <- function(
 #'
 #' `show_data_as` can be any of `normal`, `difference`, `percent`, `percentDiff`,
 #' `runTotal`, `percentOfRow`, `percentOfCol`, `percentOfTotal`, `index`.
+#'
+#' It is possible to calculate data fields if the formula is assigned as a
+#' variable name for the field to calculate. This would look like this:
+#' `data = c("am", "disp/cyl" = "New")`
 #'
 #' Possible `params` arguments are listed below. Pivot tables accepts more
 #' parameters, but they were either not tested or misbehaved (probably because
@@ -1026,6 +1046,9 @@ wb_remove_row_heights <- function(wb, sheet = current_sheet(), rows) {
 #' and DPI settings used. Setting `widths` to specific value also is no guarantee
 #' that the output will have consistent column widths.
 #'
+#' For automatic text wrapping of columns use
+#' [wb_set_cell_style(wrap_text = TRUE)][wb_set_cell_style()]
+#'
 #' @param wb A `wbWorkbook` object.
 #' @param sheet A name or index of a worksheet, a vector in the case of `remove_`
 #' @param cols Indices of cols to set/remove column widths.
@@ -1286,11 +1309,15 @@ wb_remove_worksheet <- function(wb, sheet = current_sheet()) {
 
 #' Set the default font in a workbook
 #'
-#' Modify / get the default font for the workbook. The base font in a workbook
-#' does not affect the font in data tables.
+#' Modify / get the default font for the workbook. This will alter the latin
+#' major and minor font in the workbooks theme.
 #'
-#' The font name is not validated in anyway. Excel replaces unknown font names
-#' with Arial. The default base font is Calibri, black, size 11.
+#' The font name is not validated in anyway. Spreadsheet software replaces
+#' unknown font names with system defaults.
+#'
+#' The default base font is Aptos Narrow, black, size 11. If `font_name` differs
+#' from the name in [wb_get_base_font()], the theme is updated to use the newly
+#' selected font name.
 #'
 #' @param wb A workbook object
 #' @param font_size Font size
@@ -1302,10 +1329,10 @@ wb_remove_worksheet <- function(wb, sheet = current_sheet()) {
 #' @name base_font-wb
 #' @examples
 #' ## create a workbook
-#' wb <- wb_workbook()
+#' wb <- wb_workbook(theme = "Office 2013 - 2022 Theme")
 #' wb$add_worksheet("S1")
-#' ## modify base font to size 10 Arial Narrow in red
-#' wb$set_base_font(font_size = 10, font_color = wb_color("red"), font_name = "Arial Narrow")
+#' ## modify base font to size 10 Aptos Narrow in red
+#' wb$set_base_font(font_size = 10, font_color = wb_color("red"), font_name = "Aptos Narrow")
 #'
 #' wb$add_data(x = iris)
 #'
@@ -1322,7 +1349,7 @@ wb_set_base_font <- function(
   wb,
   font_size  = 11,
   font_color = wb_color(theme = "1"),
-  font_name  = "Calibri",
+  font_name  = "Aptos Narrow",
   ...
 ) {
   assert_workbook(wb)
@@ -1340,6 +1367,60 @@ wb_get_base_font <- function(wb) {
   assert_workbook(wb)
   wb$get_base_font()
 }
+
+#' Set the default colors in a workbook
+#'
+#' Modify / get the default colors of the workbook.
+#'
+#' @details Theme must be any of the following:
+#' "Aspect", "Blue", "Blue II", "Blue Green", "Blue Warm", "Greyscale",
+#' "Green", "Green Yellow", "Marquee", "Median", "Office", "Office 2007 - 2010",
+#' "Office 2013 - 2022", "Orange", "Orange Red", "Paper", "Red",
+#' "Red Orange", "Red Violet", "Slipstream", "Violet", "Violet II",
+#' "Yellow", "Yellow Orange"
+#'
+#' @name wb_base_colors
+#' @param wb A workbook object
+#' @param theme a predefined color theme
+#' @param ... optional parameters
+#' @param xml Logical if xml string should be returned
+#' @param plot Logical if a barplot of the colors should be returned
+#' @family workbook styling functions
+#' @family workbook wrappers
+#' @examples
+#' wb <- wb_workbook()
+#' wb$get_base_colors()
+#' wb$set_base_colors(theme = 3)
+#' wb$set_base_colors(theme = "Violet II")
+#' wb$get_base_colours()
+NULL
+#' @export
+#' @rdname wb_base_colors
+wb_set_base_colors <- function(
+  wb,
+  theme = "Office",
+  ...
+) {
+  assert_workbook(wb)
+  wb$clone()$set_base_colors(
+    theme = theme,
+    ...   = ...
+  )
+}
+#' @export
+#' @rdname wb_base_colors
+wb_get_base_colors <- function(wb, xml = FALSE, plot = TRUE) {
+  assert_workbook(wb)
+  wb$get_base_colors(xml = xml, plot = plot)
+}
+#' @export
+#' @rdname wb_base_colors
+#' @usage NULL
+wb_set_base_colours <- wb_set_base_colors
+#' @export
+#' @rdname wb_base_colors
+#' @usage NULL
+wb_get_base_colours <- wb_get_base_colors
 
 
 #' Set the workbook position, size and filter
@@ -1593,10 +1674,10 @@ wb_set_header_footer <- function(
 #' wb$add_worksheet("print_title_cols")
 #'
 #' wb$add_data("print_title_rows", rbind(iris, iris, iris, iris))
-#' wb$add_data("print_title_cols", x = rbind(mtcars, mtcars, mtcars), rowNames = TRUE)
+#' wb$add_data("print_title_cols", x = rbind(mtcars, mtcars, mtcars), row_names = TRUE)
 #'
-#' wb$page_setup(sheet = "print_title_rows", printTitleRows = 1) ## first row
-#' wb$page_setup(sheet = "print_title_cols", printTitleCols = 1, printTitleRows = 1)
+#' wb$page_setup(sheet = "print_title_rows", print_title_rows = 1) ## first row
+#' wb$page_setup(sheet = "print_title_cols", print_title_cols = 1, print_title_rows = 1)
 wb_page_setup <- function(
     wb,
     sheet            = current_sheet(),
@@ -1816,19 +1897,19 @@ wb_grid_lines <- function(wb, sheet = current_sheet(), show = FALSE, print = sho
 #' @examples
 #' ## setup a workbook with 3 worksheets
 #' wb <- wb_workbook()
-#' wb$add_worksheet("Sheet 1", gridLines = FALSE)
-#' wb$add_data_table(sheet = 1, x = iris)
+#' wb$add_worksheet("Sheet 1", grid_lines = FALSE)
+#' wb$add_data_table(x = iris)
 #'
-#' wb$add_worksheet("mtcars (Sheet 2)", gridLines = FALSE)
-#' wb$add_data(sheet = 2, x = mtcars)
+#' wb$add_worksheet("mtcars (Sheet 2)", grid_lines = FALSE)
+#' wb$add_data(x = mtcars)
 #'
-#' wb$add_worksheet("Sheet 3", gridLines = FALSE)
-#' wb$add_data(sheet = 3, x = Formaldehyde)
+#' wb$add_worksheet("Sheet 3", grid_lines = FALSE)
+#' wb$add_data(x = Formaldehyde)
 #'
 #' wb_get_order(wb)
 #' wb$get_sheet_na
 #' wb$set_order(c(1, 3, 2)) # switch position of sheets 2 & 3
-#' wb$add_data(2, 'This is still the "mtcars" worksheet', startCol = 15)
+#' wb$add_data(2, 'This is still the "mtcars" worksheet', start_col = 15)
 #' wb_get_order(wb)
 #' wb$get_sheet_names() ## ordering within workbook is not changed
 #' wb$set_order(3:1)
@@ -1978,7 +2059,7 @@ wb_remove_named_region <- function(wb, sheet = current_sheet(), name = NULL) {
 #' wb$add_filter(1, row = 1, cols = seq_along(iris))
 #'
 #' ## Equivalently
-#' wb$add_data(2, x = iris, withFilter = TRUE)
+#' wb$add_data(2, x = iris, with_filter = TRUE)
 #'
 #' ## Similarly
 #' wb$add_data_table(3, iris)
@@ -2273,7 +2354,7 @@ wb_remove_tables <- function(wb, sheet = current_sheet(), table, remove_data = T
 #'
 #' wb <- wb_workbook()
 #' wb$add_worksheet("AirPass")
-#' wb$add_data("AirPass", t2, rowNames = TRUE)
+#' wb$add_data("AirPass", t2, row_names = TRUE)
 #'
 #' # groups will always end on/show the last row. in the example 1950, 1955, and 1960
 #' wb <- wb_group_rows(wb, "AirPass", 2:3, collapsed = TRUE) # group years < 1950
@@ -2328,7 +2409,7 @@ wb_ungroup_cols <- function(wb, sheet = current_sheet(), cols) {
 #'
 #' wb <- wb_workbook()
 #' wb$add_worksheet("AirPass")
-#' wb$add_data("AirPass", t2, rowNames = TRUE)
+#' wb$add_data("AirPass", t2, row_names = TRUE)
 #'
 #' wb$group_cols("AirPass", cols = grp_cols)
 #' wb$group_rows("AirPass", rows = grp_rows)
@@ -2905,7 +2986,7 @@ wb_add_fill <- function(
 #' @param wb A Workbook object
 #' @param sheet the worksheet
 #' @param dims the cell range
-#' @param name Font name: default "Calibri"
+#' @param name Font name: default "Aptos Narrow"
 #' @param color An object created by [wb_color()]
 #' @param size Font size: default "11",
 #' @param bold bold, "single" or "double", default: ""
@@ -2934,7 +3015,7 @@ wb_add_font <- function(
       wb,
       sheet      = current_sheet(),
       dims       = "A1",
-      name       = "Calibri",
+      name       = "Aptos Narrow",
       color      = wb_color(hex = "FF000000"),
       size       = "11",
       bold       = "",
@@ -3258,6 +3339,17 @@ wb_add_dxfs_style <- function(
 #' # Works with formatted text also.
 #' formatted_text <- fmt_txt("bar", underline = TRUE)
 #' wb$add_comment(dims = "B5", comment = formatted_text)
+#' # With background color
+#' wb$add_comment(dims = "B7", comment = formatted_text, color = wb_color("green"))
+#' # With background image. File extension must be png or jpeg, not jpg?
+#' tmp <- tempfile(fileext = ".png")
+#' png(file = tmp, bg = "transparent")
+#' plot(1:10)
+#' rect(1, 5, 3, 7, col = "white")
+#' dev.off()
+#'
+#' c1 <- wb_comment(text = "this is a comment", author = "", visible = TRUE)
+#' wb$add_comment(dims = "B12", comment = c1, file = tmp)
 #' @export
 wb_add_comment <- function(
     wb,

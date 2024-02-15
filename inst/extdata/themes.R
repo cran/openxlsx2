@@ -23,6 +23,8 @@ for (i in seq_along(fls)) {
   nms[[i]] <- xml_name
 }
 nms[length(nms)] <- "Old Office Theme"
+nms[duplicated(nms)] <- "Office 2007 - 2010 Theme"
+nms[nms == "Office"] <- "LibreOffice"
 names(themes) <- nms
 
 themes <- themes[order(names(themes))]
@@ -30,3 +32,6 @@ themes <- themes[order(names(themes))]
 names(themes) %>% dput()
 
 saveRDS(themes, "inst/extdata/themes.rds")
+
+
+# themes$`Office Theme` %>% stringi::stri_unescape_unicode() %>%  as_xml()

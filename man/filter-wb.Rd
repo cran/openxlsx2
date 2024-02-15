@@ -39,7 +39,7 @@ wb$add_data(1, iris)
 wb$add_filter(1, row = 1, cols = seq_along(iris))
 
 ## Equivalently
-wb$add_data(2, x = iris, withFilter = TRUE)
+wb$add_data(2, x = iris, with_filter = TRUE)
 
 ## Similarly
 wb$add_data_table(3, iris)
@@ -70,8 +70,8 @@ Other worksheet content functions:
 \code{\link{named_region-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_conditional_formatting}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_slicer}()},

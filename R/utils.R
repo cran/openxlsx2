@@ -26,18 +26,6 @@ paste_c <- function(..., sep = "", collapse = " ", unlist = FALSE) {
 `%||%` <- function(x, y) if (is.null(x)) y else x
 `%|||%` <- function(x, y) if (length(x)) x else y
 
-na_to_null <- function(x) {
-  if (is.null(x)) {
-    return(NULL)
-  }
-
-  if (isTRUE(is.na(x))) {
-    return(NULL)
-  }
-
-  x
-}
-
 # opposite of %in%
 `%out%` <- function(x, table) {
   match(x, table, nomatch = 0L) == 0L
@@ -93,11 +81,6 @@ apply_reg_match0 <- function(x, pat) unapply(x, reg_match0, pat = pat)
 wapply <- function(x, FUN, ...) {
   FUN <- match.fun(FUN)
   which(vapply(x, FUN, FUN.VALUE = NA, ...))
-}
-
-has_chr <- function(x, na = FALSE) {
-  # na controls if NA is returned as TRUE or FALSE
-  vapply(nzchar(x, keepNA = !na), isTRUE, NA)
 }
 
 dir_create <- function(..., warn = TRUE, recurse = FALSE) {
@@ -269,7 +252,7 @@ check_wb_dims_args <- function(args, select = NULL) {
 
   cond_acceptable_len_1 <- !is.null(args$from_row) || !is.null(args$from_col) || !is.null(args$x)
   nams <- names(args) %||% rep("", length(args))
-  all_args_unnamed <- all(!nzchar(nams))
+  all_args_unnamed <- !any(nzchar(nams))
 
   if (length(args) == 1 && !cond_acceptable_len_1) {
     # Providing a single argument acceptable is only  `x`
@@ -599,7 +582,7 @@ wb_dims <- function(..., select = NULL) {
   }
 
   # Just keeping this as a safeguard
-  has_some_unnamed_args <- any(!nzchar(nams))
+  has_some_unnamed_args <- !all(nzchar(nams))
   if (has_some_unnamed_args) {
     stop("Internal error, all arguments should be named after this point.")
   }
@@ -815,6 +798,7 @@ read_xml_files <- function(x) {
 #' @noRd
 un_list <- function(x) {
 
+  # TODO can use `lengths()` when depending on R 4.0
   names <- vapply(x, length, NA_integer_)
   nams <- NULL
   for (i in seq_along(names)) {

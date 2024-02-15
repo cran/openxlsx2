@@ -79,7 +79,6 @@ import_styles <- function(x) {
 #' @description
 #' Border styles can any of the following: "thin", "thick", "slantDashDot", "none", "mediumDashed", "mediumDashDot", "medium", "hair", "double", "dotted", "dashed", "dashedDotDot", "dashDot"
 #' Border colors can be created with [wb_color()]
-#' @seealso [wb_add_border()]
 #' @param diagonal_down x
 #' @param diagonal_up x
 #' @param outline x
@@ -94,6 +93,8 @@ import_styles <- function(x) {
 #' @param top x
 #' @param vertical x
 #' @param ... x
+#' @seealso [wb_add_border()]
+#' @family style creating functions
 #'
 #' @export
 create_border <- function(
@@ -164,10 +165,11 @@ create_border <- function(
   return(border)
 }
 
-#' create number format
+#' Create number format
 #' @param numFmtId an id, the list can be found in the **Details** of [create_cell_style()]
 #' @param formatCode a format code
 #' @seealso [wb_add_numfmt()]
+#' @family style creating functions
 #' @export
 create_numfmt <- function(numFmtId, formatCode) {
 
@@ -184,7 +186,7 @@ create_numfmt <- function(numFmtId, formatCode) {
   return(numfmt)
 }
 
-#' create font format
+#' Create font format
 #' @param b bold
 #' @param charset charset
 #' @param color rgb color: default "FF000000"
@@ -192,7 +194,7 @@ create_numfmt <- function(numFmtId, formatCode) {
 #' @param extend extend
 #' @param family font family: default "2"
 #' @param i italic
-#' @param name font name: default "Calibri"
+#' @param name font name: default "Aptos Narrow"
 #' @param outline outline
 #' @param scheme font scheme: default "minor"
 #' @param shadow shadow
@@ -202,6 +204,7 @@ create_numfmt <- function(numFmtId, formatCode) {
 #' @param vert_align vertical alignment
 #' @param ... ...
 #' @seealso [wb_add_font()]
+#' @family style creating functions
 #' @examples
 #' font <- create_font()
 #' # openxml has the alpha value leading
@@ -220,7 +223,7 @@ create_font <- function(
     extend     = "",
     family     = "2",
     i          = "",
-    name       = "Calibri",
+    name       = "Aptos Narrow",
     outline    = "",
     scheme     = "minor",
     shadow     = "",
@@ -322,7 +325,7 @@ create_font <- function(
   return(font)
 }
 
-#' create fill
+#' Create fill pattern
 #'
 #' @param gradientFill complex fills
 #' @param patternType various: default is "none", but also "solid", or a color like "gray125"
@@ -330,6 +333,7 @@ create_font <- function(
 #' @param fgColor hex8 color with alpha, red, green, blue only for patternFill
 #' @param ... ...
 #' @seealso [wb_add_fill()]
+#' @family style creating functions
 #'
 #' @export
 create_fill <- function(
@@ -374,7 +378,6 @@ create_fill <- function(
 # TODO can be further generalized with additional xf attributes and children
 #' Helper to create a cell style
 #'
-#' Create_cell_style with [wb_add_cell_style()]
 #' @param border_id dummy
 #' @param fill_id dummy
 #' @param font_id dummy
@@ -397,6 +400,8 @@ create_fill <- function(
 #' @param horizontal alignment can be "", "center", "right"
 #' @param vertical alignment can be "", "center", "right"
 #' @param ... reserved for additional arguments
+#' @seealso [wb_add_cell_style()]
+#' @family style creating functions
 #'
 #' @details
 #'  | "ID" | "numFmt"                    |
@@ -623,7 +628,7 @@ set_cellstyle <- function(
   write_xf(z)
 }
 
-#' get all styles on a sheet
+#' Get all styles on a sheet
 #'
 #' @param wb workbook
 #' @param sheet worksheet
@@ -666,7 +671,6 @@ get_cell_styles <- function(wb, sheet, cell) {
 #' @details
 #' It is possible to override border_color and border_style with \{left, right, top, bottom\}_color, \{left, right, top, bottom\}_style.
 #'
-#' @seealso [wb_add_style()]
 # TODO maybe font_name,font_size could be documented together.
 #' @param font_name A name of a font. Note the font name is not validated.
 #'   If `font_name` is `NULL`, the workbook `base_font` is used. (Defaults to Calibri), see [wb_get_base_font()]
@@ -688,6 +692,8 @@ get_cell_styles <- function(wb, sheet, cell) {
 #' @param text_underline underline 1, true, single or double
 #' @param ... Additional arguments
 #' @return A dxfs style node
+#' @seealso [wb_add_style()] [wb_add_dxfs_style()]
+#' @family style creating functions
 #' @examples
 #' # do not apply anything
 #' style1 <- create_dxfs_style()
@@ -701,7 +707,7 @@ get_cell_styles <- function(wb, sheet, cell) {
 #' # change font (type, size and color) and background
 #' # the old default in openxlsx and openxlsx2 <= 0.3
 #' style3 <- create_dxfs_style(
-#'   font_name = "Calibri",
+#'   font_name = "Aptos Narrow",
 #'   font_size = 11,
 #'   font_color = wb_color(hex = "FF9C0006"),
 #'   bgFill = wb_color(hex = "FFFFC7CE")
@@ -804,27 +810,37 @@ create_dxfs_style <- function(
 
 }
 
-#' create tableStyle
+## The functions below are only partially covered, but span over 300+ LOC ##
+
+# nocov start
+
+#' Create custom (pivot) table styles
 #'
-#' Create a custom table style.
-#' This function is for expert use only. Use other styling functions instead.
+#' Create a custom (pivot) table style.
+#' These functions are for expert use only. Use other styling functions instead.
 #'
 #' @param name name
 #' @param whole_table wholeTable
-#' @param header_row headerRow
-#' @param total_row totalRow
-#' @param first_column firstColumn
-#' @param last_column lastColumn
-#' @param first_row_stripe firstRowStripe
-#' @param second_row_stripe secondRowStripe
-#' @param first_column_stripe firstColumnStripe
-#' @param second_column_stripe secondColumnStripe
-#' @param first_header_cell firstHeaderCell
-#' @param last_header_cell lastHeaderCell
-#' @param first_total_cell firstTotalCell
-#' @param last_total_cell lastTotalCell
+#' @param header_row,total_row ...Row
+#' @param first_column,last_column ...Column
+#' @param first_row_stripe,second_row_stripe ...RowStripe
+#' @param first_column_stripe,second_column_stripe ...ColumnStripe
+#' @param first_header_cell,last_header_cell ...HeaderCell
+#' @param first_total_cell,last_total_cell ...TotalCell
+#' @param grand_total_row totalRow
+#' @param grand_total_column lastColumn
+#' @param first_subtotal_column,second_subtotal_column,third_subtotal_column ...SubtotalColumn
+#' @param first_subtotal_row,second_subtotal_row,third_subtotal_row ...SubtotalRow
+#' @param first_column_subheading,second_column_subheading,third_column_subheading ...ColumnSubheading
+#' @param first_row_subheading,second_row_subheading,third_row_subheading ...RowSubheading
+#' @param blank_row blankRow
+#' @param page_field_labels pageFieldLabels
+#' @param page_field_values pageFieldValues
 #' @param ... additional arguments
+#' @name create_tablestyle
+#' @family style creating functions
 #' @export
+# TODO: combine both functions and simply set pivot=0 or table=0
 create_tablestyle <- function(
     name,
     whole_table          = NULL,
@@ -954,3 +970,322 @@ create_tablestyle <- function(
     xml_children = xml_elements
   )
 }
+
+#' @rdname create_tablestyle
+#' @export
+create_pivottablestyle <- function(
+    name,
+    whole_table              = NULL,
+    header_row               = NULL,
+    grand_total_row          = NULL,
+    first_column             = NULL,
+    grand_total_column       = NULL,
+    first_row_stripe         = NULL,
+    second_row_stripe        = NULL,
+    first_column_stripe      = NULL,
+    second_column_stripe     = NULL,
+    first_header_cell        = NULL,
+    first_subtotal_column    = NULL,
+    second_subtotal_column   = NULL,
+    third_subtotal_column    = NULL,
+    first_subtotal_row       = NULL,
+    second_subtotal_row      = NULL,
+    third_subtotal_row       = NULL,
+    blank_row                = NULL,
+    first_column_subheading  = NULL,
+    second_column_subheading = NULL,
+    third_column_subheading  = NULL,
+    first_row_subheading     = NULL,
+    second_row_subheading    = NULL,
+    third_row_subheading     = NULL,
+    page_field_labels        = NULL,
+    page_field_values        = NULL,
+    ...
+) {
+
+  standardize_case_names(...)
+
+  tab_wholeTable <- NULL
+  if (length(whole_table)) {
+    tab_wholeTable <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "wholeTable", dxfId = whole_table))
+  }
+  tab_pageFieldLabels <- NULL
+  if (length(page_field_labels)) {
+    tab_pageFieldLabels <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "pageFieldLabels", dxfId = page_field_labels))
+  }
+  tab_pageFieldValues <- NULL
+  if (length(page_field_values)) {
+    tab_pageFieldValues <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "pageFieldValues", dxfId = page_field_values))
+  }
+  tab_firstColumnStripe <- NULL
+  if (length(first_column_stripe)) {
+    tab_firstColumnStripe <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstColumnStripe", dxfId = first_column_stripe))
+  }
+  tab_secondColumnStripe <- NULL
+  if (length(second_column_stripe)) {
+    tab_secondColumnStripe <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "secondColumnStripe", dxfId = second_column_stripe))
+  }
+  tab_firstRowStripe <- NULL
+  if (length(first_row_stripe)) {
+    tab_firstRowStripe <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstRowStripe", dxfId = first_row_stripe))
+  }
+  tab_secondRowStripe <- NULL
+  if (length(second_row_stripe)) {
+    tab_secondRowStripe <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "secondRowStripe", dxfId = second_row_stripe))
+  }
+  tab_firstColumn <- NULL
+  if (length(first_column)) {
+    tab_firstColumn <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstColumn", dxfId = first_column))
+  }
+  tab_headerRow <- NULL
+  if (length(header_row)) {
+    tab_headerRow <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "headerRow", dxfId = header_row))
+  }
+  tab_firstHeaderCell <- NULL
+  if (length(first_header_cell)) {
+    tab_firstHeaderCell <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstHeaderCell", dxfId = first_header_cell))
+  }
+  tab_subtotalColumn1 <- NULL
+  if (length(first_subtotal_column)) {
+    tab_subtotalColumn1 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstSubtotalColumn", dxfId = first_subtotal_column))
+  }
+  tab_subtotalColumn2 <- NULL
+  if (length(second_subtotal_column)) {
+    tab_subtotalColumn2 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "secondSubtotalColumn", dxfId = second_subtotal_column))
+  }
+  tab_subtotalColumn3 <- NULL
+  if (length(third_subtotal_column)) {
+    tab_subtotalColumn3 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "thirdSubtotalColumn", dxfId = third_subtotal_column))
+  }
+  tab_blankRow <- NULL
+  if (length(blank_row)) {
+    tab_blankRow <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "blankRow", dxfId = blank_row))
+  }
+  tab_subtotalRow1 <- NULL
+  if (length(first_subtotal_row)) {
+    tab_subtotalRow1 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstSubtotalRow", dxfId = first_subtotal_row))
+  }
+  tab_subtotalRow2 <- NULL
+  if (length(second_subtotal_row)) {
+    tab_subtotalRow2 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "secondSubtotalRow", dxfId = second_subtotal_row))
+  }
+  tab_subtotalRow3 <- NULL
+  if (length(third_subtotal_row)) {
+    tab_subtotalRow3 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "thirdSubtotalRow", dxfId = third_subtotal_row))
+  }
+  tab_columnSubheading1 <- NULL
+  if (length(first_column_subheading)) {
+    tab_columnSubheading1 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstColumnSubheading", dxfId = first_column_subheading))
+  }
+  tab_columnSubheading2 <- NULL
+  if (length(second_column_subheading)) {
+    tab_columnSubheading2 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "secondColumnSubheading", dxfId = second_column_subheading))
+  }
+  tab_columnSubheading3 <- NULL
+  if (length(third_column_subheading)) {
+    tab_columnSubheading3 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "thirdColumnSubheading", dxfId = third_column_subheading))
+  }
+  tab_rowSubheading1 <- NULL
+  if (length(first_row_subheading)) {
+    tab_rowSubheading1 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "firstRowSubheading", dxfId = first_row_subheading))
+  }
+  tab_rowSubheading2 <- NULL
+  if (length(second_row_subheading)) {
+    tab_rowSubheading2 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "secondRowSubheading", dxfId = second_row_subheading))
+  }
+  tab_rowSubheading3 <- NULL
+  if (length(third_row_subheading)) {
+    tab_rowSubheading3 <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "thirdRowSubheading", dxfId = third_row_subheading))
+  }
+  tab_grandTotalColumn <- NULL
+  if (length(grand_total_column)) {
+    tab_grandTotalColumn <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "lastColumn", dxfId = grand_total_column))
+  }
+  tab_grandTotalRow <- NULL
+  if (length(grand_total_row)) {
+    tab_grandTotalRow <- xml_node_create(
+      "tableStyleElement",
+      xml_attributes = c(type = "totalRow", dxfId = grand_total_row))
+  }
+
+  xml_elements <- c(
+    tab_wholeTable,
+    tab_headerRow,
+    tab_firstColumn,
+    tab_grandTotalColumn,
+    tab_firstRowStripe,
+    tab_secondRowStripe,
+    tab_firstColumnStripe,
+    tab_secondColumnStripe,
+    tab_firstHeaderCell,
+    tab_subtotalColumn1,
+    tab_subtotalColumn2,
+    tab_subtotalColumn3,
+    tab_subtotalRow1,
+    tab_subtotalRow2,
+    tab_subtotalRow3,
+    tab_blankRow,
+    tab_columnSubheading1,
+    tab_columnSubheading2,
+    tab_columnSubheading3,
+    tab_rowSubheading1,
+    tab_rowSubheading2,
+    tab_rowSubheading3,
+    tab_grandTotalRow,
+    tab_pageFieldLabels,
+    tab_pageFieldValues
+  )
+
+  rand_str <- random_string(length = 12, pattern = "[A-Z0-9]")
+
+  xml_node_create(
+    "tableStyle",
+    xml_attributes = c(
+      name      = name,
+      table     = "0", # table uses different styles
+      count     = as_xml_attr(length(xml_elements)),
+       # possible st_guid()
+      `xr9:uid` = sprintf("{ADA2BA8A-2FEC-2C46-A01D-%s}", rand_str)
+    ),
+    xml_children = xml_elements
+  )
+}
+
+#' Create custom color xml schemes
+#'
+#' Create custom color themes that can be used with [wb_set_base_colors()]. The color input will be checked with [wb_color()], so it must be either a color R from [grDevices::colors()] or a hex value.
+#' Default values for the dark argument are: `black`, `white`, `darkblue` and `lightgray`. For the accent argument, the six inner values of [grDevices::palette()]. The link argument uses `blue` and `purple` by default for active and visited links.
+#' @name create_colors_xml
+#' @param name the color name
+#' @param dark four colors: dark, light, brighter dark, darker light
+#' @param accent six accent colors
+#' @param link two link colors: link and visited link
+#' @family style creating functions
+#' @examples
+#' colors <- create_colors_xml()
+#' wb <- wb_workbook()$add_worksheet()$set_base_colors(xml = colors)
+#' @export
+create_colors_xml <- function(
+    name   = "Base R",
+    dark   = NULL,
+    accent = NULL,
+    link   = NULL
+  ) {
+
+  if (is.null(dark))
+    dark <- c("black", "white", "darkblue", "lightgray")
+
+  if (is.null(accent))
+    accent <- grDevices::palette()[2:7]
+
+  if (is.null(link))
+    link <- c("blue", "purple")
+
+  if (length(dark) != 4) {
+    stop("dark vector must be of length 4")
+  }
+  if (length(accent) != 6) {
+    stop("accent vector must be of length 6")
+  }
+  if (length(link) != 2) {
+    stop("link vector must be of length 2")
+  }
+
+  colors <- c(dark, accent, link)
+  colors <- as.character(wb_color(colors))
+  if (length(colors) != 12) {
+    stop("colors vector must be of length 12")
+  }
+
+  colors <- vapply(
+    colors,
+    function(x) substring(x, 3, nchar(x)),
+    NA_character_
+  )
+
+  read_xml(
+    sprintf(
+      "<a:clrScheme name=\"%s\">
+      <a:dk1><a:sysClr val=\"windowText\" lastClr=\"%s\"/></a:dk1>
+      <a:lt1><a:sysClr val=\"window\" lastClr=\"%s\"/></a:lt1>
+      <a:dk2><a:srgbClr val=\"%s\"/></a:dk2>
+      <a:lt2><a:srgbClr val=\"%s\"/></a:lt2>
+      <a:accent1><a:srgbClr val=\"%s\"/></a:accent1>
+      <a:accent2><a:srgbClr val=\"%s\"/></a:accent2>
+      <a:accent3><a:srgbClr val=\"%s\"/></a:accent3>
+      <a:accent4><a:srgbClr val=\"%s\"/></a:accent4>
+      <a:accent5><a:srgbClr val=\"%s\"/></a:accent5>
+      <a:accent6><a:srgbClr val=\"%s\"/></a:accent6>
+      <a:hlink><a:srgbClr val=\"%s\"/></a:hlink>
+      <a:folHlink><a:srgbClr val=\"%s\"/></a:folHlink>
+      </a:clrScheme>",
+      name,
+      colors[1], # dk1
+      colors[2], # lt1
+      colors[3], # dk2
+      colors[4], # lt2
+      colors[5], # accent1
+      colors[6], # accent2
+      colors[7], # accent3
+      colors[8], # accent4
+      colors[9], # accent5
+      colors[10], # accent6
+      colors[11], # hlink
+      colors[12] # folHlink
+    ), pointer = FALSE
+  )
+}
+#' @export
+#' @rdname create_colors_xml
+#' @usage NULL
+create_colours_xml <- create_colors_xml
+
+# nocov end

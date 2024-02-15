@@ -12,7 +12,7 @@ test_that("openxlsx2_types", {
   z <- complex(real = stats::rnorm(1), imaginary = stats::rnorm(1))
   expect_equal(openxlsx2_celltype[["character"]], openxlsx2_type(z))
 
-  # write_datatable example: data frame with various types
+  # wb_add_data_table() example: data frame with various types
   df <- data.frame(
     "Date" = Sys.Date() - 0:19,
     "T" = TRUE, "F" = FALSE,
@@ -33,8 +33,8 @@ test_that("openxlsx2_types", {
   got <- openxlsx2_type(df)
   exp <- c(
     Date = openxlsx2_celltype[["short_date"]],
-    T = openxlsx2_celltype[["logical"]],
-    F = openxlsx2_celltype[["logical"]],
+    `T` = openxlsx2_celltype[["logical"]],
+    `F` = openxlsx2_celltype[["logical"]],
     Time = openxlsx2_celltype[["long_date"]],
     Cash = openxlsx2_celltype[["currency"]],
     Cash2 = openxlsx2_celltype[["accounting"]],
@@ -78,10 +78,10 @@ test_that("wb_page_setup example", {
   wb$add_worksheet("print_title_cols")
 
   wb$add_data("print_title_rows", rbind(iris, iris, iris, iris))
-  wb$add_data("print_title_cols", x = rbind(mtcars, mtcars, mtcars), rowNames = TRUE)
+  wb$add_data("print_title_cols", x = rbind(mtcars, mtcars, mtcars), row_names = TRUE)
 
-  wb$page_setup(sheet = "print_title_rows", printTitleRows = 1) ## first row
-  wb$page_setup(sheet = "print_title_cols", printTitleCols = 1, printTitleRows = 1)
+  wb$page_setup(sheet = "print_title_rows", print_title_rows = 1) ## first row
+  wb$page_setup(sheet = "print_title_cols", print_title_cols = 1, print_title_rows = 1)
 
   exp <- c(
     "<definedName localSheetId=\"2\" name=\"_xlnm.Print_Titles\">'print_title_rows'!$1:$1</definedName>",
@@ -204,12 +204,42 @@ test_that("add_sparklines", {
 
 })
 
+test_that("more sparkline tests", {
+
+  set.seed(123) # sparklines has a random uri string
+  options("openxlsx2_seed" = NULL)
+
+  sl1 <- create_sparklines("Sheet 1", "A3:K3", "L3")
+  sl2 <- create_sparklines("Sheet 1", "A4:K4", "L4", type = "column", high = TRUE, low = TRUE)
+  sl3 <- create_sparklines("Sheet 1", "A5:K5", "L5", type = "stacked", display_empty_cells_as = 0)
+
+  wb <- wb_workbook() %>%
+    wb_add_worksheet() %>%
+    wb_add_data(x = mtcars) %>%
+    wb_add_sparklines(sparklines = c(sl1, sl2, sl3))
+
+  exp <- "<ext xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" uri=\"{05C60535-1F16-4fd2-B633-F4F36F0B64E0}\"><x14:sparklineGroups xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\"><x14:sparklineGroup displayEmptyCellsAs=\"gap\" xr2:uid=\"{6F57B887-24F1-C14A-942C-4C6EF08E87F7}\"><x14:colorSeries rgb=\"FF376092\"/><x14:colorNegative rgb=\"FFD00000\"/><x14:colorAxis rgb=\"FFD00000\"/><x14:colorMarkers rgb=\"FFD00000\"/><x14:colorFirst rgb=\"FFD00000\"/><x14:colorLast rgb=\"FFD00000\"/><x14:colorHigh rgb=\"FFD00000\"/><x14:colorLow rgb=\"FFD00000\"/><x14:sparklines><x14:sparkline><xm:f>'Sheet 1'!A3:K3</xm:f><xm:sqref>L3</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup><x14:sparklineGroup type=\"column\" displayEmptyCellsAs=\"gap\" high=\"1\" low=\"1\" xr2:uid=\"{6F57B887-24F1-C14A-942C-459E3EFAA032}\"><x14:colorSeries rgb=\"FF376092\"/><x14:colorNegative rgb=\"FFD00000\"/><x14:colorAxis rgb=\"FFD00000\"/><x14:colorMarkers rgb=\"FFD00000\"/><x14:colorFirst rgb=\"FFD00000\"/><x14:colorLast rgb=\"FFD00000\"/><x14:colorHigh rgb=\"FFD00000\"/><x14:colorLow rgb=\"FFD00000\"/><x14:sparklines><x14:sparkline><xm:f>'Sheet 1'!A4:K4</xm:f><xm:sqref>L4</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup><x14:sparklineGroup type=\"stacked\" displayEmptyCellsAs=\"0\" xr2:uid=\"{6F57B887-24F1-C14A-942C-2B92FF2D7883}\"><x14:colorSeries rgb=\"FF376092\"/><x14:colorNegative rgb=\"FFD00000\"/><x14:colorAxis rgb=\"FFD00000\"/><x14:colorMarkers rgb=\"FFD00000\"/><x14:colorFirst rgb=\"FFD00000\"/><x14:colorLast rgb=\"FFD00000\"/><x14:colorHigh rgb=\"FFD00000\"/><x14:colorLow rgb=\"FFD00000\"/><x14:sparklines><x14:sparkline><xm:f>'Sheet 1'!A5:K5</xm:f><xm:sqref>L5</xm:sqref></x14:sparkline></x14:sparklines></x14:sparklineGroup></x14:sparklineGroups></ext>"
+  got <- wb$worksheets[[1]]$extLst
+  expect_equal(exp, got)
+
+})
+
 test_that("distinct() works", {
 
   x <- c("London", "NYC", "NYC", "Berlin", "Madrid", "London", "BERLIN", "berlin")
 
   exp <- c("London", "NYC", "Berlin", "Madrid")
   got <- distinct(x)
+  expect_equal(exp, got)
+
+})
+
+test_that("fix_pt_names() works", {
+
+  x <- c("Foo", "foo", "bar", "FOO", "bar", "x")
+
+  exp <- c("Foo", "foo2", "bar", "FOO3", "bar2", "x")
+  got <- fix_pt_names(x)
   expect_equal(exp, got)
 
 })
@@ -247,6 +277,18 @@ test_that("is_double works", {
   x <- c("0.1", "a")
   exp <- c(TRUE, FALSE)
   got <- is_charnum(x)
+  expect_equal(exp, got)
+
+})
+
+test_that("create_hyperlinks() works", {
+  exp <- "=HYPERLINK(\"#'Sheet3'!B1\")"
+  got <- create_hyperlink(sheet = "Sheet3", row = 1, col = 2)
+  expect_equal(exp, got)
+
+  fl <- "testdir/testfile.R"
+  exp <- "=HYPERLINK(\"[testdir/testfile.R]Sheet2!J3\", \"Link to File.\")"
+  got <- create_hyperlink(sheet = "Sheet2", row = 3, col = 10, file = fl, text = "Link to File.")
   expect_equal(exp, got)
 
 })

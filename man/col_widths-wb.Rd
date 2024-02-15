@@ -49,6 +49,9 @@ changing one will update the other.
 NOTE: The default column width varies by spreadsheet software, operating system,
 and DPI settings used. Setting \code{widths} to specific value also is no guarantee
 that the output will have consistent column widths.
+
+For automatic text wrapping of columns use
+\link[=wb_set_cell_style]{wb_set_cell_style(wrap_text = TRUE)}
 }
 \examples{
 ## Create a new workbook
@@ -79,12 +82,13 @@ Other workbook wrappers:
 \code{\link{grouping-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_slicer}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_colors}},
 \code{\link{wb_clone_worksheet}()},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_freeze_pane}()},
@@ -99,8 +103,8 @@ Other worksheet content functions:
 \code{\link{named_region-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_conditional_formatting}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_slicer}()},

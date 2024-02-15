@@ -40,7 +40,8 @@ Initialize a \link{wbWorkbook} object. You can set workbook properties as well.
 \code{theme} can be one of
 "Atlas", "Badge", "Berlin", "Celestial", "Crop", "Depth", "Droplet",
 "Facet", "Feathered", "Gallery", "Headlines", "Integral", "Ion",
-"Ion Boardroom", "Madison", "Main Event", "Mesh", "Office Theme",
+"Ion Boardroom", "LibreOffice", "Madison", "Main Event", "Mesh",
+"Office 2007 - 2010 Theme", "Office 2013 - 2022 Theme", "Office Theme",
 "Old Office Theme", "Organic", "Parallax", "Parcel", "Retrospect",
 "Savon", "Slice", "Vapor Trail", "View", "Wisp", "Wood Type"
 }
@@ -64,12 +65,13 @@ Other workbook wrappers:
 \code{\link{grouping-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_slicer}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_colors}},
 \code{\link{wb_clone_worksheet}()},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_freeze_pane}()},

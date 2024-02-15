@@ -2,7 +2,8 @@
 % Please edit documentation in R/wb_styles.R
 \name{create_tablestyle}
 \alias{create_tablestyle}
-\title{create tableStyle}
+\alias{create_pivottablestyle}
+\title{Create custom (pivot) table styles}
 \usage{
 create_tablestyle(
   name,
@@ -21,39 +22,86 @@ create_tablestyle(
   last_total_cell = NULL,
   ...
 )
+
+create_pivottablestyle(
+  name,
+  whole_table = NULL,
+  header_row = NULL,
+  grand_total_row = NULL,
+  first_column = NULL,
+  grand_total_column = NULL,
+  first_row_stripe = NULL,
+  second_row_stripe = NULL,
+  first_column_stripe = NULL,
+  second_column_stripe = NULL,
+  first_header_cell = NULL,
+  first_subtotal_column = NULL,
+  second_subtotal_column = NULL,
+  third_subtotal_column = NULL,
+  first_subtotal_row = NULL,
+  second_subtotal_row = NULL,
+  third_subtotal_row = NULL,
+  blank_row = NULL,
+  first_column_subheading = NULL,
+  second_column_subheading = NULL,
+  third_column_subheading = NULL,
+  first_row_subheading = NULL,
+  second_row_subheading = NULL,
+  third_row_subheading = NULL,
+  page_field_labels = NULL,
+  page_field_values = NULL,
+  ...
+)
 }
 \arguments{
 \item{name}{name}
 
 \item{whole_table}{wholeTable}
 
-\item{header_row}{headerRow}
+\item{header_row, total_row}{...Row}
 
-\item{total_row}{totalRow}
+\item{first_column, last_column}{...Column}
 
-\item{first_column}{firstColumn}
+\item{first_row_stripe, second_row_stripe}{...RowStripe}
 
-\item{last_column}{lastColumn}
+\item{first_column_stripe, second_column_stripe}{...ColumnStripe}
 
-\item{first_row_stripe}{firstRowStripe}
+\item{first_header_cell, last_header_cell}{...HeaderCell}
 
-\item{second_row_stripe}{secondRowStripe}
-
-\item{first_column_stripe}{firstColumnStripe}
-
-\item{second_column_stripe}{secondColumnStripe}
-
-\item{first_header_cell}{firstHeaderCell}
-
-\item{last_header_cell}{lastHeaderCell}
-
-\item{first_total_cell}{firstTotalCell}
-
-\item{last_total_cell}{lastTotalCell}
+\item{first_total_cell, last_total_cell}{...TotalCell}
 
 \item{...}{additional arguments}
+
+\item{grand_total_row}{totalRow}
+
+\item{grand_total_column}{lastColumn}
+
+\item{first_subtotal_column, second_subtotal_column, third_subtotal_column}{...SubtotalColumn}
+
+\item{first_subtotal_row, second_subtotal_row, third_subtotal_row}{...SubtotalRow}
+
+\item{blank_row}{blankRow}
+
+\item{first_column_subheading, second_column_subheading, third_column_subheading}{...ColumnSubheading}
+
+\item{first_row_subheading, second_row_subheading, third_row_subheading}{...RowSubheading}
+
+\item{page_field_labels}{pageFieldLabels}
+
+\item{page_field_values}{pageFieldValues}
 }
 \description{
-Create a custom table style.
-This function is for expert use only. Use other styling functions instead.
+Create a custom (pivot) table style.
+These functions are for expert use only. Use other styling functions instead.
 }
+\seealso{
+Other style creating functions: 
+\code{\link{create_border}()},
+\code{\link{create_cell_style}()},
+\code{\link{create_colors_xml}()},
+\code{\link{create_dxfs_style}()},
+\code{\link{create_fill}()},
+\code{\link{create_font}()},
+\code{\link{create_numfmt}()}
+}
+\concept{style creating functions}

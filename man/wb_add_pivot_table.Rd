@@ -73,6 +73,10 @@ output file and cause spreadsheet software to crash.
 \code{show_data_as} can be any of \code{normal}, \code{difference}, \code{percent}, \code{percentDiff},
 \code{runTotal}, \code{percentOfRow}, \code{percentOfCol}, \code{percentOfTotal}, \code{index}.
 
+It is possible to calculate data fields if the formula is assigned as a
+variable name for the field to calculate. This would look like this:
+\code{data = c("am", "disp/cyl" = "New")}
+
 Possible \code{params} arguments are listed below. Pivot tables accepts more
 parameters, but they were either not tested or misbehaved (probably because
 we misunderstood how the parameter should be used).
@@ -134,11 +138,12 @@ Other workbook wrappers:
 \code{\link{grouping-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_slicer}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_colors}},
 \code{\link{wb_clone_worksheet}()},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_freeze_pane}()},
@@ -154,8 +159,8 @@ Other worksheet content functions:
 \code{\link{named_region-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_conditional_formatting}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_slicer}()},
 \code{\link{wb_add_thread}()},

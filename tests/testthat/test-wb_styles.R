@@ -165,8 +165,8 @@ test_that("test add_font()", {
 
   # check font
   exp <- c(
-    "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Calibri\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
-    "<font><color rgb=\"FFFFFF00\"/><name val=\"Calibri\"/><sz val=\"11\"/></font>"
+    "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+    "<font><color rgb=\"FFFFFF00\"/><name val=\"Aptos Narrow\"/><sz val=\"11\"/></font>"
   )
   got <- wb$styles_mgr$styles$fonts
 
@@ -331,16 +331,16 @@ test_that("get & set cell style(s)", {
 
   # get style from b1 to assign it to a1
   numfmt <- wb$get_cell_style(dims = "B1")
-  expect_equal("1", numfmt)
+  expect_equal(numfmt, "1")
 
   # assign style to a1
   pre <- wb$get_cell_style(dims = "A1")
-  expect_equal("", pre)
+  expect_equal(pre, "")
 
   expect_silent(wb$set_cell_style(dims = "A1", style = numfmt))
 
   post <- wb$get_cell_style(dims = "A1")
-  expect_equal("1", post)
+  expect_equal(post, "1")
 
   s_a1_b1 <- wb$get_cell_style(dims = "A1:B1")
   expect_silent(wb$set_cell_style(dims = "A2:B2", style = s_a1_b1))
@@ -367,21 +367,19 @@ test_that("get_cell_styles()", {
                right_border = "",
                top_border = "")
 
-  exp <- "1"
   got <- wb$get_cell_style(dims = "B2")
-  expect_equal(exp, got)
+  expect_equal(got, "1")
 
   exp <- "<xf applyFont=\"1\" borderId=\"0\" fillId=\"0\" fontId=\"1\" numFmtId=\"0\" xfId=\"0\"/>"
   got <- get_cell_styles(wb, 1, "B2")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
-  exp <- "3"
   got <- wb$get_cell_style(dims = "B3")
-  expect_equal(exp, got)
+  expect_equal(got, "3")
 
   exp <- "<xf applyFill=\"1\" applyFont=\"1\" borderId=\"0\" fillId=\"2\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\"/>"
   got <- get_cell_styles(wb, 1, "B3")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   wb$add_cell_style(dims = "B3:L3",
                     textRotation = "45",
@@ -391,7 +389,7 @@ test_that("get_cell_styles()", {
 
   exp <- "<xf applyFill=\"1\" applyFont=\"1\" borderId=\"0\" fillId=\"2\" fontId=\"2\" numFmtId=\"0\" xfId=\"0\"><alignment horizontal=\"center\" textRotation=\"45\" vertical=\"center\" wrapText=\"1\"/></xf>"
   got <- get_cell_styles(wb, 1, "B3")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -431,11 +429,11 @@ test_that("style names are xml", {
   exp <- list(
     numFmts = NULL,
     fonts = c(
-      "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Calibri\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
-      "<font><b val=\"1\"/><color rgb=\"FF000000\"/><name val=\"Calibri\"/><sz val=\"14\"/></font>",
-      "<font><b val=\"1\"/><color rgb=\"FF000000\"/><name val=\"Calibri\"/><sz val=\"11\"/></font>",
-      "<font><color rgb=\"FF000000\"/><i val=\"1\"/><name val=\"Calibri\"/><sz val=\"11\"/></font>",
-      "<font><color rgb=\"FFFFFFFF\"/><name val=\"Calibri\"/><sz val=\"11\"/></font>"
+      "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+      "<font><b val=\"1\"/><color rgb=\"FF000000\"/><name val=\"Aptos Narrow\"/><sz val=\"14\"/></font>",
+      "<font><b val=\"1\"/><color rgb=\"FF000000\"/><name val=\"Aptos Narrow\"/><sz val=\"11\"/></font>",
+      "<font><color rgb=\"FF000000\"/><i val=\"1\"/><name val=\"Aptos Narrow\"/><sz val=\"11\"/></font>",
+      "<font><color rgb=\"FFFFFFFF\"/><name val=\"Aptos Narrow\"/><sz val=\"11\"/></font>"
     ),
     fills = c(
       "<fill><patternFill patternType=\"none\"/></fill>",
@@ -868,6 +866,25 @@ test_that("apply styles across columns and rows", {
     "<col min=\"3\" max=\"4\" style=\"1\" width=\"8.43\"/>"
   )
   got <- wb$worksheets[[1]]$cols_attr
+  expect_equal(exp, got)
+
+})
+
+test_that("create_colors_xml() works", {
+
+  exp <- "<a:clrScheme name=\"Base R\"><a:dk1><a:sysClr val=\"windowText\" lastClr=\"000000\"/></a:dk1><a:lt1><a:sysClr val=\"window\" lastClr=\"FFFFFF\"/></a:lt1><a:dk2><a:srgbClr val=\"00008B\"/></a:dk2><a:lt2><a:srgbClr val=\"D3D3D3\"/></a:lt2><a:accent1><a:srgbClr val=\"DF536B\"/></a:accent1><a:accent2><a:srgbClr val=\"61D04F\"/></a:accent2><a:accent3><a:srgbClr val=\"2297E6\"/></a:accent3><a:accent4><a:srgbClr val=\"28E2E5\"/></a:accent4><a:accent5><a:srgbClr val=\"CD0BBC\"/></a:accent5><a:accent6><a:srgbClr val=\"F5C710\"/></a:accent6><a:hlink><a:srgbClr val=\"0000FF\"/></a:hlink><a:folHlink><a:srgbClr val=\"A020F0\"/></a:folHlink></a:clrScheme>"
+  got <- create_colors_xml()
+  expect_equal(exp, got)
+
+  got <- create_colours_xml()
+  expect_equal(exp, got)
+
+  wb <- wb_workbook()$set_base_colors(xml = got)
+  got <- wb$get_base_colors(xml = TRUE, plot = FALSE)
+  expect_equal(exp, got)
+
+  wb <- wb_workbook()$set_base_colours(xml = got)
+  got <- wb$get_base_colours(xml = TRUE, plot = FALSE)
   expect_equal(exp, got)
 
 })

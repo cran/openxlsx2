@@ -29,15 +29,14 @@ int2col <- function(x) {
 col2int <- function(x) {
   if (is.null(x)) return(NULL)
 
-  if (is.numeric(x) || is.integer(x) || is.factor(x))
+  if (is.numeric(x) || is.factor(x))
     return(as.integer(x))
 
   if (!is.character(x)) {
     stop("x must be character")
-
-    if (anyNA(x))
-      stop("x must be a valid character")
   }
+
+  if (anyNA(x)) stop("x contains NA")
 
   if (any(grepl(":", x))) {
     # loop through x until all ":" are replaced with integer sequences

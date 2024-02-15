@@ -99,7 +99,7 @@ inner_update <- function(
   cc[sel, replacement] <- x[replacement]
 
   # avoid missings in cc
-  if (any(is.na(cc)))
+  if (anyNA(cc))
     cc[is.na(cc)] <- ""
 
   # push everything back to workbook
@@ -274,8 +274,14 @@ write_data2 <- function(
     }
 
     # add colnames
-    if (colNames)
-      data <- rbind(colnames(data), data)
+    if (colNames) {
+      # its quicker to convert data to character and append the colnames
+      # then to create a data frame from colnames, construct the required
+      # length and copy the converted to character data into it.
+      data <- rbind(data, colnames(data))
+      out <- c(nrow(data), seq_len(nrow(data))[-nrow(data)])
+      data <- data[out, , drop = FALSE]
+    }
   }
 
 
@@ -444,7 +450,8 @@ write_data2 <- function(
     # styles. gets the reference an passes it on.
     get_data_class_dims <- function(data_class) {
       sel <- dc == openxlsx2_celltype[[data_class]]
-      sel_cols <- names(rtyp[sel == TRUE])
+      # sel = TRUE
+      sel_cols <- names(rtyp[sel])
       sel_rows <- rownames(rtyp)
 
       # ignore first row if colNames
@@ -460,12 +467,27 @@ write_data2 <- function(
       dim_sel <- get_data_class_dims("hyperlink")
       # message("hyperlink: ", dim_sel)
 
+      # get hyperlink color from template
+      if (is.null(wb$theme)) {
+        has_hlink <- 11
+      } else {
+        clrs <- xml_node(wb$theme, "a:theme", "a:themeElements", "a:clrScheme")
+        has_hlink <- which(xml_node_name(clrs, "a:clrScheme") == "a:hlink")
+      }
+
+      if (has_hlink) {
+        hyperlink_col <- wb_color(theme = has_hlink - 1L)
+      } else {
+        hyperlink_col <- wb_color(hex = "FF0000FF")
+      }
+
       wb$add_font(
         sheet = sheetno,
-        dim = dim_sel,
-        color = wb_color(hex = "FF0000FF"),
-        name = wb_get_base_font(wb)$name$val,
-        u = "single"
+        dims  = dim_sel,
+        color = hyperlink_col,
+        name  = wb_get_base_font(wb)$name$val,
+        size  = wb_get_base_font(wb)$size$val,
+        u     = "single"
       )
     }
 
@@ -479,7 +501,7 @@ write_data2 <- function(
 
         wb$add_cell_style(
           sheet = sheetno,
-          dim = dim_sel,
+          dims = dim_sel,
           applyNumberFormat = "1",
           quotePrefix = "1",
           numFmtId = "49"
@@ -498,7 +520,7 @@ write_data2 <- function(
 
         wb$add_numfmt(
           sheet = sheetno,
-          dim = dim_sel,
+          dims = dim_sel,
           numfmt = numfmt_numeric
         )
       }
@@ -511,7 +533,7 @@ write_data2 <- function(
 
       wb$add_numfmt(
         sheet = sheetno,
-        dim = dim_sel,
+        dims = dim_sel,
         numfmt = numfmt_dt
       )
     }
@@ -523,7 +545,7 @@ write_data2 <- function(
 
       wb$add_numfmt(
         sheet = sheetno,
-        dim = dim_sel,
+        dims = dim_sel,
         numfmt = numfmt_posix
       )
     }
@@ -535,7 +557,7 @@ write_data2 <- function(
 
       wb$add_numfmt(
         sheet = sheetno,
-        dim = dim_sel,
+        dims = dim_sel,
         numfmt = numfmt_hms
       )
     }
@@ -548,7 +570,7 @@ write_data2 <- function(
       # message("currency: ", dim_sel)
 
       wb$add_numfmt(
-        dim = dim_sel,
+        dims = dim_sel,
         numfmt = numfmt_currency
       )
     }
@@ -559,7 +581,7 @@ write_data2 <- function(
       # message("accounting: ", dim_sel)
 
       wb$add_numfmt(
-        dim = dim_sel,
+        dims = dim_sel,
         numfmt = numfmt_accounting
       )
     }
@@ -571,7 +593,7 @@ write_data2 <- function(
 
       wb$add_numfmt(
         sheet = sheetno,
-        dim = dim_sel,
+        dims = dim_sel,
         numfmt = numfmt_percentage
       )
     }
@@ -583,7 +605,7 @@ write_data2 <- function(
 
       wb$add_numfmt(
         sheet = sheetno,
-        dim = dim_sel,
+        dims = dim_sel,
         numfmt = numfmt_scientific
       )
     }
@@ -595,7 +617,7 @@ write_data2 <- function(
 
       wb$add_numfmt(
         sheet = sheetno,
-        dim = dim_sel,
+        dims = dim_sel,
         numfmt = numfmt_comma
       )
     }
@@ -721,7 +743,6 @@ write_data_table <- function(
 
   ## Input validating
   assert_workbook(wb)
-  if (missing(x)) stop("`x` is missing")
   assert_class(colNames, "logical")
   assert_class(rowNames, "logical")
   assert_class(withFilter, "logical")
@@ -771,6 +792,7 @@ write_data_table <- function(
   startRow <- as.integer(startRow)
 
   ## special case - vector of hyperlinks
+  # TODO: replace the =HYPERLINK() with the relship hyperlinks
   is_hyperlink <- FALSE
   if (applyCellStyle) {
     if (is.null(dim(x))) {
@@ -789,6 +811,8 @@ write_data_table <- function(
         }
         class(x[is_hyperlink]) <- c("character", "hyperlink")
       } else {
+        # workaround for tibbles that break with the class assignment below
+        if (inherits(x, "tbl_df")) x <- as.data.frame(x)
         # check should be in create_hyperlink and that apply should not be required either
         if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
           x[is_hyperlink] <- apply(
@@ -831,7 +855,7 @@ write_data_table <- function(
   if (!data_table) {
 
     ## write autoFilter, can only have a single filter per worksheet
-    if (withFilter) {
+    if (withFilter) { # TODO: replace ref calculation with wb_dims()
       coords <- data.frame("x" = c(startRow, startRow + nRow + colNames - 1L), "y" = c(startCol, startCol + nCol - 1L))
       ref <- stri_join(get_cell_refs(coords), collapse = ":")
 
@@ -842,11 +866,17 @@ write_data_table <- function(
 
       dn <- sprintf('<definedName name="_xlnm._FilterDatabase" localSheetId="%s" hidden="1">%s</definedName>', sheet - 1L, dfn)
 
-      if (length(wb$workbook$definedNames) > 0) {
-        ind <- grepl('name="_xlnm._FilterDatabase"', wb$workbook$definedNames)
-        if (length(ind) > 0) {
+      if (!is.null(wbdn <- wb$get_named_regions())) {
+
+        ind <- wbdn$name == "_xlnm._FilterDatabase" & wbdn$localSheetId == sheet - 1L
+        if (any(ind)) {
           wb$workbook$definedNames[ind] <- dn
+        } else {
+          wb$workbook$definedNames <- c(
+            wb$workbook$definedNames, dn
+          )
         }
+
       } else {
         wb$workbook$definedNames <- dn
       }

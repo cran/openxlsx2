@@ -10,7 +10,7 @@ wb_set_base_font(
   wb,
   font_size = 11,
   font_color = wb_color(theme = "1"),
-  font_name = "Calibri",
+  font_name = "Aptos Narrow",
   ...
 )
 
@@ -28,19 +28,23 @@ wb_get_base_font(wb)
 \item{...}{Additional arguments}
 }
 \description{
-Modify / get the default font for the workbook. The base font in a workbook
-does not affect the font in data tables.
+Modify / get the default font for the workbook. This will alter the latin
+major and minor font in the workbooks theme.
 }
 \details{
-The font name is not validated in anyway. Excel replaces unknown font names
-with Arial. The default base font is Calibri, black, size 11.
+The font name is not validated in anyway. Spreadsheet software replaces
+unknown font names with system defaults.
+
+The default base font is Aptos Narrow, black, size 11. If \code{font_name} differs
+from the name in \code{\link[=wb_get_base_font]{wb_get_base_font()}}, the theme is updated to use the newly
+selected font name.
 }
 \examples{
 ## create a workbook
-wb <- wb_workbook()
+wb <- wb_workbook(theme = "Office 2013 - 2022 Theme")
 wb$add_worksheet("S1")
-## modify base font to size 10 Arial Narrow in red
-wb$set_base_font(font_size = 10, font_color = wb_color("red"), font_name = "Arial Narrow")
+## modify base font to size 10 Aptos Narrow in red
+wb$set_base_font(font_size = 10, font_color = wb_color("red"), font_name = "Aptos Narrow")
 
 wb$add_data(x = iris)
 
@@ -54,7 +58,8 @@ wb_get_base_font(wb)
 \seealso{
 Other workbook styling functions: 
 \code{\link{wb_add_dxfs_style}()},
-\code{\link{wb_add_style}()}
+\code{\link{wb_add_style}()},
+\code{\link{wb_base_colors}}
 
 Other workbook wrappers: 
 \code{\link{col_widths-wb}},
@@ -62,12 +67,13 @@ Other workbook wrappers:
 \code{\link{grouping-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_slicer}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_colors}},
 \code{\link{wb_clone_worksheet}()},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_freeze_pane}()},

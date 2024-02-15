@@ -2,7 +2,7 @@
 % Please edit documentation in R/wb_styles.R
 \name{create_font}
 \alias{create_font}
-\title{create font format}
+\title{Create font format}
 \usage{
 create_font(
   b = "",
@@ -12,7 +12,7 @@ create_font(
   extend = "",
   family = "2",
   i = "",
-  name = "Calibri",
+  name = "Aptos Narrow",
   outline = "",
   scheme = "minor",
   shadow = "",
@@ -38,7 +38,7 @@ create_font(
 
 \item{i}{italic}
 
-\item{name}{font name: default "Calibri"}
+\item{name}{font name: default "Aptos Narrow"}
 
 \item{outline}{outline}
 
@@ -57,7 +57,7 @@ create_font(
 \item{...}{...}
 }
 \description{
-create font format
+Create font format
 }
 \examples{
 font <- create_font()
@@ -71,4 +71,14 @@ hex8 <- paste0("#", substr(hex8, 3, 8), substr(hex8, 1, 2))
 }
 \seealso{
 \code{\link[=wb_add_font]{wb_add_font()}}
+
+Other style creating functions: 
+\code{\link{create_border}()},
+\code{\link{create_cell_style}()},
+\code{\link{create_colors_xml}()},
+\code{\link{create_dxfs_style}()},
+\code{\link{create_fill}()},
+\code{\link{create_numfmt}()},
+\code{\link{create_tablestyle}()}
 }
+\concept{style creating functions}

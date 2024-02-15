@@ -16,8 +16,8 @@ test_that("wb_set_col_widths", {
   # set column width to 12
   expect_silent(wb$set_col_widths("test", widths = 12L, cols = seq_along(mtcars)))
   expect_equal(
-    "<col min=\"1\" max=\"11\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"12.711\"/>",
-    wb$worksheets[[1]]$cols_attr
+    wb$worksheets[[1]]$cols_attr,
+    "<col min=\"1\" max=\"11\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"12.711\"/>"
   )
 
   # wrong sheet
@@ -26,8 +26,8 @@ test_that("wb_set_col_widths", {
   # reset the column with, we do not provide an option ot remove the column entry
   expect_silent(wb$set_col_widths("test", cols = seq_along(mtcars)))
   expect_equal(
-    "<col min=\"1\" max=\"11\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"9.141\"/>",
-    wb$worksheets[[1]]$cols_attr
+    wb$worksheets[[1]]$cols_attr,
+    "<col min=\"1\" max=\"11\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"9.141\"/>"
   )
 
   # create column width for column 25
@@ -360,7 +360,7 @@ test_that("clone worksheet", {
   wb <- wb_load(fl)
   # wb$get_sheet_names() # chartsheet has no named name?
   expect_silent(wb$clone_worksheet(1, "Clone 1"))
-  expect_true(inherits(wb$worksheets[[5]], "wbChartSheet"))
+  expect_s3_class(wb$worksheets[[5]], "wbChartSheet")
   # wb$open()
 
   # clone pivot table and drawing -----------------------------------------
@@ -502,7 +502,7 @@ test_that("add_drawing works", {
     add_drawing(xml = tmp, dims = NULL)$
     add_drawing(xml = tmp, dims = "L19")
 
-  expect_equal(1L, length(wb$drawings))
+  expect_length(wb$drawings, 1L)
 
 })
 
@@ -534,7 +534,7 @@ test_that("add_drawing works", {
       wt = c(2.62, 2.875, 2.32, 3.215)
     ),
     row.names = 3:6,
-    class = c("data.frame", "wb_data"),
+    class = c("wb_data", "data.frame"),
     dims = structure(
       list(
         A = c("A2", "A3", "A4", "A5", "A6"),
@@ -563,7 +563,7 @@ test_that("add_drawing works", {
   wb <- wb %>%
     wb_add_mschart(dims = "F4:L20", graph = scatter_plot)
 
-  expect_equal(1L, NROW(wb$charts))
+  expect_equal(NROW(wb$charts), 1L)
 
   chart_01 <- ms_linechart(
     data = us_indus_prod,
@@ -644,7 +644,7 @@ test_that("add_chartsheet works", {
 
   wb$add_mschart(graph = data_plot)
 
-  expect_equal(1, nrow(wb$charts))
+  expect_equal(nrow(wb$charts), 1)
 
   expect_true(grepl("A &amp; B", wb$charts$chart))
 
@@ -661,7 +661,7 @@ test_that("add_chartsheet works", {
   )
   wb$add_mschart(sheet = 2, graph = data_plot)
 
-  expect_equal(2L, nrow(wb$charts))
+  expect_equal(nrow(wb$charts), 2L)
 
   exp <- "xdr:absoluteAnchor"
   got <- xml_node_name(unlist(wb$drawings), "xdr:wsDr")
@@ -757,6 +757,11 @@ test_that("image relships work with comment", {
 test_that("workbook themes work", {
 
   wb <- wb_workbook()$add_worksheet()
+  exp <- "Aptos Narrow"
+  got <- wb$get_base_font()$name$val
+  expect_equal(exp, got)
+
+  wb <- wb_workbook(theme = "Office 2013 - 2022 Theme")$add_worksheet()
   exp <- "Calibri"
   got <- wb$get_base_font()$name$val
   expect_equal(exp, got)
@@ -775,7 +780,7 @@ test_that("workbook themes work", {
     wb <- wb_workbook(theme = "Foo")$add_worksheet(),
     "theme Foo not found falling back to default theme"
   )
-  exp <- "Calibri"
+  exp <- "Aptos Narrow"
   got <- wb$get_base_font()$name$val
   expect_equal(exp, got)
 
@@ -820,10 +825,10 @@ test_that("numfmt in pivot tables works", {
                     filter = c("Location", "Status"), data = "Units")$
     add_pivot_table(df, dims = "A3", rows = "Plant",
                     filter = c("Location", "Status"), data = "Units",
-                    param = list(numfmt = c(formatCode = "#,###0"), sort_row = "ascending"))$
+                    params = list(numfmt = c(formatCode = "#,###0"), sort_row = "ascending"))$
     add_pivot_table(df, dims = "A3", rows = "Plant",
                     filter = c("Location", "Status"), data = "Units",
-                    param = list(numfmt = c(numfmt = 10), sort_row = "descending"))
+                    params = list(numfmt = c(numfmt = 10), sort_row = "descending"))
 
   exp <- c(
     "<dataField name=\"Sum of Units\" fld=\"3\" baseField=\"0\" baseItem=\"0\"/>",
@@ -839,15 +844,15 @@ test_that("numfmt in pivot tables works", {
   ## Create the workbook and the pivot table
   wb <- wb_workbook()$
     add_worksheet("Data")$
-    add_data(x = df, startCol = 1, startRow = 2)
+    add_data(x = df, start_col = 1, start_row = 2)
 
   df <- wb_data(wb)
   wb$add_pivot_table(df, dims = "A3", rows = "cyl", cols = "gear",
-                     data = c("vs", "am"), param = list(sort_row = 1, sort_col = -2))
+                     data = c("vs", "am"), params = list(sort_row = 1, sort_col = -2))
 
   wb$add_pivot_table(df, dims = "A3", rows = "gear",
                      filter = c("cyl"), data = c("vs", "am"),
-                     param = list(sort_row = "descending"))
+                     params = list(sort_row = "descending"))
 
 
   exp <- c(
@@ -859,14 +864,14 @@ test_that("numfmt in pivot tables works", {
 
   expect_warning(
     wb$add_pivot_table(df, dims = "A3", rows = "cyl", cols = "gear",
-                       data = c("vs", "am"), param = list(sort_row = 1, sort_col = -7)),
+                       data = c("vs", "am"), params = list(sort_row = 1, sort_col = -7)),
     "invalid sort position found"
   )
 
   expect_error(
     wb$add_pivot_table(df, dims = "A3", rows = "cyl", cols = "gear",
                        data = c("vs", "am"),
-                       param = list(numfmt = c(numfmt = 10))),
+                       params = list(numfmt = c(numfmt = 10))),
     "length of numfmt and data does not match"
   )
 
@@ -878,7 +883,7 @@ test_that("numfmt in pivot tables works", {
   ## Create the workbook and the pivot table
   wb <- wb_workbook()$
     add_worksheet("Data")$
-    add_data(x = df, startCol = 1, startRow = 2)
+    add_data(x = df, start_col = 1, start_row = 2)
 
   df <- wb_data(wb)
   wb$add_pivot_table(
@@ -887,8 +892,8 @@ test_that("numfmt in pivot tables works", {
     rows = c("cyl", "am"),
     cols = c("gear", "carb"),
     data = c("disp", "mpg"),
-    param = list(sort_row = 1,
-                 sort_col = -2)
+    params = list(sort_row = 1,
+                  sort_col = -2)
   )
 
   exp <- c("", "ascending", "", "", "", "", "", "", "", "descending", "")
@@ -913,9 +918,9 @@ expect_silent(
 expect_warning(
   wb_add_pivot_table(wb, df, dims = "A3",
                      filter = "am", rows = "cyl", cols = "gear", data = "disp",
-                     params = list(sort_item = list(gear = c(1)))
+                     params = list(sort_item = list(gear = seq_len(4)))
   ),
-  "Length of sort order for 'gear' does not match required length. Is 1, needs 3."
+  "Length of sort order for 'gear' does not match required length. Is 4, needs 3."
 )
 
 })
@@ -933,6 +938,134 @@ test_that("wbWorkbook print works", {
            " Sheets: Sheet 1, Sheet 1 (1), Sheet & NoSheet ",
            " Write order: 1, 2, 3")
   got <- capture.output(wb)
+  expect_equal(exp, got)
+
+})
+
+test_that("genBaseWorkbook() works", {
+
+  # kinda superfluous. if it wouldn't work openxlsx2 would be broken
+
+  exp <- c(
+    "fileVersion", "fileSharing", "workbookPr", "alternateContent",
+    "revisionPtr", "absPath", "workbookProtection", "bookViews",
+    "sheets", "functionGroups", "externalReferences", "definedNames",
+    "calcPr", "oleSize", "customWorkbookViews", "pivotCaches", "smartTagPr",
+    "smartTagTypes", "webPublishing", "fileRecoveryPr", "webPublishObjects",
+    "extLst"
+  )
+  expect_equal(
+    names(genBaseWorkbook()),
+    exp
+  )
+
+})
+
+test_that("subsetting wb_data() works", {
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = head(esoph, 3))
+
+  df1 <- wb_data(wb)
+
+  exp <- data.frame(alcgp = rep("0-39g/day", 3), stringsAsFactors = FALSE)
+  got <- df1[, 2, drop = FALSE]
+  expect_equal(exp, got, ignore_attr = TRUE)
+
+  exp <- rep("0-39g/day", 3)
+  got <- unclass(df1[, 2])
+  expect_equal(exp, got)
+
+  exp <- structure(
+    list(
+      agegp = c("25-34", "25-34"),
+      alcgp = c("0-39g/day", "0-39g/day")
+    ),
+    row.names = 2:3,
+    dims = structure(
+      list(
+        A = c("A1", "A2", "A3"),
+        B = c("B1", "B2", "B3")
+      ),
+      row.names = c(NA, 3L),
+      class = "data.frame"),
+    sheet = "Sheet 1"
+  )
+  got <- unclass(df1[1:2, 1:2])
+  expect_equal(exp, got)
+
+  expect_null(attributes(df1[c("agegp")]))
+
+  exp <- list(
+    names = "agegp",
+    row.names = 2:4,
+    class = c("wb_data", "data.frame"),
+    dims = structure(
+      list(A = c("A1", "A2", "A3", "A4")),
+      row.names = c(NA, 4L),
+      class = "data.frame"
+    ),
+    sheet = "Sheet 1"
+  )
+  got <- attributes(df1[c("agegp"), drop = FALSE])
+  expect_equal(exp, got)
+
+  exp <- list(
+    names = c("alcgp", "tobgp", "ncases"),
+    row.names = 2:4,
+    class = c("wb_data", "data.frame"),
+    dims = structure(
+      list(
+        B = c("B1", "B2", "B3", "B4"),
+        C = c("C1", "C2", "C3", "C4"),
+        D = c("D1", "D2", "D3", "D4")
+      ),
+      row.names = c(NA, 4L),
+      class = "data.frame"
+    ),
+    sheet = "Sheet 1"
+  )
+  got <- attributes(df1[c("alcgp", "tobgp", "ncases")])
+  expect_equal(exp, got)
+
+  exp <- list(
+    names = c("agegp", "alcgp", "tobgp", "ncases", "ncontrols"),
+    row.names = 3:4,
+    class = c("wb_data", "data.frame"),
+    dims = structure(
+      list(
+        A = c("A1", "A3", "A4"),
+        B = c("B1", "B3", "B4"),
+        C = c("C1", "C3", "C4"),
+        D = c("D1", "D3", "D4"),
+        E = c("E1", "E3", "E4")
+      ),
+      row.names = c(1L, 3L, 4L),
+      class = "data.frame"
+    ),
+    sheet = "Sheet 1"
+  )
+  got <- attributes(df1[-1, ])
+  expect_equal(exp, got)
+
+  exp <- list(
+    names = c("agegp", "alcgp", "tobgp", "ncases", "ncontrols"),
+    row.names = 2:3,
+    class = c("wb_data", "data.frame"),
+    dims = structure(
+      list(
+        A = c("A1", "A2", "A3"),
+        B = c("B1", "B2", "B3"),
+        C = c("C1", "C2", "C3"),
+        D = c("D1", "D2", "D3"),
+        E = c("E1", "E2", "E3")
+      ),
+      row.names = c(NA, 3L),
+      class = "data.frame"
+    ),
+    sheet = "Sheet 1")
+  got <- attributes(df1[-nrow(df1), ])
   expect_equal(exp, got)
 
 })

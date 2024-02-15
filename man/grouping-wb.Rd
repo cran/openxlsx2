@@ -53,7 +53,7 @@ dimnames(t2) <- dimnames(.preformat.ts(t1))
 
 wb <- wb_workbook()
 wb$add_worksheet("AirPass")
-wb$add_data("AirPass", t2, rowNames = TRUE)
+wb$add_data("AirPass", t2, row_names = TRUE)
 
 # groups will always end on/show the last row. in the example 1950, 1955, and 1960
 wb <- wb_group_rows(wb, "AirPass", 2:3, collapsed = TRUE) # group years < 1950
@@ -81,7 +81,7 @@ grp_cols <- list(
 
 wb <- wb_workbook()
 wb$add_worksheet("AirPass")
-wb$add_data("AirPass", t2, rowNames = TRUE)
+wb$add_data("AirPass", t2, row_names = TRUE)
 
 wb$group_cols("AirPass", cols = grp_cols)
 wb$group_rows("AirPass", rows = grp_rows)
@@ -93,12 +93,13 @@ Other workbook wrappers:
 \code{\link{creators-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_slicer}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_colors}},
 \code{\link{wb_clone_worksheet}()},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_freeze_pane}()},
@@ -113,8 +114,8 @@ Other worksheet content functions:
 \code{\link{named_region-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_conditional_formatting}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_slicer}()},
@@ -128,12 +129,13 @@ Other workbook wrappers:
 \code{\link{creators-wb}},
 \code{\link{row_heights-wb}},
 \code{\link{wb_add_chartsheet}()},
-\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_data}()},
+\code{\link{wb_add_data_table}()},
 \code{\link{wb_add_formula}()},
 \code{\link{wb_add_pivot_table}()},
 \code{\link{wb_add_slicer}()},
 \code{\link{wb_add_worksheet}()},
+\code{\link{wb_base_colors}},
 \code{\link{wb_clone_worksheet}()},
 \code{\link{wb_copy_cells}()},
 \code{\link{wb_freeze_pane}()},

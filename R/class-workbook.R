@@ -2,10 +2,55 @@
 
 # R6 class ----------------------------------------------------------------
 # Lines 7 and 8 are needed until r-lib/roxygen2#1504 is fixed
-#' R6 class for a workbook
+#' Workbook class
 #'
 #' @description
-#' A workbook. The documentation is more complete in each of the wrapper functions.
+#' This is the class used by `openxlsx2` to modify workbooks from R.
+#' You can load an existing workbook with [wb_load()] and create a new one with
+#' [wb_workbook()].
+#'
+#' After that, you can modify the `wbWorkbook` object through two primary methods:
+#'
+#' *Wrapper Function Method*: Utilizes the `wb` family of functions that support
+#'  piping to streamline operations.
+#' ``` r
+#' wb <- wb_workbook(creator = "My name here") %>%
+#'   wb_add_worksheet(sheet = "Expenditure", grid_lines = FALSE) %>%
+#'   wb_add_data(x = USPersonalExpenditure, row_names = TRUE)
+#' ```
+#' *Chaining Method*: Directly modifies the object through a series of chained
+#'  function calls.
+#' ``` r
+#' wb <- wb_workbook(creator = "My name here")$
+#'   add_worksheet(sheet = "Expenditure", grid_lines = FALSE)$
+#'   add_data(x = USPersonalExpenditure, row_names = TRUE)
+#' ```
+#'
+#' While wrapper functions require explicit assignment of their output to reflect
+#' changes, chained functions inherently modify the input object. Both approaches
+#' are equally supported, offering flexibility to suit user preferences. The
+#' documentation mainly highlights the use of wrapper functions.
+#'
+#' ``` r
+#' # Import workbooks
+#' path <- system.file("extdata/openxlsx2_example.xlsx", package = "openxlsx2")
+#' wb <- wb_load(path)
+#'
+#' ## or create one yourself
+#' wb <- wb_workbook()
+#' # add a worksheet
+#' wb$add_worksheet("sheet")
+#' # add some data
+#' wb$add_data("sheet", cars)
+#' # Add data with piping in a different location
+#' wb <- wb %>% wb_add_data(x = cars, dims = wb_dims(from_col = "D", from_row = 4))
+#' # open it in your default spreadsheet software
+#' if (interactive()) wb$open()
+#' ```
+#'
+#' Note that the documentation is more complete in each of the wrapper functions.
+#' (i.e. `?wb_add_data` rather than `?wbWorkbook`).
+#'
 #' @param creator character vector of creators. Duplicated are ignored.
 #' @param dims Cell range in a sheet
 #' @param sheet The name of the sheet
@@ -1245,6 +1290,14 @@ wbWorkbook <- R6::R6Class(
       ) {
 
       standardize(...)
+      if (missing(x)) stop("`x` is missing")
+      if (length(self$sheet_names) == 0) {
+        stop(
+          "Can't add data to a workbook with no worksheet.\n",
+          "Did you forget to add a worksheet with `wb_add_worksheet()`?",
+          call. = FALSE
+          )
+      }
 
       write_data(
         wb                = self,
@@ -1312,6 +1365,14 @@ wbWorkbook <- R6::R6Class(
     ) {
 
       standardize(...)
+      if (missing(x)) stop("`x` is missing")
+      if (length(self$sheet_names) == 0) {
+        stop(
+          "Can't add data to a workbook with no worksheet.\n",
+          "Did you forget to add a worksheet with `wb_add_worksheet()`?",
+          call. = FALSE
+        )
+      }
 
       write_datatable(
         wb              = self,
@@ -1395,6 +1456,11 @@ wbWorkbook <- R6::R6Class(
         }
       }
 
+      if (any(sel <- duplicated(tolower(names(x))))) {
+        nms <- names(x)
+        names(x) <- fix_pt_names(nms)
+      }
+
       # for now we use a new worksheet
       if (add_sheet) {
         self$add_worksheet()
@@ -1419,6 +1485,26 @@ wbWorkbook <- R6::R6Class(
 
       if (is.null(params$name) && !is.null(pivot_table))
         params$name <- pivot_table
+
+      # not sure if rows & cols can be formulas too
+      if (any(sel <- !data %in% names(x))) {
+
+        varfun <- data[sel]
+
+        if (is.null(names(varfun))) {
+          stop("Unknown variable in data argument: ", data)
+        }
+
+        for (var in varfun) {
+          if (all(grepl("^=", names(varfun)))) {
+            x[[var]] <- names(varfun[varfun == var])
+            class(x[[var]]) <- c("is_formula", "character")
+          } else {
+            stop("missing variable found in pivot table: data object. Formula names must begin with '='.")
+          }
+        }
+
+      }
 
       pivot_table <- create_pivot_table(
         x       = x,
@@ -1536,7 +1622,7 @@ wbWorkbook <- R6::R6Class(
       sel <- which(pt$name == pivot_table)
       cid <- pt$cacheId[sel]
 
-      uni_name <- paste0(stringi::stri_replace_all_fixed(slicer, ' ', '_'), cid)
+      uni_name <- paste0(stringi::stri_replace_all_fixed(slicer, " ", "_"), cid)
 
       ### slicer_cache
       sortOrder <- NULL
@@ -1582,7 +1668,7 @@ wbWorkbook <- R6::R6Class(
           showMissing  = showMissing,
           crossFilter  = crossFilter
         ),
-        xml_children = get_items(x, which(names(x) == slicer), NULL, slicer = TRUE, choose = choo)
+        xml_children = get_items(x, which(names(x) == slicer), NULL, slicer = TRUE, choose = choo, has_default = TRUE)
       )
 
       slicer_cache <- read_xml(sprintf(
@@ -2492,16 +2578,16 @@ wbWorkbook <- R6::R6Class(
         )
       } else {
        write_file(
-         head = '',
+         head = "",
          body = '<styleSheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>',
-         tail = '',
+         tail = "",
          fl = file.path(xlDir, "styles.xml")
        )
       }
 
       if (length(self$calcChain)) {
         write_file(
-          head = '',
+          head = "",
           body = pxml(self$calcChain),
           tail = "",
           fl = file.path(xlDir, "calcChain.xml")
@@ -2511,9 +2597,9 @@ wbWorkbook <- R6::R6Class(
       # write metadata file. required if cm attribut is set.
       if (length(self$metadata)) {
         write_file(
-          head = '',
+          head = "",
           body = self$metadata,
-          tail = '',
+          tail = "",
           fl = file.path(xlDir, "metadata.xml")
         )
       }
@@ -2554,7 +2640,7 @@ wbWorkbook <- R6::R6Class(
       CT$tmpDirPartName <- paste0(tmpDir, CT$PartName)
       CT$fileExists <- file.exists(CT$tmpDirPartName)
 
-      if (any(!CT$fileExists)) {
+      if (!all(CT$fileExists)) {
         missing_in_tmp <- CT$PartName[!CT$fileExists]
         warning(
           "[CT] file expected to be in output is missing: ",
@@ -2567,7 +2653,7 @@ wbWorkbook <- R6::R6Class(
       WR$tmpDirPartName <- paste0(tmpDir, "/xl/", WR$Target)
       WR$fileExists <- file.exists(WR$tmpDirPartName)
 
-      if (any(!WR$fileExists)) {
+      if (!all(WR$fileExists)) {
         missing_in_tmp <- WR$Target[!WR$fileExists]
         warning(
           "[WR] file expected to be in output is missing: ",
@@ -2609,7 +2695,7 @@ wbWorkbook <- R6::R6Class(
             WR$type <- basename(WR$Type)
             WR <- WR[WR$type != "hyperlink", ]
 
-            if (any(!WR$fileExists)) {
+            if (!all(WR$fileExists)) {
               missing_in_tmp <- WR$Target[!WR$fileExists]
               warning(
                 "[", folder, "] file expected to be in output is missing: ",
@@ -2935,13 +3021,13 @@ wbWorkbook <- R6::R6Class(
 
       # TODO improve this. It should use v or inlineStr from cc
       if (as_value) {
-        to_data <- data
+        data <- as.data.frame(unclass(data))
 
         if (transpose) {
           data <- t(data)
         }
 
-        self$add_data(sheet = sheet, x = data, dims = to_dims_f[[1]], colNames = FALSE, ...)
+        self$add_data(sheet = sheet, x = data, dims = to_dims_f[[1]], col_names = FALSE, ...)
 
         return(invisible(self))
       }
@@ -3027,7 +3113,7 @@ wbWorkbook <- R6::R6Class(
       }
 
       if (length(name[[1]]) == 0) {
-        name <- list("val" = "Calibri")
+        name <- list("val" = "Aptos Narrow")
       } else {
         name <- as.list(name)
       }
@@ -3047,13 +3133,142 @@ wbWorkbook <- R6::R6Class(
     set_base_font = function(
       font_size  = 11,
       font_color = wb_color(theme = "1"),
-      font_name  = "Calibri",
+      font_name  = "Aptos Narrow",
        ...
     ) {
-      standardize(...)
+      arguments <- c("font_size", "font_color", "font_name",
+        "font_type", "font_panose")
+      standardize(..., arguments = arguments)
       if (font_size < 0) stop("Invalid font_size")
       if (!is_wbColour(font_color)) font_color <- wb_color(font_color)
+
+      fl <- system.file("extdata", "panose", "panose.csv", package = "openxlsx2")
+      panose <- read.csv(fl, stringsAsFactors = FALSE)
+
+      # if the default font name differes from the wanted name: update theme
+      if (self$get_base_font()$name$val != font_name) {
+        if (!exists("font_type")) font_type <- "Regular"
+
+        sel <- panose$family == font_name & panose$type == font_type
+        if (!any(sel) && !exists("font_panose")) {
+          panose_hex <- NULL
+        } else if (exists("font_panose")) {
+          # the input provides a panose value
+          panose_hex <- font_panose
+        } else {
+          panose_hex <- panose[sel, "panose"]
+        }
+
+        if (is.null(self$theme)) self$theme <- genBaseTheme()
+
+        xml_font <- xml_node_create(
+          "a:latin",
+          xml_attributes = c(typeface = font_name, panose = panose_hex)
+        )
+
+        # TODO This alters both fonts. Should be able to alter indepdendently
+        fS <- xml_node(self$theme, "a:theme", "a:themeElements", "a:fontScheme")
+        maj_font <- xml_node(fS, "a:fontScheme", "a:majorFont", "a:latin")
+        min_font <- xml_node(fS, "a:fontScheme", "a:minorFont", "a:latin")
+
+        self$theme <- gsub(maj_font, xml_font, self$theme)
+        self$theme <- gsub(min_font, xml_font, self$theme)
+      }
+
       self$styles_mgr$styles$fonts[[1]] <- create_font(sz = font_size, color = font_color, name = font_name)
+      invisible(self)
+    },
+
+    #' @description Get the base color
+    #' @param xml xml
+    #' @param plot plot
+    get_base_colors = function(xml = FALSE, plot = TRUE) {
+
+      if (is.null(self$theme)) self$theme <- genBaseTheme()
+
+      current <- xml_node(self$theme, "a:theme", "a:themeElements", "a:clrScheme")
+      name    <- xml_attr(current, "a:clrScheme")[[1]][["name"]]
+
+      nodes  <- xml_node_name(current, "a:clrScheme")
+      childs <- xml_node_name(current, "a:clrScheme", nodes[1])
+
+      rgbs <- vapply(
+        seq_along(nodes),
+        function(x) {
+          nm <- nodes[x]
+          cld <- childs[x]
+          paste0("#", rbindlist(xml_attr(current, "a:clrScheme", nm, cld))[[1]])
+        },
+        NA_character_
+      )
+      names(rgbs) <- nodes
+
+      if (interactive() && plot)
+        barplot(
+          rep(1, length(rgbs)),
+          col = rgbs, names.arg = names(rgbs),
+          main = name, yaxt = "n", las = 2
+        )
+
+      out <- list(rgbs)
+      names(out) <- name
+
+      if (xml) out <- current
+
+      out
+    },
+
+    #' @description Get the base colour
+    #' @param xml xml
+    #' @param plot plot
+    get_base_colours = function(xml = FALSE, plot = TRUE) {
+      self$get_base_colors(xml = xml, plot = plot)
+    },
+
+    #' @description Set the base color
+    #' @param theme theme
+    #' @param ... ...
+    #' @return The `wbWorkbook` object
+    set_base_colors = function(theme = "Office", ...) {
+
+      xml <- list(...)$xml
+
+      if (is.null(xml)) {
+        # read predefined themes
+        clr_rds <- system.file("extdata", "colors.rds", package = "openxlsx2")
+        colors <- readRDS(clr_rds)
+
+        if (is.character(theme)) {
+          sel <- match(theme, names(colors))
+          err <- is.na(sel)
+        } else {
+          sel <- theme
+          err <- sel > length(colors)
+        }
+
+        if (err) {
+          stop("theme ", theme, " not found. doing nothing")
+        }
+
+        new <- colors[[sel]]
+      } else {
+        new <- xml
+      }
+
+      if (is.null(self$theme)) self$theme <- genBaseTheme()
+
+      current    <- xml_node(self$theme, "a:theme", "a:themeElements", "a:clrScheme")
+      self$theme <- stringi::stri_replace_all_fixed(self$theme, current, new)
+
+      invisible(self)
+    },
+
+    #' @description Set the base colour
+    #' @param theme theme
+    #' @param ... ...
+    #' @return The `wbWorkbook` object
+    set_base_colours = function(theme = "Office", ...) {
+      self$set_base_colors(theme = theme, ... = ...)
     },
 
     ### book views ----
@@ -3352,7 +3567,8 @@ wbWorkbook <- R6::R6Class(
         stop("Invalid rows entered (<= 0).")
       }
 
-      hidden <- all(collapsed == TRUE)
+      # all collapsed = TRUE
+      hidden <- all(collapsed)
       collapsed <- rep(as.character(as.integer(collapsed)), length.out = length(cols))
 
       # Remove duplicates
@@ -3574,7 +3790,8 @@ wbWorkbook <- R6::R6Class(
         stop("Invalid rows entered (<= 0).")
       }
 
-      hidden <- all(collapsed == TRUE)
+      # all collapsed = TRUE
+      hidden <- all(collapsed)
       collapsed <- rep(as.character(as.integer(collapsed)), length.out = length(rows))
 
       # Remove duplicates
@@ -4757,7 +4974,7 @@ wbWorkbook <- R6::R6Class(
       pos <- '<xdr:pos x="0" y="0" />'
 
       drawingsXML <- stri_join(
-        '<xdr:absoluteAnchor>',
+        "<xdr:absoluteAnchor>",
         pos,
         sprintf('<xdr:ext cx="%s" cy="%s"/>', width, height),
         genBasePic(imageNo, next_id),
@@ -6843,7 +7060,7 @@ wbWorkbook <- R6::R6Class(
     },
 
     #' @description provide simple font function
-    #' @param name font name: default "Calibri"
+    #' @param name font name: default "Aptos Narrow"
     #' @param color rgb color: default "FF000000"
     #' @param size font size: default "11",
     #' @param bold bold
@@ -6862,7 +7079,7 @@ wbWorkbook <- R6::R6Class(
     add_font = function(
         sheet      = current_sheet(),
         dims       = "A1",
-        name       = "Calibri",
+        name       = "Aptos Narrow",
         color      = wb_color(hex = "FF000000"),
         size       = "11",
         bold       = "",
@@ -7822,9 +8039,9 @@ wbWorkbook <- R6::R6Class(
         ## write vml output
         if (self$vml[[i]] != "") {
           write_file(
-              head = '',
+              head = "",
               body = pxml(self$vml[[i]]),
-              tail = '',
+              tail = "",
               fl = file.path(dir, sprintf("vmlDrawing%s.vml", i))
           )
 
@@ -7926,9 +8143,9 @@ wbWorkbook <- R6::R6Class(
         ## Write drawing i (will always exist) skip those that are empty
         if (!all(self$drawings[[i]] == "")) {
           write_file(
-            head = '',
+            head = "",
             body = pxml(self$drawings[[i]]),
-            tail = '',
+            tail = "",
             fl = file.path(xldrawingsDir, stri_join("drawing", i, ".xml"))
           )
           if (!all(self$drawings_rels[[i]] == "")) {
