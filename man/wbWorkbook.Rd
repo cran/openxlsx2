@@ -42,7 +42,7 @@ wb$add_worksheet("sheet")
 # add some data
 wb$add_data("sheet", cars)
 # Add data with piping in a different location
-wb <- wb \%>\% wb_add_data(x = cars, dims = wb_dims(from_col = "D", from_row = 4))
+wb <- wb \%>\% wb_add_data(x = cars, dims = wb_dims(from_dims = "D4"))
 # open it in your default spreadsheet software
 if (interactive()) wb$open()
 }\if{html}{\out{</div>}}
@@ -191,8 +191,10 @@ worksheet names.}
 \item \href{#method-wbWorkbook-unmerge_cells}{\code{wbWorkbook$unmerge_cells()}}
 \item \href{#method-wbWorkbook-freeze_pane}{\code{wbWorkbook$freeze_pane()}}
 \item \href{#method-wbWorkbook-add_comment}{\code{wbWorkbook$add_comment()}}
+\item \href{#method-wbWorkbook-get_comment}{\code{wbWorkbook$get_comment()}}
 \item \href{#method-wbWorkbook-remove_comment}{\code{wbWorkbook$remove_comment()}}
 \item \href{#method-wbWorkbook-add_thread}{\code{wbWorkbook$add_thread()}}
+\item \href{#method-wbWorkbook-get_thread}{\code{wbWorkbook$get_thread()}}
 \item \href{#method-wbWorkbook-add_conditional_formatting}{\code{wbWorkbook$add_conditional_formatting()}}
 \item \href{#method-wbWorkbook-add_image}{\code{wbWorkbook$add_image()}}
 \item \href{#method-wbWorkbook-add_plot}{\code{wbWorkbook$add_plot()}}
@@ -209,6 +211,7 @@ worksheet names.}
 \item \href{#method-wbWorkbook-add_creators}{\code{wbWorkbook$add_creators()}}
 \item \href{#method-wbWorkbook-remove_creators}{\code{wbWorkbook$remove_creators()}}
 \item \href{#method-wbWorkbook-set_last_modified_by}{\code{wbWorkbook$set_last_modified_by()}}
+\item \href{#method-wbWorkbook-set_page_setup}{\code{wbWorkbook$set_page_setup()}}
 \item \href{#method-wbWorkbook-page_setup}{\code{wbWorkbook$page_setup()}}
 \item \href{#method-wbWorkbook-set_header_footer}{\code{wbWorkbook$set_header_footer()}}
 \item \href{#method-wbWorkbook-get_tables}{\code{wbWorkbook$get_tables()}}
@@ -577,6 +580,7 @@ add a data table
   remove_cell_style = FALSE,
   na.strings = na_strings(),
   inline_strings = TRUE,
+  total_row = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -622,6 +626,8 @@ add a data table
 \code{na_strings()} uses the special \verb{#N/A} value within the workbook.}
 
 \item{\code{inline_strings}}{write characters as inline strings}
+
+\item{\code{total_row}}{write total rows to table}
 
 \item{\code{...}}{additional arguments}
 }
@@ -970,8 +976,9 @@ Build table
   showColNames,
   tableStyle,
   tableName,
-  withFilter,
+  withFilter = TRUE,
   totalsRowCount = 0,
+  totalLabel = FALSE,
   showFirstColumn = 0,
   showLastColumn = 0,
   showRowStripes = 1,
@@ -997,6 +1004,8 @@ Build table
 \item{\code{withFilter}}{withFilter}
 
 \item{\code{totalsRowCount}}{totalsRowCount}
+
+\item{\code{totalLabel}}{totalLabel}
 
 \item{\code{showFirstColumn}}{showFirstColumn}
 
@@ -1743,6 +1752,28 @@ The \code{wbWorkbook} object
 }
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-get_comment"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-get_comment}{}}}
+\subsection{Method \code{get_comment()}}{
+Get comments
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_comment(sheet = current_sheet(), dims = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{sheet}
+
+\item{\code{dims}}{dims}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A data frame containing comments
+}
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-wbWorkbook-remove_comment"></a>}}
 \if{latex}{\out{\hypertarget{method-wbWorkbook-remove_comment}{}}}
 \subsection{Method \code{remove_comment()}}{
@@ -1798,6 +1829,28 @@ add threaded comment to worksheet
 \item{\code{resolve}}{logical if the comment should be marked as resolved}
 }
 \if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-get_thread"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-get_thread}{}}}
+\subsection{Method \code{get_thread()}}{
+Get threads
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_thread(sheet = current_sheet(), dims = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{sheet}
+
+\item{\code{dims}}{dims}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A data frame containing threads
 }
 }
 \if{html}{\out{<hr>}}
@@ -2285,6 +2338,117 @@ Change the last modified by
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{name}}{A new value}
+
+\item{\code{...}}{additional arguments}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorkbook} object, invisibly
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-set_page_setup"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-set_page_setup}{}}}
+\subsection{Method \code{set_page_setup()}}{
+set_page_setup() this function is intended to supersede page_setup(), but is not yet stable
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$set_page_setup(
+  sheet = current_sheet(),
+  black_and_white = NULL,
+  cell_comments = NULL,
+  copies = NULL,
+  draft = NULL,
+  errors = NULL,
+  first_page_number = NULL,
+  id = NULL,
+  page_order = NULL,
+  paper_height = NULL,
+  paper_width = NULL,
+  hdpi = NULL,
+  vdpi = NULL,
+  use_first_page_number = NULL,
+  use_printer_defaults = NULL,
+  orientation = NULL,
+  scale = NULL,
+  left = 0.7,
+  right = 0.7,
+  top = 0.75,
+  bottom = 0.75,
+  header = 0.3,
+  footer = 0.3,
+  fit_to_width = FALSE,
+  fit_to_height = FALSE,
+  paper_size = NULL,
+  print_title_rows = NULL,
+  print_title_cols = NULL,
+  summary_row = NULL,
+  summary_col = NULL,
+  tab_color = NULL,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{The name of the sheet}
+
+\item{\code{black_and_white}}{black_and_white}
+
+\item{\code{cell_comments}}{cell_comment}
+
+\item{\code{copies}}{copies}
+
+\item{\code{draft}}{draft}
+
+\item{\code{errors}}{errors}
+
+\item{\code{first_page_number}}{first_page_number}
+
+\item{\code{id}}{id}
+
+\item{\code{page_order}}{page_order}
+
+\item{\code{paper_height, paper_width}}{paper size}
+
+\item{\code{hdpi, vdpi}}{horizontal and vertical dpi}
+
+\item{\code{use_first_page_number}}{use_first_page_number}
+
+\item{\code{use_printer_defaults}}{use_printer_defaults}
+
+\item{\code{orientation}}{orientation}
+
+\item{\code{scale}}{scale}
+
+\item{\code{left}}{left}
+
+\item{\code{right}}{right}
+
+\item{\code{top}}{top}
+
+\item{\code{bottom}}{bottom}
+
+\item{\code{header}}{header}
+
+\item{\code{footer}}{footer}
+
+\item{\code{fit_to_width}}{fitToWidth}
+
+\item{\code{fit_to_height}}{fitToHeight}
+
+\item{\code{paper_size}}{paperSize}
+
+\item{\code{print_title_rows}}{printTitleRows}
+
+\item{\code{print_title_cols}}{printTitleCols}
+
+\item{\code{summary_row}}{summaryRow}
+
+\item{\code{summary_col}}{summaryCol}
+
+\item{\code{tab_color}}{tabColor}
 
 \item{\code{...}}{additional arguments}
 }

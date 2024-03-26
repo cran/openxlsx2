@@ -1,3 +1,34 @@
+# openxlsx2 1.5
+
+## New features
+
+* It's now possible to pass array formula vectors to `wb_add_formula()`. [958](https://github.com/JanMarvin/openxlsx2/pull/958)
+
+* `wb_add_data_table()` gained a new `total_row` argument. This allows to add a total row to spreadsheets including text and spreadsheet formulas. [959](https://github.com/JanMarvin/openxlsx2/pull/959)
+
+* `wb_dims()` now accepts `from_dims` to specify a starting cell [960](https://github.com/JanMarvin/openxlsx2/pull/960).
+
+* You can now set `options(openxlsx2.na.strings)` to a value  to have a default value for `na.strings` in `wb_add_data()`, `wb_add_data_table()`, and `write_xlsx()` [968](https://github.com/JanMarvin/openxlsx2/pull/968).
+
+## Fixes
+
+* Export `wb_add_ignore_error()`. [955](https://github.com/JanMarvin/openxlsx2/pull/955)
+
+## Breaking changes
+
+* The direction vectors are written is now controlled via `dims`. Previously it was required to transpose a vector to write it horizontally: `wb_add_data(x = t(letters), col_names = FALSE)`. Now the direction is defined by `dims`. The default is still to write vectors vertically, but for a horizontal vector it is possible to write `wb_add_data(x = letters, dims = "A1:Z1")`. This change impacts vectors, hyperlinks and formulas and basically everything that is not a two dimensional `x` object.
+This is only breaking, if previous code made use of the transposed trick above and already defined a correct `dims`. Since the `wb_add_data()` function is agnostic of the direction of `x`, this `wb_add_data(x = t(letters), dims = "A1:Z1", col_names = FALSE)` would write the `letters` into cells `A1:A26`, because of a round trip through transpose.
+
+```r
+# before (workaround needed)
+wb$add_data(dims = wb_dims(rows = 1, cols = 1:3), x = t(c(4, 5, 8)), col_names = FALSE)
+# now (listens to dims)
+wb$add_data(dims = wb_dims(rows = 1, cols = 1:3), x = c(4, 5, 8))
+```
+
+***************************************************************************
+
+
 # openxlsx2 1.4
 
 ## New features
@@ -29,7 +60,7 @@
 * Updating to themes. This includes updates to the default style `'Office Theme'` [899](https://github.com/JanMarvin/openxlsx2/pull/899)
   * This includes switching to the new default font `'Aptos Narrow'`
   * A new style `'Office 2013 - 2022 Theme'` was added
-  
+
   Users that want to remain on the old style should use `wb_workbook(theme = 'Office 2013 - 2022 Theme')` or `wb_set_base_font(font_name = "Calibri")`.
 
 ## Maintenance

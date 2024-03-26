@@ -10,7 +10,8 @@
 #' @param colNames has colNames (only in update_cell)
 #' @param removeCellStyle remove the cell style (only in update_cell)
 #' @param na.strings Value used for replacing `NA` values from `x`. Default
-#'   `na_strings()` uses the special `#N/A` value within the workbook.#' @keywords internal
+#'   `na_strings()` uses the special `#N/A` value within the workbook.
+#' @keywords internal
 #' @noRd
 inner_update <- function(
     wb,
@@ -176,9 +177,11 @@ update_cell <- function(x, wb, sheet, cell, colNames = FALSE,
 #' @param applyCellStyle apply styles when writing on the sheet
 #' @param removeCellStyle keep the cell style?
 #' @param na.strings Value used for replacing `NA` values from `x`. Default
-#'   `na_strings()` uses the special `#N/A` value within the workbook.
+#'   looks if `options(openxlsx2.na.strings)` is set. Otherwise [na_strings()]
+#'   uses the special `#N/A` value within the workbook.
 #' @param data_table logical. if `TRUE` and `rowNames = TRUE`, do not write the cell containing  `"_rowNames_"`
 #' @param inline_strings write characters as inline strings
+#' @param dims worksheet dimensions
 #' @details
 #' The string `"_openxlsx_NA"` is reserved for `openxlsx2`. If the data frame
 #' contains this string, the output will be broken.
@@ -212,7 +215,8 @@ write_data2 <- function(
     removeCellStyle = FALSE,
     na.strings = na_strings(),
     data_table = FALSE,
-    inline_strings = TRUE
+    inline_strings = TRUE,
+    dims = NULL
 ) {
 
   is_data_frame <- FALSE
@@ -289,29 +293,16 @@ write_data2 <- function(
   # message("sheet no: ", sheetno)
 
   # create a data frame
-  if (!is_data_frame)
+  if (!is_data_frame) {
     data <- as.data.frame(t(data))
+  }
 
-  data_nrow <- NROW(data)
-  data_ncol <- NCOL(data)
+  dims <- fits_in_dims(x = data, dims = dims, startCol = startCol, startRow = startRow)
 
-  endRow <- (startRow - 1) + data_nrow
-  endCol <- (startCol - 1) + data_ncol
-
-  if (endRow > 1048576 || endCol > 16384)
-    stop("Dimensions exceed worksheet")
-
-  dims <- paste0(
-    int2col(startCol), startRow,
-    ":",
-    int2col(endCol), endRow
-  )
-
-  ### ref for formulas from write_formula caring ref attr
   if (!is.null(attr(data, "f_ref"))) {
     ref <- attr(data, "f_ref")
   } else {
-    ref <- dims
+    ref <- rep("0", ncol(data))
   }
 
   if (!is.null(attr(data, "c_cm"))) {
@@ -355,10 +346,10 @@ write_data2 <- function(
   # list(c("A1, ..., "k1"), ...,  c("An", ..., "kn"))
   rtyp <- dims_to_dataframe(dims, fill = FALSE)
 
-  rows_attr <- vector("list", data_nrow)
+  rows_attr <- vector("list", nrow(rtyp))
 
   # create <rows ...>
-  want_rows <- startRow:endRow
+  want_rows <- as.integer(dims_to_rowcol(dims)[[2]])
   rows_attr <- empty_row_attr(n = length(want_rows))
   rows_attr$r <- rownames(rtyp)
 
@@ -711,8 +702,10 @@ write_data2 <- function(
 #' @param applyCellStyle apply styles when writing on the sheet
 #' @param removeCellStyle if writing into existing cells, should the cell style be removed?
 #' @param na.strings Value used for replacing `NA` values from `x`. Default
-#'   `na_strings()` uses the special `#N/A` value within the workbook.
+#'   looks if `options(openxlsx2.na.strings)` is set. Otherwise [na_strings()]
+#'   uses the special `#N/A` value within the workbook.
 #' @param inline_strings optional write strings as inline strings
+#' @param total_row optional write total rows
 #' @noRd
 #' @keywords internal
 write_data_table <- function(
@@ -738,7 +731,8 @@ write_data_table <- function(
     removeCellStyle = FALSE,
     data_table      = FALSE,
     na.strings      = na_strings(),
-    inline_strings  = TRUE
+    inline_strings  = TRUE,
+    total_row       = FALSE
 ) {
 
   ## Input validating
@@ -767,6 +761,11 @@ write_data_table <- function(
   # avoid stoi error with NULL
   if (is.null(x)) {
     return(wb)
+  }
+  # overwrite na.strings if nothing was provided
+  # with whatever is in the option if not set to default
+  if (is_na_strings(na.strings) && !is.null(getOption("openxlsx2.na.strings"))) {
+    na.strings <- getOption("openxlsx2.na.strings")
   }
 
   if (data_table && nrow(x) < 1) {
@@ -827,12 +826,19 @@ write_data_table <- function(
 
   ### Create data frame --------------------------------------------------------
 
+  transpose <- FALSE
+  # do not transpose if input is a matrix. assuming that the input
+  if (length(dims[[1]]) > length(dims[[2]]) &&
+        !inherits(x, "matrix") && !inherits(x, "data.frame"))
+    transpose <- TRUE
+
   ## special case - formula
   # only for data frame case where a data frame is passed down containing formulas
   if (inherits(x, "formula")) {
     x <- data.frame("X" = x, stringsAsFactors = FALSE)
     class(x[[1]]) <- if (array) "array_formula" else "formula"
     colNames <- FALSE
+    if (transpose) x <- transpose_df(x)
   }
 
   if (is.vector(x) || is.factor(x) || inherits(x, "Date") || inherits(x, "POSIXt")) {
@@ -844,8 +850,12 @@ write_data_table <- function(
     ## vector of hyperlinks
     class(x) <- c("character", "hyperlink")
     x <- as.data.frame(x, stringsAsFactors = FALSE)
+    if (transpose) x <- transpose_df(x)
+    # colNames <- FALSE
   } else if (!inherits(x, "data.frame")) {
     x <- as.data.frame(x, stringsAsFactors = FALSE)
+    if (transpose) x <- transpose_df(x)
+    # colNames <- FALSE
   }
 
   nCol <- ncol(x)
@@ -861,10 +871,10 @@ write_data_table <- function(
 
       wb$worksheets[[sheet]]$autoFilter <- sprintf('<autoFilter ref="%s"/>', ref)
 
-      l <- int2col(unlist(coords[, 2]))
+      l   <- int2col(unlist(coords[, 2]))
       dfn <- sprintf("'%s'!%s", wb$get_sheet_names(escape = TRUE)[sheet], stri_join("$", l, "$", coords[, 1], collapse = ":"))
 
-      dn <- sprintf('<definedName name="_xlnm._FilterDatabase" localSheetId="%s" hidden="1">%s</definedName>', sheet - 1L, dfn)
+      dn  <- sprintf('<definedName name="_xlnm._FilterDatabase" localSheetId="%s" hidden="1">%s</definedName>', sheet - 1L, dfn)
 
       if (!is.null(wbdn <- wb$get_named_regions())) {
 
@@ -885,40 +895,41 @@ write_data_table <- function(
   ### End: Only in data --------------------------------------------------------
 
   if (data_table) {
-    overwrite_nrows <- 1L
+    overwrite_nrows     <- 1L
     check_tab_head_only <- FALSE
-    error_msg <- "Cannot overwrite existing table with another table"
+    error_msg           <- "Cannot overwrite existing table with another table"
   } else {
-    overwrite_nrows <- colNames
+    overwrite_nrows     <- colNames
     check_tab_head_only <- TRUE
-    error_msg <- "Cannot overwrite table headers. Avoid writing over the header row or see wb_get_tables() & wb_remove_tabless() to remove the table object."
+    error_msg           <- "Cannot overwrite table headers. Avoid writing over the header row or see wb_get_tables() & wb_remove_tabless() to remove the table object."
   }
 
   ## Check not overwriting existing table headers
   wb_check_overwrite_tables(
-    wb = wb,
-    sheet = sheet,
-    new_rows = c(startRow, startRow + nRow - 1L + overwrite_nrows),
-    new_cols = c(startCol, startCol + nCol - 1L),
+    wb                      = wb,
+    sheet                   = sheet,
+    new_rows                = c(startRow, startRow + nRow - 1L + overwrite_nrows),
+    new_cols                = c(startCol, startCol + nCol - 1L),
     check_table_header_only = check_tab_head_only,
-    error_msg = error_msg
+    error_msg               = error_msg
   )
 
   ## actual driver, the rest should not create data used for writing
   wb <- write_data2(
-    wb =  wb,
-    sheet = sheet,
-    data = x,
-    name = name,
-    colNames = colNames,
-    rowNames = rowNames,
-    startRow = startRow,
-    startCol = startCol,
-    applyCellStyle = applyCellStyle,
+    wb              =  wb,
+    sheet           = sheet,
+    data            = x,
+    name            = name,
+    colNames        = colNames,
+    rowNames        = rowNames,
+    startRow        = startRow,
+    startCol        = startCol,
+    applyCellStyle  = applyCellStyle,
     removeCellStyle = removeCellStyle,
-    na.strings = na.strings,
-    data_table = data_table,
-    inline_strings = inline_strings
+    na.strings      = na.strings,
+    data_table      = data_table,
+    inline_strings  = inline_strings,
+    dims            = dims
   )
 
   ### Beg: Only in datatable ---------------------------------------------------
@@ -936,6 +947,40 @@ write_data_table <- function(
       tableName <- paste0("Table", as.character(NROW(wb$tables) + 1L))
     } else {
       tableName <- wb_validate_table_name(wb, tableName)
+    }
+
+    ## write total rows column. this is a formula and needs to be written separately
+    total_fml <- FALSE
+    total_lbl <- FALSE
+    if (!isFALSE(total_row)) {
+
+      total <- known_subtotal_funs(
+        x         = x,
+        total     = total_row,
+        table     = tableName,
+        row_names = rowNames
+      )
+
+      total_row <- total[[1]]
+      total_fml <- total[[2]]
+      total_lbl <- total[[3]]
+
+      wb <- write_data2(
+        wb              = wb,
+        sheet           = sheet,
+        data            = total_row,
+        name            = name,
+        colNames        = FALSE,
+        rowNames        = FALSE,
+        startRow        = startRow + nrow(x),
+        startCol        = startCol,
+        applyCellStyle  = applyCellStyle,
+        removeCellStyle = removeCellStyle,
+        na.strings      = na.strings,
+        data_table      = data_table,
+        inline_strings  = inline_strings,
+        dims            = NULL
+      )
     }
 
     ## If 0 rows append a blank row
@@ -960,21 +1005,22 @@ write_data_table <- function(
 
     ref1 <- paste0(int2col(startCol), startRow)
     ref2 <- paste0(int2col(startCol + nCol - !rowNames), startRow + nRow)
-    ref <- paste(ref1, ref2, sep = ":")
+    ref  <- paste(ref1, ref2, sep = ":")
 
     ## create table.xml and assign an id to worksheet tables
     wb$buildTable(
-      sheet = sheet,
-      colNames = col_names,
-      ref = ref,
-      showColNames = colNames,
-      tableStyle = tableStyle,
-      tableName = tableName,
-      withFilter = withFilter,
-      totalsRowCount = 0L,
-      showFirstColumn = firstColumn,
-      showLastColumn = lastColumn,
-      showRowStripes = bandedRows,
+      sheet             = sheet,
+      colNames          = col_names,
+      ref               = ref,
+      showColNames      = colNames,
+      tableStyle        = tableStyle,
+      tableName         = tableName,
+      totalLabel        = total_lbl,
+      withFilter        = withFilter,
+      totalsRowCount    = total_fml,
+      showFirstColumn   = firstColumn,
+      showLastColumn    = lastColumn,
+      showRowStripes    = bandedRows,
       showColumnStripes = bandedCols
     )
   }
@@ -1069,6 +1115,14 @@ write_formula <- function(
   standardize_case_names(...)
 
   assert_class(x, "character")
+
+  # detect array formulas
+  if (any(substr(x, 1, 1) == "{")) {
+    pattern <- "^\\{(.*)\\}$"
+    x <- gsub(pattern, "\\1", x)
+    array <- TRUE
+  }
+
   dfx <- data.frame("X" = x, stringsAsFactors = FALSE)
 
   formula <- "formula"
@@ -1122,15 +1176,26 @@ write_formula <- function(
     formula <- "cm_formula"
   }
 
-  class(dfx$X) <- c("character", formula)
-  if (!is.null(dims)) {
-    if (array || cm) {
-      attr(dfx, "f_ref") <- dims
-    }
-  }
+  class(dfx$X) <- c(formula, "character")
 
   if (any(grepl("=([\\s]*?)HYPERLINK\\(", x, perl = TRUE))) {
     class(dfx$X) <- c("character", "formula", "hyperlink")
+  }
+
+  # transpose match write_data_table
+  rc <- dims_to_rowcol(dims)
+  if (length(rc[[1]]) > length(rc[[2]])) {
+    dfx <- transpose_df(dfx)
+  }
+
+  if (is.null(dims)) {
+    dims <- wb_dims(start_row, start_col)
+  }
+
+  if (array || cm) {
+    if (length(dfx$X) == 1) {
+      attr(dfx, "f_ref") <- dims
+    }
   }
 
   write_data(
@@ -1179,6 +1244,7 @@ write_datatable <- function(
     remove_cell_style = FALSE,
     na.strings        = na_strings(),
     inline_strings    = TRUE,
+    total_row         = FALSE,
     ...
 ) {
 
@@ -1207,6 +1273,7 @@ write_datatable <- function(
     applyCellStyle  = apply_cell_style,
     removeCellStyle = remove_cell_style,
     na.strings      = na.strings,
-    inline_strings  = inline_strings
+    inline_strings  = inline_strings,
+    total_row       = total_row
   )
 }

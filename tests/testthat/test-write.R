@@ -206,10 +206,10 @@ test_that("update cell(s)", {
 
   exp <- structure(
     list(c(7, NA, NA, NA, NA, 7),
-         c("y", "z", "TRUE", "FALSE", "TRUE", NA),
+         c(NA, NA, TRUE, FALSE, TRUE, NA),
          c(2, NA, 2.5, NA, NA, NA),
          c(7, 2, 3, NA, 5, NA)),
-    names = c(NA, "x", "Var2", "Var3"),
+    names = c(NA, "x", "y", "z"),
     row.names = 4:9,
     class = "data.frame")
 
@@ -804,5 +804,158 @@ test_that("filter works with wb_add_data()", {
   )
   got <- wb$workbook$definedNames
   expect_equal(exp, got)
+
+})
+
+test_that("writing total row works", {
+
+  # default row sums
+  wb <- wb_workbook()$add_worksheet()$add_data_table(x = mtcars, total_row = TRUE)
+
+  exp <- data.frame(
+    A = "SUBTOTAL(109,Table1[mpg])", B = "SUBTOTAL(109,Table1[cyl])",
+    C = "SUBTOTAL(109,Table1[disp])", D = "SUBTOTAL(109,Table1[hp])",
+    E = "SUBTOTAL(109,Table1[drat])", F = "SUBTOTAL(109,Table1[wt])",
+    G = "SUBTOTAL(109,Table1[qsec])", H = "SUBTOTAL(109,Table1[vs])",
+    I = "SUBTOTAL(109,Table1[am])", J = "SUBTOTAL(109,Table1[gear])",
+    K = "SUBTOTAL(109,Table1[carb])"
+  )
+  got <- wb_to_df(wb, dims = wb_dims(rows = 33, cols = "A:K"),
+                  show_formula = TRUE, col_names = FALSE)
+  expect_equal(exp, got, ignore_attr = TRUE)
+
+  # empty total row
+  wb <- wb_workbook()$add_worksheet()$add_data_table(x = mtcars, total_row = c("none"))
+
+  exp <- data.frame(
+    A = NA_real_, B = NA_real_, C = NA_real_, D = NA_real_,
+    E = NA_real_, F = NA_real_, G = NA_real_, H = NA_real_, I = NA_real_,
+    J = NA_real_, K = NA_real_
+  )
+  got <- wb_to_df(wb, dims = wb_dims(rows = 33, cols = "A:K"),
+                  show_formula = TRUE, col_names = FALSE)
+  expect_equal(exp, got, ignore_attr = TRUE)
+
+  # total row with text only
+  wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c(text = "Result", text = "sum"))
+
+  exp <- data.frame(A = "Result", B = "sum")
+  got <- wb_to_df(wb, dims = wb_dims(rows = 51, cols = "A:B"),
+                  show_formula = TRUE, col_names = FALSE)
+  expect_equal(exp, got, ignore_attr = TRUE)
+
+  # total row with text and formula
+  wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c(text = "Result", "sum"))
+
+  exp <- data.frame(A = "Result", B = "SUBTOTAL(109,Table1[dist])")
+  got <- wb_to_df(wb, dims = wb_dims(rows = 51, cols = "A:B"),
+                  show_formula = TRUE, col_names = FALSE)
+  expect_equal(exp, got, ignore_attr = TRUE)
+
+  # total row with none and custom formula
+  wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c("none", "COUNTA"))
+
+  exp <- data.frame(A = NA_real_, B = "COUNTA(Table1[dist])")
+  got <- wb_to_df(wb, dims = wb_dims(rows = 51, cols = "A:B"),
+                  show_formula = TRUE, col_names = FALSE)
+  expect_equal(exp, got, ignore_attr = TRUE)
+
+  # with rownames
+  wb <- wb_workbook()$add_worksheet()$
+    add_data_table(
+      x = as.data.frame(USPersonalExpenditure),
+      row_names = TRUE,
+      total_row = c(text = "Total", "none", "sum", "sum", "sum", "SUM")
+    )
+
+  exp <- data.frame(
+    A = "Total", B = NA_real_, C = "SUBTOTAL(109,Table1[1945])",
+    D = "SUBTOTAL(109,Table1[1950])", E = "SUBTOTAL(109,Table1[1955])",
+    F = "SUM(Table1[1960])"
+  )
+  got <- wb_to_df(wb, dims = wb_dims(rows = 6, cols = "A:F"), col_names = FALSE, show_formula = TRUE)
+  expect_equal(exp, got, ignore_attr = TRUE)
+
+})
+
+test_that("writing vectors direction with dims works", {
+
+  # write vectors column or rowwise
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = 1:2, dims = "A1:B1")$
+    add_data(x = t(1:2), dims = "D1:D2", col_names = FALSE)$ # ignores dims
+    add_data(x = 1:2, dims = "A3:A4")$
+    add_data(x = t(1:2), dims = "D3:E3", col_names = FALSE)  # ignores dims
+
+  exp <- c("A1", "B1", "D1", "E1", "A3", "D3", "E3", "A4")
+  got <- wb$worksheets[[1]]$sheet_data$cc$r
+  expect_equal(exp, got)
+
+  ## sum, sum as array and sum as cm
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = head(cars))$
+    add_formula(x = c("SUM(A2:A7)", "SUM(B2:B7)"), dims = "A9:B9")$
+    add_formula(x = c("{SUM(A2:A7)}", "{SUM(B2:B7)}"), dims = "A10:B10")
+
+  expect_warning(
+    wb$add_formula(x = c("{SUM(A2:A7)}", "{SUM(B2:B7)}"), dims = "A11:B11", cm = TRUE),
+    "modifications with cm formulas are experimental. use at own risk"
+  )
+
+  exp <- c("A1", "B1", "A2", "B2", "A3", "B3", "A4", "B4", "A5", "B5",
+           "A6", "B6", "A7", "B7", "A9", "B9", "A10", "B10", "A11", "B11")
+  got <- wb$worksheets[[1]]$sheet_data$cc$r
+  expect_equal(exp, got)
+
+})
+
+test_that("dims size warnings work", {
+
+  op <- options("openxlsx2.warn_if_dims_dont_fit" = TRUE)
+  on.exit(options(op), add = TRUE)
+
+  wb <- wb_workbook()$add_worksheet()
+
+  # default no dims
+  expect_warning(
+    wb$add_data(x = head(mtcars)),
+    "dimension of `x` exceeds all `dims`"
+  )
+
+  # with explicit default dims
+  expect_warning(
+    wb$add_data(dims = "A1", x = head(mtcars)),
+    "dimension of `x` exceeds all `dims`"
+  )
+
+  # wb_add_data(dims = wb_dims(x = obj), x = obj) should always be silent
+  expect_silent(wb$add_data(dims = wb_dims(x = head(mtcars)), x = head(mtcars)))
+
+  # correct size should always be silent
+  expect_silent(wb$add_data(dims = "A1:K7", x = head(mtcars)))
+
+  # To wide
+  expect_warning(
+    wb$add_data(dims = "A1:K1", x = head(mtcars)),
+    "dimension of `x` exceeds rows of `dims`"
+  )
+
+  # To short
+  expect_warning(
+    wb$add_data(dims = "A1:J7", x = head(mtcars)),
+    "dimension of `x` exceeds cols of `dims`"
+  )
+
+  # ending in the correct cell isn't enough
+  expect_warning(
+    wb$add_data(dims = "B2:K7", x = head(mtcars)),
+    "dimension of `x` exceeds all `dims`"
+  )
+
+  # currently write_xlsx() uses the default dims
+  expect_warning(
+    wb <- write_xlsx(x = head(mtcars))
+  )
 
 })

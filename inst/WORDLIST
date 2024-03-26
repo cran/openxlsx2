@@ -21,6 +21,7 @@ Greyscale
 HeaderCell
 JIS
 JOHAB
+Kaku
 LastModifiedBy
 Libreoffice
 OEM
@@ -195,6 +196,7 @@ posixt
 pre
 printTitleCols
 printTitleRows
+priori
 pugi
 pugixml
 queryTables
@@ -221,6 +223,7 @@ showLastColumn
 showRowStripes
 showSheetTabs
 showVerticalScroll
+signalling
 slantDashDot
 slicerCaches
 sparkline
@@ -239,6 +242,7 @@ tableStyle
 tablename
 textLength
 th
+totalLabel
 totalRow
 totalsRowCount
 twoCell

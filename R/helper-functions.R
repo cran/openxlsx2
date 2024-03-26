@@ -976,3 +976,221 @@ clone_shared_strings <- function(wb_old, old, wb_new, new) {
   # print(sprintf("cloned: %s", length(new_ids)))
 
 }
+
+known_subtotal_funs <- function(x, total, table, row_names = FALSE) {
+
+  # unfortunately x has no row names at this point
+  ncol_x <- ncol(x) + row_names
+  nms_x <- names(x)
+  if (row_names) nms_x <- c("_rowNames_", nms_x)
+
+  fml <- vector("character", ncol_x)
+  atr <- vector("character", ncol_x)
+  lbl <- rep(NA_character_, ncol_x)
+
+  if (isTRUE(total) || all(as.character(total) == "109") || all(total == "sum")) {
+    fml <- paste0("SUBTOTAL(109,", table, "[", names(x), "])")
+    atr <- rep("sum", ncol_x)
+  } else {
+
+    # all get the same total_row value
+    if (length(total) == 1) {
+      total <- rep(total, ncol_x)
+    }
+
+    if (length(total) != ncol_x) {
+      stop("length of total_row and table columns do not match", call. = FALSE)
+    }
+
+    builtinIds <- c("101", "103", "102", "104", "105", "107", "109", "110")
+    builtins   <- c("average", "count", "countNums", "max", "min", "stdDev", "sum", "var")
+
+    ttl <- as.character(total)
+
+    for (i in seq_len(ncol_x)) {
+
+      if (any(names(total)[i] == "") && (ttl[i] %in% builtinIds || ttl[i] %in% builtins)) {
+        if (ttl[i] == "101" || ttl[i] == "average") {
+          fml[i] <- paste0("SUBTOTAL(", 101, ",", table, "[", nms_x[i], "])")
+          atr[i] <- "average"
+        } else if (ttl[i] == "102" || ttl[i] == "countNums") {
+          fml[i] <- paste0("SUBTOTAL(", 102, ",", table, "[", nms_x[i], "])")
+          atr[i] <- "countNums"
+        } else if (ttl[i] == "103" || ttl[i] == "count") {
+          fml[i] <- paste0("SUBTOTAL(", 103, ",", table, "[", nms_x[i], "])")
+          atr[i] <- "count"
+        } else if (ttl[i] == "104" || ttl[i] == "max") {
+          fml[i] <- paste0("SUBTOTAL(", 104, ",", table, "[", nms_x[i], "])")
+          atr[i] <- "max"
+        } else if (ttl[i] == "105" || ttl[i] == "min") {
+          fml[i] <- paste0("SUBTOTAL(", 105, ",", table, "[", nms_x[i], "])")
+          atr[i] <- "min"
+        } else if (ttl[i] == "107" || ttl[i] == "stdDev") {
+          fml[i] <- paste0("SUBTOTAL(", 107, ",", table, "[", nms_x[i], "])")
+          atr[i] <- "stdDev"
+        } else if (ttl[i] == "109" || ttl[i] == "sum") {
+          fml[i] <- paste0("SUBTOTAL(", 109, ",", table, "[", nms_x[i], "])")
+          atr[i] <- "sum"
+        } else if (ttl[i] == "110" || ttl[i] == "var") {
+          fml[i] <- paste0("SUBTOTAL(", 110, ",", table, "[", nms_x[i], "])")
+          atr[i] <- "var"
+        }
+
+      } else if (ttl[i] == "0" || ttl[i] == "none") {
+        fml[i] <- ""
+        atr[i] <- "none"
+      } else if (any(names(total)[i] == "text")) {
+        fml[i] <- as_xml_attr(ttl[i])
+        atr[i] <- ""
+        lbl[i] <- as_xml_attr(ttl[i])
+      } else {
+        # works, but in excel the formula is added to tables.xml as a child to the column
+        fml[i] <- paste0(ttl[i], "(", table, "[", nms_x[i], "])")
+        atr[i] <- "custom"
+      }
+
+    }
+
+  }
+
+  # prepare output
+  fml <- as.data.frame(t(fml))
+  names(fml) <- nms_x
+  names(atr) <- nms_x
+  names(lbl) <- nms_x
+
+  # prepare output to be written with formulas
+  for (i in seq_along(fml)) {
+    if (is.na(lbl[[i]])) class(fml[[i]]) <- c("formula", fml[[i]])
+  }
+
+  list(fml, atr, lbl)
+
+}
+
+#' helper to read sheetPr xml to dataframe
+#' @param xml xml_node
+#' @noRd
+read_sheetpr <- function(xml) {
+  # https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.sheetproperties?view=openxml-2.8.1
+  if (!inherits(xml, "pugi_xml")) xml <- read_xml(xml)
+
+  vec_attrs <- c("codeName", "enableFormatConditionsCalculation", "filterMode",
+                 "published", "syncHorizontal", "syncRef", "syncVertical",
+                 "transitionEntry", "transitionEvaluation")
+  vec_chlds <- c("tabColor", "outlinePr", "pageSetUpPr")
+
+  read_xml2df(
+    xml       = xml,
+    vec_name  = "sheetPr",
+    vec_attrs = vec_attrs,
+    vec_chlds = vec_chlds
+  )
+}
+
+#' helper to write sheetPr dataframe to xml
+#' @param df a data frame
+#' @noRd
+write_sheetpr <- function(df) {
+
+  # we have to preserve a certain order of elements at least for childs
+  vec_attrs <- c("codeName", "enableFormatConditionsCalculation", "filterMode",
+                 "published", "syncHorizontal", "syncRef", "syncVertical",
+                 "transitionEntry", "transitionEvaluation")
+  vec_chlds <- c("tabColor", "outlinePr", "pageSetUpPr")
+  nms <- c(vec_attrs, vec_chlds)
+
+  write_df2xml(
+    df        = df[nms],
+    vec_name  = "sheetPr",
+    vec_attrs = vec_attrs,
+    vec_chlds = vec_chlds
+  )
+}
+
+# helper construct dim comparison from rowcol_to_dims(as_integer = TRUE) object
+min_and_max <- function(x) {
+  c(
+    (max(x[[2]]) + 1L) - min(x[[2]]), # row
+    (max(x[[1]]) + 1L) - min(x[[1]])  # col
+  )
+}
+
+#' helper function to detect if x fits into dims
+#'
+#' This function will throw a warning depending on the experimental option: `openxlsx2.warn_if_dims_dont_fit`
+#' @param x the x object
+#' @param dims the worksheet dimensions
+#' @param startCol,startRow start column. Since write_data() is not defunct, we might not be fully able to select this from dims
+#' @noRd
+fits_in_dims <- function(x, dims, startCol, startRow) {
+
+  # happens only in direct calls to write_data2 in some old tests
+  if (is.null(dims)) {
+    dims <- wb_dims(from_col = startCol, from_row = startRow)
+  }
+
+  if (length(dims) == 1 && is.character(dims)) {
+    dims <- dims_to_rowcol(dims, as_integer = TRUE)
+  }
+
+  dim_x <- dim(x)
+  dim_d <- min_and_max(dims)
+
+  opt <- getOption("openxlsx2.warn_if_dims_dont_fit", default = FALSE)
+
+  if (all(dim_x <= dim_d)) {
+    fits <- TRUE
+  } else if (all(dim_x > dim_d)) {
+    if (opt) warning("dimension of `x` exceeds all `dims`")
+    fits <- FALSE
+  } else if (dim_x[1] > dim_d[1]) {
+    if (opt) warning("dimension of `x` exceeds rows of `dims`")
+    fits <- FALSE
+  } else if (dim_x[2] > dim_d[2]) {
+    if (opt) warning("dimension of `x` exceeds cols of `dims`")
+    fits <- FALSE
+  }
+
+  if (fits) {
+
+    # why oh why wasn't dims_to_rowcol()/rowcol_to_dims() created as a matching pair
+    dims <- rowcol_to_dims(row = dims[[2]], col = dims[[1]])
+
+  } else {
+
+    # # one off. needs check if dims = NULL or row names argument?
+    # dims <- wb_dims(x = x, from_col = startCol, from_row = startRow)
+
+    data_nrow <- NROW(x)
+    data_ncol <- NCOL(x)
+
+    endRow <- (startRow - 1) + data_nrow
+    endCol <- (startCol - 1) + data_ncol
+
+    dims <- paste0(
+      int2col(startCol), startRow,
+      ":",
+      int2col(endCol), endRow
+    )
+
+  }
+
+  rc <- dims_to_rowcol(dims)
+  if (max(as.integer(rc[[2]])) > 1048576 || max(col2int(rc[[1]])) > 16384)
+    stop("Dimensions exceed worksheet")
+
+  dims
+}
+
+# transpose single column or row data frames to wide/long. keeps attributes and class
+transpose_df <- function(x) {
+  attribs <- attr(x, "c_cm")
+  classes <- class(x[[1]])
+  x <- as.data.frame(t(x))
+  for (i in seq_along(x)) {
+    class(x[[i]]) <- classes
+  }
+  attr(x, "c_cm") <- attribs
+  x
+}
