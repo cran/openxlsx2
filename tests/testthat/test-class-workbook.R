@@ -6,7 +6,7 @@ test_that("Workbook class", {
 })
 
 
-test_that("wb_set_col_widths", {
+test_that("wb_set_col_widths works", {
 # TODO use wb$wb_set_col_widths()
 
   wb <- wbWorkbook$new()
@@ -39,17 +39,10 @@ test_that("wb_set_col_widths", {
     wb$worksheets[[1]]$cols_attr
   )
 
-  # a few more errors
-  expect_error(wb$set_col_widths("test", cols = "Y", width = 1:2))
-  expect_error(wb$set_col_widths("test", cols = "Y", hidden = 1:2))
-
-
-
-
   wb <- wb_workbook()$
     add_worksheet()$
-    set_col_widths(cols = 1:10, width = (8:17) + .5)$
-    add_data(x = rbind(8:17), colNames = FALSE)
+    set_col_widths(cols = 1:10, widths = (8:17) + .5)$
+    add_data(x = rbind(8:17), col_names = FALSE)
 
   exp <- c(
     "<col min=\"1\" max=\"1\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"9.211\"/>",
@@ -72,8 +65,18 @@ test_that("wb_set_col_widths", {
     "<col min=\"18\" max=\"16384\" width=\"8.88671875\" style=\"16\"/>"
   )
 
-  expect_silent(wb$set_col_widths(cols = 19, width = 9))
+  expect_silent(wb$set_col_widths(cols = 19, widths = 9))
 
+})
+
+test_that("set_col_widths informs when inconsistent lengths are supplied", {
+  wb <- wbWorkbook$new()
+  wb$add_worksheet("test")
+
+  expect_warning(wb$set_col_widths(cols = c(1, 2, 3), widths = c(2, 3)), "compatible length")
+  expect_error(wb$set_col_widths(cols = "Y", widths = 1:2), "More widths than column")
+  expect_error(wb$set_col_widths("test", cols = "Y", hidden = 1:2), "hidden argument is longer")
+  expect_warning(wb$set_col_widths(cols = c("X", "Y", "Z"), hidden = c(1, 0)), "compatible length")
 })
 
 test_that("option maxWidth works", {
@@ -1117,6 +1120,99 @@ test_that("subsetting wb_data() works", {
     ),
     sheet = "Sheet 1")
   got <- attributes(df1[-nrow(df1), ])
+  expect_equal(exp, got)
+
+})
+
+test_that("adding mips section works", {
+
+  # helper function to mock a mips section
+  create_fake_mips <- function() {
+    guid <- st_guid()
+    lid  <- tolower(gsub("[{}]", "", guid))
+
+    mips_xml <- sprintf(
+      '<property fmtid="%s" pid="2" name="MSIP_Label_%s_Enabled">
+      <vt:lpwstr>true</vt:lpwstr>
+    </property>
+    <property fmtid="%s" pid="3" name="MSIP_Label_%s_SetDate">
+      <vt:lpwstr>2024-04-07T14:27:12Z</vt:lpwstr>
+    </property>
+    <property fmtid="%s" pid="4" name="MSIP_Label_%s_Method">
+      <vt:lpwstr>Privileged</vt:lpwstr>
+    </property>
+    <property fmtid="%s" pid="5" name="MSIP_Label_%s_Name">
+      <vt:lpwstr>General</vt:lpwstr>
+    </property>
+    <property fmtid="%s" pid="6" name="MSIP_Label_%s_SiteId">
+      <vt:lpwstr>%s</vt:lpwstr>
+    </property>
+    <property fmtid="%s" pid="7" name="MSIP_Label_%s_ActionId">
+      <vt:lpwstr>%s</vt:lpwstr>
+    </property>
+    <property fmtid="%s" pid="8" name="MSIP_Label_%s_ContentBits">
+      <vt:lpwstr>0</vt:lpwstr>
+    </property>',
+      guid, lid,
+      guid, lid,
+      guid, lid,
+      guid, lid,
+      guid, lid, lid,
+      guid, lid, lid,
+      guid, lid
+    )
+    read_xml(mips_xml, pointer = FALSE)
+  }
+
+  fmips <- create_fake_mips()
+
+  wb <- wb_workbook()$add_worksheet()$add_mips(xml = fmips)
+
+  expect_message(wb_get_mips(wb, quiet = FALSE), "Found MIPS section: General")
+
+  expect_equal(fmips, wb$get_mips())
+
+  tmp <- temp_xlsx()
+
+  wb$save(tmp)
+
+  expect_equal(fmips, wb_load(tmp)$get_mips())
+
+  wb <- wb_load(tmp)
+
+  expect_message(wb$add_mips(xml = fmips), "File has duplicated custom section")
+  expect_equal(fmips, wb$get_mips())
+
+
+  op <- options("openxlsx2.mips_xml_string" = fmips)
+  on.exit(options(op), add = TRUE)
+
+  wb <- wb_workbook()$add_worksheet()$add_mips(xml = fmips)
+
+  wb <- wb_workbook()$add_worksheet()$add_mips()
+  expect_equal(fmips, wb$get_mips())
+
+
+  wb <- wb_workbook() |>
+    wb_add_worksheet() |>
+    wb_set_properties(
+      custom = list(
+        Software    = "openxlsx2",
+        Version     = 1.5,
+        ReleaseDate = as.Date("2024-03-26"),
+        CRAN        = TRUE,
+        DEV         = FALSE
+      )
+    )
+
+  wb <- wb_workbook()$add_worksheet()$
+    set_properties(
+      custom = list(int     = 1L)
+    )
+  expect_silent(wb$add_mips())
+
+  exp <- "3"
+  got <- rbindlist(xml_attr(wb$get_mips(single_xml = FALSE)[1], "property"))$pid
   expect_equal(exp, got)
 
 })

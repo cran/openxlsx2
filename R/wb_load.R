@@ -187,6 +187,13 @@ wb_load <- function(
   pivotDefRelsXML   <- grep_xml("pivotCacheDefinition[0-9]+.xml.rels$")
   pivotCacheRecords <- grep_xml("pivotCacheRecords[0-9]+.xml$")
 
+  # rich data
+  rdrichvalue       <- grep_xml("richData/rdrichvalue.xml")
+  rdrichvaluestr    <- grep_xml("richData/rdrichvaluestructure.xml")
+  rdRichValueTypes  <- grep_xml("richData/rdRichValueTypes.xml")
+  richValueRel      <- grep_xml("richData/richValueRel.xml")
+  richValueRelrels  <- grep_xml("richData/_rels/richValueRel.xml.rels")
+
   ## slicers
   slicerXML         <- grep_xml("slicer[0-9]+.xml$")
   slicerCachesXML   <- grep_xml("slicerCache[0-9]+.xml$")
@@ -203,6 +210,27 @@ wb_load <- function(
     ),
     add = TRUE
   )
+
+  file_folders <- unique(basename(dirname(xmlFiles)))
+  known <- c(
+    basename(xmlDir), "_rels", "charts", "chartsheets", "ctrlProps",
+    "customXml", "docProps", "drawings", "embeddings", "externalLinks",
+    "media", "persons", "pivotCache", "pivotTables", "printerSettings",
+    "queryTables", "richData", "slicerCaches", "slicers", "tables", "theme",
+    "threadedComments", "worksheets", "xl"
+  )
+  unknown <- file_folders[!file_folders %in% known]
+  # nocov start
+  if (length(unknown)) {
+    message <- paste0(
+      "Found unknown folders in the input file:\n",
+      paste(unknown, collapse = "\n"), "\n\n",
+      "These folders are not yet processed by openxlsx2, but depending on what you want to do, this may not be fatal.\n",
+      "Most likely a file with these folders has not yet been detected. If you want to contribute to the development of the package, maybe just to silence this warning, please open an issue about unknown content folders and, if possible, provide a file via our Github or by mail."
+    )
+    warning(message, call. = FALSE)
+  }
+  # nocov end
 
   # modifications for xlsb
   if (length(workbookBIN)) {
@@ -1512,6 +1540,75 @@ wb_load <- function(
     }
 
   }
+
+  ## richData ------------------------------------------------------------------------------------
+  # This is new in openxlsx2 1.6 and probably not yet entire correct
+  if (!data_only && (length(richValueRel) || length(rdrichvalue) || length(rdrichvaluestr) || length(rdRichValueTypes))) {
+
+    rd <- data.frame(
+      richValueRel     = "",
+      richValueRelrels = "",
+      rdrichvalue      = "",
+      rdrichvaluestr   = "",
+      rdRichValueTypes = "",
+      stringsAsFactors = FALSE
+    )
+
+    if (length(richValueRel)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/richValueRel.xml" ContentType="application/vnd.ms-excel.richvaluerel+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId5" Type="http://schemas.microsoft.com/office/2022/10/relationships/richValueRel" Target="richData/richValueRel.xml"/>'
+      )
+      rd$richValueRel <- read_xml(richValueRel, pointer = FALSE)
+    }
+
+    if (length(richValueRelrels)) {
+      rd$richValueRelrels <- read_xml(richValueRelrels, pointer = FALSE)
+    }
+
+    if (length(rdrichvalue)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/rdrichvalue.xml" ContentType="application/vnd.ms-excel.rdrichvalue+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId6" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue" Target="richData/rdrichvalue.xml"/>'
+      )
+      rd$rdrichvalue <- read_xml(rdrichvalue, pointer = FALSE)
+    }
+
+    if (length(rdrichvaluestr)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/rdrichvaluestructure.xml" ContentType="application/vnd.ms-excel.rdrichvaluestructure+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId7" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure" Target="richData/rdrichvaluestructure.xml"/>'
+      )
+      rd$rdrichvaluestr <- read_xml(rdrichvaluestr, pointer = FALSE)
+    }
+
+    if (length(rdRichValueTypes)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/rdRichValueTypes.xml" ContentType="application/vnd.ms-excel.rdrichvaluetypes+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId8" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes" Target="richData/rdRichValueTypes.xml"/>'
+      )
+      rd$rdRichValueTypes <- read_xml(rdRichValueTypes, pointer = FALSE)
+    }
+
+    wb$richData <- rd
+  }
+
 
   # final cleanup
   if (length(workbookBIN)) {

@@ -115,6 +115,7 @@ wb_save <- function(wb, file = NULL, overwrite = TRUE, path = NULL) {
 #'   looks if `options(openxlsx2.na.strings)` is set. Otherwise [na_strings()]
 #'   uses the special `#N/A` value within the workbook.
 #' @param inline_strings write characters as inline strings
+#' @param enforce enforce that selected dims is filled. For this to work, `dims` must match `x`
 #' @param ... additional arguments
 #' @export
 #' @details Formulae written using [wb_add_formula()] to a Workbook object will
@@ -216,6 +217,7 @@ wb_add_data <- function(
     remove_cell_style = FALSE,
     na.strings        = na_strings(),
     inline_strings    = TRUE,
+    enforce           = FALSE,
     ...
 ) {
   assert_workbook(wb)
@@ -235,6 +237,7 @@ wb_add_data <- function(
     remove_cell_style = remove_cell_style,
     na.strings        = na.strings,
     inline_strings    = inline_strings,
+    enforce           = enforce,
     ...               = ...
   )
 }
@@ -332,7 +335,7 @@ wb_add_data_table <- function(
     remove_cell_style = remove_cell_style,
     na.strings        = na.strings,
     inline_strings    = inline_strings,
-    total_row        = total_row,
+    total_row         = total_row,
     ...               = ...
   )
 }
@@ -568,6 +571,7 @@ wb_add_slicer <- function(
 #'   Add this, if you see "@" inserted into your formulas.
 #' @param apply_cell_style Should we write cell styles to the workbook?
 #' @param remove_cell_style Should we keep the cell style?
+#' @param enforce enforce dims
 #' @param ... additional arguments
 #' @return The workbook, invisibly.
 #' @family workbook wrappers
@@ -599,6 +603,7 @@ wb_add_formula <- function(
     cm                = FALSE,
     apply_cell_style  = TRUE,
     remove_cell_style = FALSE,
+    enforce           = FALSE,
     ...
 ) {
   assert_workbook(wb)
@@ -612,6 +617,7 @@ wb_add_formula <- function(
     cm                = cm,
     apply_cell_style  = apply_cell_style,
     remove_cell_style = remove_cell_style,
+    enforce           = enforce,
     ...               = ...
   )
 }
@@ -2541,6 +2547,7 @@ wb_ungroup_rows <- function(wb, sheet = current_sheet(), rows) {
 #' @name properties-wb
 #' @param wb A Workbook object
 #' @param modifier A character string indicating who was the last person to modify the workbook
+#' @param custom A named vector of custom properties added to the workbook
 #' @seealso [wb_workbook()]
 #' @inheritParams wb_workbook
 #' @return A wbWorkbook object, invisibly.
@@ -2561,7 +2568,7 @@ wb_get_properties <- function(wb) {
 
 #' @rdname properties-wb
 #' @export
-wb_set_properties <- function(wb, creator = NULL, title = NULL, subject = NULL, category = NULL, datetime_created = Sys.time(), modifier = NULL, keywords = NULL, comments = NULL, manager = NULL, company = NULL) {
+wb_set_properties <- function(wb, creator = NULL, title = NULL, subject = NULL, category = NULL, datetime_created = Sys.time(), modifier = NULL, keywords = NULL, comments = NULL, manager = NULL, company = NULL, custom = NULL) {
   assert_workbook(wb)
   wb$clone()$set_properties(
     creator           = creator,
@@ -2573,8 +2580,45 @@ wb_set_properties <- function(wb, creator = NULL, title = NULL, subject = NULL, 
     keywords          = keywords,
     comments          = comments,
     manager           = manager,
-    company           = company
+    company           = company,
+    custom            = custom
   )
+}
+
+#' wb get and apply MIP section
+#'
+#' Read sensitivity labels from files and apply them to workbooks
+#'
+#' @details
+#' The MIP section is a special user-defined XML section that is used to create
+#' sensitivity labels in workbooks. It consists of a series of XML property
+#' nodes that define the sensitivity label. This XML string cannot be created
+#' and it is necessary to first load a workbook with a suitable sensitivity
+#' label. Once the workbook is loaded, the string `fmips <- wb_get_mips(wb)`
+#' can be extracted. This xml string can later be assigned to an
+#' `options("openxlsx2.mips_xml_string" = fmips)` option.
+#'
+#' The sensitivity label can then be assigned with `wb_add_mips(wb)`. If no xml
+#' string is passed, the MIP section is taken from the option. This should make
+#' it easier for users to read the section from a specific workbook, save it to
+#' a file or string and copy it to an option via the .Rprofile.
+#'
+#' @param wb a workbook
+#' @param xml a mips string obtained from [wb_get_mips()] or a global option "openxlsx2.mips_xml_string"
+#' @returns the workbook invisible ([wb_add_mips()]) or the xml string ([wb_get_mips()])
+#' @export
+wb_add_mips <- function(wb, xml = NULL) {
+  assert_workbook(wb)
+  wb$clone()$set_properties(custom = xml)
+}
+
+#' @param single_xml option to define if the string should be exported as single string. helpful if storing as option is desired.
+#' @param quiet option to print a MIP section name. This is not always a human readable string.
+#' @rdname wb_add_mips
+#' @export
+wb_get_mips <- function(wb, single_xml = TRUE, quiet = TRUE) {
+  assert_workbook(wb)
+  wb$get_mips(single_xml = single_xml, quiet = quiet)
 }
 
 #' Modify creators of a workbook

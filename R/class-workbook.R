@@ -148,6 +148,9 @@ wbWorkbook <- R6::R6Class(
     #' @field queryTables queryTables
     queryTables = NULL,
 
+    #' @field richData richData
+    richData = NULL,
+
     #' @field slicers slicers
     slicers = NULL,
 
@@ -296,6 +299,8 @@ wbWorkbook <- R6::R6Class(
       self$pivotDefinitionsRels <- NULL
 
       self$queryTables <- NULL
+
+      self$richData <- NULL
 
       self$slicers <- NULL
       self$slicerCaches <- NULL
@@ -996,16 +1001,20 @@ wbWorkbook <- R6::R6Class(
 
       }
 
+      if (!is.null(self$richData)) {
+        warning("Cloning richData (e.g., cells with picture) is not yet supported. The output file will be broken.")
+      }
+
       # The IDs in the drawings array are sheet-specific, so within the new
       # cloned sheet the same IDs can be used => no need to modify drawings
-      vml_id <- from$worksheets[[old]]$relships$vml
+      vml_id <- from$worksheets[[old]]$relships$vmlDrawing
       cmt_id <- from$worksheets[[old]]$relships$comments
       trd_id <- from$worksheets[[old]]$relships$threadedComment
 
       if (length(vml_id)) {
         self$append("vml",      from$vml[[vml_id]])
         self$append("vml_rels", from$vml_rels[[vml_id]])
-        self$worksheets[[newSheetIndex]]$relships$vml <- length(self$vml)
+        self$worksheets[[newSheetIndex]]$relships$vmlDrawing <- length(self$vml)
       }
 
       if (length(cmt_id)) {
@@ -1269,6 +1278,7 @@ wbWorkbook <- R6::R6Class(
     #' @param na.strings Value used for replacing `NA` values from `x`. Default
     #'   `na_strings()` uses the special `#N/A` value within the workbook.
     #' @param inline_strings write characters as inline strings
+    #' @param enforce enforce that selected dims is filled. For this to work, `dims` must match `x`
     #' @param return The `wbWorkbook` object
     add_data = function(
         sheet            = current_sheet(),
@@ -1286,6 +1296,7 @@ wbWorkbook <- R6::R6Class(
         remove_cell_style = FALSE,
         na.strings        = na_strings(),
         inline_strings    = TRUE,
+        enforce           = FALSE,
         ...
       ) {
 
@@ -1315,7 +1326,8 @@ wbWorkbook <- R6::R6Class(
         apply_cell_style  = apply_cell_style,
         remove_cell_style = remove_cell_style,
         na.strings        = na.strings,
-        inline_strings    = inline_strings
+        inline_strings    = inline_strings,
+        enforce           = enforce
       )
       invisible(self)
     },
@@ -1876,6 +1888,7 @@ wbWorkbook <- R6::R6Class(
     #' @param cm cm
     #' @param apply_cell_style applyCellStyle
     #' @param remove_cell_style if writing into existing cells, should the cell style be removed?
+    #' @param enforce enforce dims
     #' @return The `wbWorkbook` object
     add_formula = function(
         sheet             = current_sheet(),
@@ -1887,6 +1900,7 @@ wbWorkbook <- R6::R6Class(
         cm                = FALSE,
         apply_cell_style  = TRUE,
         remove_cell_style = FALSE,
+        enforce           = FALSE,
         ...
     ) {
 
@@ -1901,7 +1915,8 @@ wbWorkbook <- R6::R6Class(
         array           = array,
         cm              = cm,
         applyCellStyle  = apply_cell_style,
-        removeCellStyle = remove_cell_style
+        removeCellStyle = remove_cell_style,
+        enforce         = enforce
       )
       invisible(self)
     },
@@ -2430,6 +2445,57 @@ wbWorkbook <- R6::R6Class(
             fl = file.path(
               externalLinksRelsDir,
               sprintf("externalLink%s.xml.rels", i)
+            )
+          )
+        }
+      }
+
+      if (!is.null(self$richData)) {
+        richDataDir <- dir_create(tmpDir, "xl", "richData")
+        if (length(self$richData$richValueRel)) {
+          write_file(
+            body = self$richData$richValueRel,
+            fl = file.path(
+              richDataDir,
+              "richValueRel.xml"
+            )
+          )
+        }
+        if (length(self$richData$rdrichvalue)) {
+          write_file(
+            body = self$richData$rdrichvalue,
+            fl = file.path(
+              richDataDir,
+              "rdrichvalue.xml"
+            )
+          )
+        }
+        if (length(self$richData$rdrichvaluestr)) {
+          write_file(
+            body = self$richData$rdrichvaluestr,
+            fl = file.path(
+              richDataDir,
+              "rdrichvaluestructure.xml"
+            )
+          )
+        }
+        if (length(self$richData$rdRichValueTypes)) {
+          write_file(
+            body = self$richData$rdRichValueTypes,
+            fl = file.path(
+              richDataDir,
+              "rdRichValueTypes.xml"
+            )
+          )
+        }
+
+        if (length(self$richData$richValueRelrels)) {
+          richDataRelDir <- dir_create(tmpDir, "xl", "richData", "_rels")
+          write_file(
+            body = self$richData$richValueRelrels,
+            fl = file.path(
+              richDataRelDir,
+              "richValueRel.xml.rels"
             )
           )
         }
@@ -3458,7 +3524,7 @@ wbWorkbook <- R6::R6Class(
 
           if (any(ind)) {
             nn <- sprintf("'%s'", new_name[i])
-            nn <- stringi::stri_replace_all_fixed(self$workbook$definedName[ind], old, nn)
+            nn <- stringi::stri_replace_all_fixed(self$workbook$definedNames[ind], old, nn)
             nn <- stringi::stri_replace_all(nn, regex = "'+", replacement = "'")
             self$workbook$definedNames[ind] <- nn
           }
@@ -3731,8 +3797,25 @@ wbWorkbook <- R6::R6Class(
         stop("hidden argument is longer than cols.")
       }
 
+      compatible_length <- length(cols) %% length(widths) == 0
+
+      if (!compatible_length) {
+        # needed because rep(c(1, 2 ), length.out = 3) is successful,
+        # but not clear if this is what the user wanted.
+        warning("`cols` and `widths` should have compatible lengths.\n",
+             "`cols` has length ", length(cols), " while ",
+             "`widths` has length ", length(widths), ".")
+      }
+
       if (length(widths) < length(cols)) {
         widths <- rep(widths, length.out = length(cols))
+      }
+      compatible_length <- length(cols) %% length(hidden) == 0
+
+      if (!compatible_length) {
+        warning("`cols` and `hidden` should have compatible lengths.\n",
+             "`cols` has length ", length(cols), " while ",
+             "`hidden` has length ", length(hidden), ".")
       }
 
       if (length(hidden) < length(cols)) {
@@ -5898,7 +5981,7 @@ wbWorkbook <- R6::R6Class(
     },
 
     #' @description Set a property of a workbook
-    #' @param title,subject,category,datetime_created,modifier,keywords,comments,manager,company A workbook property to set
+    #' @param title,subject,category,datetime_created,modifier,keywords,comments,manager,company,custom A workbook property to set
     set_properties = function(
       creator          = NULL,
       title            = NULL,
@@ -5909,7 +5992,8 @@ wbWorkbook <- R6::R6Class(
       keywords         = NULL,
       comments         = NULL,
       manager          = NULL,
-      company          = NULL
+      company          = NULL,
+      custom           = NULL
     ) {
 
       datetime_created <-
@@ -6006,8 +6090,114 @@ wbWorkbook <- R6::R6Class(
         escapes = TRUE
       )
 
+      if (!is.null(custom)) {
+
+        if (!is.null(names(custom))) {
+          custom <- mapply(
+            custom, names(custom),
+            FUN = function(x, y) {
+
+              child <- xml_node_create("vt:lpwstr", xml_children = x)
+              if (is.logical(x)) {
+                child <- xml_node_create("vt:bool", xml_children = as_xml_attr(x))
+              } else if (is.numeric(x) && is.integer(x)) {
+                child <- xml_node_create("vt:i4", xml_children = as_xml_attr(x))
+              } else if (is.numeric(x) && !is.integer(x)) {
+                child <- xml_node_create("vt:r8", xml_children = as_xml_attr(x))
+              } else if (inherits(x, "Date") || inherits(x, "POSIXt")) {
+                child <- xml_node_create("vt:filetime", xml_children = format(as_POSIXct_utc(x), "%Y-%m-%dT%H:%M:%SZ"))
+              }
+
+              xml_node_create(
+                "property",
+                xml_attributes = c(
+                  fmtid = "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}",
+                  pid   = "0",
+                  name  = y
+                ),
+                xml_children = child
+              )
+            },
+            USE.NAMES = FALSE
+          )
+        }
+
+        custom <- xml_node(custom, "property")
+
+        if (length(self$custom) == 0) {
+          self$custom <- xml_node_create(
+            "Properties",
+            xml_attributes = c(
+              xmlns = "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties",
+              `xmlns:vt` = "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
+            ),
+            xml_children = custom
+          )
+          self$append(
+            "Content_Types",
+            "<Override PartName=\"/docProps/custom.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.custom-properties+xml\"/>"
+          )
+        } else {
+
+          props <- xml_node(self$custom, "Properties", "property")
+
+          new_names <- rbindlist(xml_attr(custom, "property"))$name
+          old_names <- rbindlist(xml_attr(props, "property"))$name
+
+          # TODO add update or remove option
+          if (any(duplicated(c(old_names, new_names)))) {
+            message("File has duplicated custom section")
+            cstm <- self$custom
+            idxs <- which(old_names %in% new_names)
+            # remove all duplicates in reverse order
+            for (idx in rev(idxs)) {
+              cstm <- xml_rm_child(cstm, "property", which = idx)
+            }
+            # add replacement childs (order might differ. does it matter?)
+            self$custom <- xml_add_child(cstm, custom)
+          } else {
+            self$custom <- xml_add_child(self$custom, custom) # pxml()
+          }
+
+        }
+
+        self$custom <- wb_upd_custom_pid(self)
+      }
+
       invisible(self)
 
+    },
+
+    #' @description add mips string
+    #' @param xml A mips string added to self$custom
+    add_mips = function(xml = NULL) {
+      if (!is.null(xml)) assert_class(xml, "character")
+
+      # get option and make sure that it can be imported as xml
+      mips <- xml %||% getOption("openxlsx2.mips_xml_string")
+      if (is.null(mips)) stop("no mips xml provided")
+      mips <- xml_node(mips, "property")
+
+      self$set_properties(custom = mips)
+    },
+
+    #' @description get mips string
+    #' @param single_xml single_xml
+    #' @param quiet quiet
+    get_mips = function(single_xml = TRUE, quiet = TRUE) {
+        props <- xml_node(self$custom, "Properties", "property")
+        prop_nams <- grepl("MSIP_Label_", rbindlist(xml_attr(props, "property"))$name)
+
+        name <- grepl("_Name$", rbindlist(xml_attr(props[prop_nams], "property"))$name)
+
+        name <- xml_value(props[prop_nams][name], "property", "vt:lpwstr")
+        if (!quiet) message("Found MIPS section: ", name)
+
+        mips <- props[prop_nams]
+        if (single_xml)
+          paste0(mips, collapse = "")
+        else
+          mips
     },
 
     #' @description Set creator(s)
@@ -8794,6 +8984,7 @@ wbWorkbook <- R6::R6Class(
       tableInds        <- grep("table[0-9]+.xml",                            self$workbook.xml.rels)
       personInds       <- grep("person.xml",                                 self$workbook.xml.rels)
       calcChainInd     <- grep("calcChain.xml",                              self$workbook.xml.rels)
+      richDataInd      <- grep("richData",                                   self$workbook.xml.rels)
 
 
       ## Reordering of workbook.xml.rels
@@ -8813,7 +9004,8 @@ wbWorkbook <- R6::R6Class(
           sharedStringsInd,
           tableInds,
           personInds,
-          calcChainInd
+          calcChainInd,
+          richDataInd
         )]
 
       ## Re assign rIds to children of workbook.xml.rels

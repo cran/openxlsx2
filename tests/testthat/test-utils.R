@@ -13,7 +13,6 @@ test_that("rbindlist", {
 
 })
 
-
 test_that("dims to col & row and back", {
 
   exp <- list(c("A", "B"), c("1", "2"))
@@ -44,7 +43,16 @@ test_that("dims to col & row and back", {
   got <- rowcol_to_dims(2:8, 5:10)
   expect_equal(exp, got)
 
+  # We might have to relax this in the future, if we are ever going to allow
+  # something like "$1:$2" to select every column for a range of cells.
+  expect_error(dims_to_rowcol("A1;B64:65"), "A dims string passed to ")
+
+  exp <- "A1:A3,B1:B3"
+  got <- rowcol_to_dims(row = c(1, 3), col = c(1, 2), single = FALSE)
+  expect_equal(exp, got)
+
 })
+
 test_that("`wb_dims()` works/errors as expected with unnamed arguments", {
 
   # Acceptable inputs
@@ -71,6 +79,8 @@ test_that("`wb_dims()` works/errors as expected with unnamed arguments", {
 
   expect_error(wb_dims(rows = c(1, 3, 4), cols = c(1, 4)), "You must supply positive, consecutive values to `cols`")
 
+  expect_error(wb_dims(1, 2, 3))
+  expect_error(wb_dims(x = mtcars, select = c("bad", "col_names")), "accepts a single")
 })
 
 test_that("`wb_dims()` errors when providing unsupported arguments", {
@@ -95,12 +105,14 @@ test_that("wb_dims() works when not supplying `x`.", {
   expect_equal(wb_dims(rows = 5, cols = 7), "G5")
 
   expect_equal(wb_dims(1:2, 1:4, from_row = 2, from_col = "B"), "B2:E3")
-  # This used to error, but now passes with a message.
+  # Assuming other unnamed argument is rows or cols.
   expect_message(out <- wb_dims(1, rows = 2), "Assuming the .+ `cols`")
+  expect_equal(out, "A2")
+  expect_message(out <- wb_dims(cols = 1, 2), "Assuming the .+ `rows`")
   expect_equal(out, "A2")
   # warns when trying to pass weird things
   expect_warning(wb_dims(rows = "BC", cols = 1), regexp = "supply an integer")
-  # "`wb_dims()` newe
+  # "`wb_dims()` works
   expect_equal(wb_dims(from_col = 4), "D1")
   expect_equal(wb_dims(from_row = 4), "A4")
   expect_equal(wb_dims(from_row = 4, from_col = 3), "C4")
@@ -111,6 +123,8 @@ test_that("wb_dims() works when not supplying `x`.", {
   expect_error(wb_dims(3, 0))
   expect_error(wb_dims(1, 1, col_names = TRUE))
   expect_error(wb_dims(1, 1, row_names = FALSE), "`row_names`")
+  expect_error(wb_dims(2, 10, select = "col_names"), "Can't supply `select` when `x` is absent")
+
 })
 
 test_that("`wb_dims()` can select content in a nice fashion with `x`", {
@@ -175,7 +189,7 @@ test_that("`wb_dims()` works when Supplying an object `x`.", {
   # doesn't work
   expect_equal(wb_dims(x = letters), "A1:A26")
   expect_equal(wb_dims(x = t(letters), col_names = TRUE), "A1:Z2")
-  expect_error(wb_dims(x = letters, col_names = TRUE), "Supplying `col_names` when `x` is a vector is not supported.") # don't want this error anymore.
+  expect_error(wb_dims(x = letters, col_names = TRUE), "Can't supply `col_names` when `x` is a vector") # don't want this error anymore.
 
   expect_equal(wb_dims(x = mtcars, rows = 5, from_col = "C"), "C6:M6")
 
@@ -208,6 +222,8 @@ test_that("`wb_dims()` works when Supplying an object `x`.", {
   # use 1 column name works
 
   expect_error(wb_dims(cols = "hp"), "Supplying a single argument")
+  # using non-existing character column doesn't work
+  expect_error(wb_dims(x = mtcars, cols = "A"), "`cols` must be an integer or an existing column name of `x`.")
   expect_error(
     wb_dims(x = mtcars, cols = c("hp", "vs")),
     regexp = "Supplying multiple column names is not supported"
@@ -254,6 +270,10 @@ test_that("`wb_dims()` handles row_names = TRUE consistenly.", {
   expect_equal(wb_dims(x = mtcars, row_names = TRUE, col_names = TRUE), "A1:L33")
   expect_equal(wb_dims(x = mtcars, rows = 2:10, cols = "cyl", row_names = TRUE), "C3:C11")
   # Style row names of an object
+})
+
+test_that("wb_dims() handles empty data frames", {
+  expect_equal(wb_dims(x = data.frame(), from_col = "B"), "B1")
 })
 
 test_that("wb_dims() handles `from_dims`", {

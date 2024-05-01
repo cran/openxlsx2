@@ -1,4 +1,38 @@
+# openxlsx2 1.6
+
+## New features
+
+* Helper to read sensitivity labels from files and apply them to workbooks. 
+[983](https://github.com/JanMarvin/openxlsx2/pull/983)
+
+* It is now possible to pass non consecutive dims like `"A1:B1,C2:D2"` to various style helpers like `wb_add_fill()`. In addition it is now possible to write a data set into a predefined dims region using `enforce = TRUE`. This handles either `","` or `";"` as cell separator. [993](https://github.com/JanMarvin/openxlsx2/pull/993)
+
+```r
+# force a dataset into a specific cell dimension
+wb <- wb_workbook()$add_worksheet()
+wb$add_data(dims = "I2:J2;A1:B2;G5:H6", x = matrix(1:8, 4, 2), enforce = TRUE)
+```
+
+## Fixes
+
+* Allow writing data frames with zero rows. [987](https://github.com/JanMarvin/openxlsx2/pull/987)
+
+* `wb_dims()` has been improved and is safer on 0-length inputs. In particular, it will error for a case where a `cols` doesn't exist in `x`  ([990](https://github.com/JanMarvin/openxlsx2/pull/990), @olivroy).
+
+```r
+# Previously created a wrong dims
+wb_dims(x = mtcars, cols = "non-existent-col")
+# Now errors
+```
+
+* `wb_set_col_widths()` is more strict about its arguments. If you provide `cols`, `widths`, or `hidden` don't have appropriate length, it will throw a warning. This may change to an error in the future, so it is recommended to use appropriate values. ([991](https://github.com/JanMarvin/openxlsx2/pull/991), @olivroy).
+
+
+***************************************************************************
+
 # openxlsx2 1.5
+
+(This was updated post release.)
 
 ## New features
 
@@ -10,14 +44,7 @@
 
 * You can now set `options(openxlsx2.na.strings)` to a value  to have a default value for `na.strings` in `wb_add_data()`, `wb_add_data_table()`, and `write_xlsx()` [968](https://github.com/JanMarvin/openxlsx2/pull/968).
 
-## Fixes
-
-* Export `wb_add_ignore_error()`. [955](https://github.com/JanMarvin/openxlsx2/pull/955)
-
-## Breaking changes
-
 * The direction vectors are written is now controlled via `dims`. Previously it was required to transpose a vector to write it horizontally: `wb_add_data(x = t(letters), col_names = FALSE)`. Now the direction is defined by `dims`. The default is still to write vectors vertically, but for a horizontal vector it is possible to write `wb_add_data(x = letters, dims = "A1:Z1")`. This change impacts vectors, hyperlinks and formulas and basically everything that is not a two dimensional `x` object.
-This is only breaking, if previous code made use of the transposed trick above and already defined a correct `dims`. Since the `wb_add_data()` function is agnostic of the direction of `x`, this `wb_add_data(x = t(letters), dims = "A1:Z1", col_names = FALSE)` would write the `letters` into cells `A1:A26`, because of a round trip through transpose.
 
 ```r
 # before (workaround needed)
@@ -25,6 +52,11 @@ wb$add_data(dims = wb_dims(rows = 1, cols = 1:3), x = t(c(4, 5, 8)), col_names =
 # now (listens to dims)
 wb$add_data(dims = wb_dims(rows = 1, cols = 1:3), x = c(4, 5, 8))
 ```
+
+## Fixes
+
+* Export `wb_add_ignore_error()`. [955](https://github.com/JanMarvin/openxlsx2/pull/955)
+
 
 ***************************************************************************
 

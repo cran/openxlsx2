@@ -150,6 +150,22 @@ test_that("wb_get_properties() is a wrapper", {
   expect_wrapper("get_properties", wb = wb)
 })
 
+# wb_add_mips() ---------------------------------------------------------------
+
+test_that("wb_add_mips() is a wrapper", {
+  wb <- wb_workbook()
+  xml <- "<property fmtid=\"1\" pid=\"2\" name=\"MSIP_Label_1_Enabled\"><vt:lpwstr>true</vt:lpwstr></property>"
+  expect_wrapper("add_mips", wb = wb, params = list(xml = xml))
+})
+
+# wb_get_mips() ---------------------------------------------------------------
+
+test_that("wb_get_mips() is a wrapper", {
+  xml <- "<property fmtid=\"1\" pid=\"2\" name=\"MSIP_Label_1_Enabled\"><vt:lpwstr>true</vt:lpwstr></property>"
+  wb <- wb_workbook()$add_mips(xml = xml)
+  expect_wrapper("get_mips", wb = wb)
+})
+
 # wb_set_last_modified_by() ---------------------------------------------------
 
 test_that("wb_set_last_modified_by() is a wrapper", {
@@ -275,7 +291,7 @@ test_that("wb_get_tables(), wb_remove_tables() are wrappers", {
 
 test_that("wb_add_filter(), wb_remove_filter() is a wrapper", {
   wb <- wb_workbook()$add_worksheet("a")
-  params <- list(sheet = "a", col = 1, row = 1)
+  params <- list(sheet = "a", cols = 1, rows = 1)
   expect_wrapper("add_filter", wb = wb, params = params)
   wb$add_filter("a", 1, 1)
   expect_wrapper("remove_filter", wb = wb, params = list(sheet = "a"))

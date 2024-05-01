@@ -105,6 +105,8 @@ Note that the documentation is more complete in each of the wrapper functions.
 
 \item{\code{queryTables}}{queryTables}
 
+\item{\code{richData}}{richData}
+
 \item{\code{slicers}}{slicers}
 
 \item{\code{slicerCaches}}{slicerCaches}
@@ -207,6 +209,8 @@ worksheet names.}
 \item \href{#method-wbWorkbook-protect_worksheet}{\code{wbWorkbook$protect_worksheet()}}
 \item \href{#method-wbWorkbook-get_properties}{\code{wbWorkbook$get_properties()}}
 \item \href{#method-wbWorkbook-set_properties}{\code{wbWorkbook$set_properties()}}
+\item \href{#method-wbWorkbook-add_mips}{\code{wbWorkbook$add_mips()}}
+\item \href{#method-wbWorkbook-get_mips}{\code{wbWorkbook$get_mips()}}
 \item \href{#method-wbWorkbook-set_creators}{\code{wbWorkbook$set_creators()}}
 \item \href{#method-wbWorkbook-add_creators}{\code{wbWorkbook$add_creators()}}
 \item \href{#method-wbWorkbook-remove_creators}{\code{wbWorkbook$remove_creators()}}
@@ -509,6 +513,7 @@ add data
   remove_cell_style = FALSE,
   na.strings = na_strings(),
   inline_strings = TRUE,
+  enforce = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -546,6 +551,8 @@ add data
 \code{na_strings()} uses the special \verb{#N/A} value within the workbook.}
 
 \item{\code{inline_strings}}{write characters as inline strings}
+
+\item{\code{enforce}}{enforce that selected dims is filled. For this to work, \code{dims} must match \code{x}}
 
 \item{\code{...}}{additional arguments}
 
@@ -747,6 +754,7 @@ Add formula
   cm = FALSE,
   apply_cell_style = TRUE,
   remove_cell_style = FALSE,
+  enforce = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -771,6 +779,8 @@ Add formula
 \item{\code{apply_cell_style}}{applyCellStyle}
 
 \item{\code{remove_cell_style}}{if writing into existing cells, should the cell style be removed?}
+
+\item{\code{enforce}}{enforce dims}
 
 \item{\code{...}}{additional arguments}
 }
@@ -2257,7 +2267,8 @@ Set a property of a workbook
   keywords = NULL,
   comments = NULL,
   manager = NULL,
-  company = NULL
+  company = NULL,
+  custom = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -2266,7 +2277,43 @@ Set a property of a workbook
 \describe{
 \item{\code{creator}}{character vector of creators. Duplicated are ignored.}
 
-\item{\code{title, subject, category, datetime_created, modifier, keywords, comments, manager, company}}{A workbook property to set}
+\item{\code{title, subject, category, datetime_created, modifier, keywords, comments, manager, company, custom}}{A workbook property to set}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-add_mips"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-add_mips}{}}}
+\subsection{Method \code{add_mips()}}{
+add mips string
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_mips(xml = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{xml}}{A mips string added to self$custom}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-get_mips"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-get_mips}{}}}
+\subsection{Method \code{get_mips()}}{
+get mips string
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_mips(single_xml = TRUE, quiet = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{single_xml}}{single_xml}
+
+\item{\code{quiet}}{quiet}
 }
 \if{html}{\out{</div>}}
 }
