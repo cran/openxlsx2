@@ -414,7 +414,7 @@ wb_add_data_table <- function(
 #' @param fun A vector of functions to be used with `data`. See **Details** for the list of available options.
 #' @param params A list of parameters to modify pivot table creation. See **Details** for available options.
 #' @param pivot_table An optional name for the pivot table
-#' @param slicer Any additional column name(s) of `x` used as slicer
+#' @param slicer,timeline Any additional column name(s) of `x` used as slicer/timeline
 #' @seealso [wb_data()]
 #' @examples
 #' wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = mtcars)
@@ -446,17 +446,19 @@ wb_add_pivot_table <- function(
     fun,
     params,
     pivot_table,
-    slicer
+    slicer,
+    timeline
 ) {
   assert_workbook(wb)
-  if (missing(filter))      filter <- substitute()
-  if (missing(rows))        rows   <- substitute()
-  if (missing(cols))        cols   <- substitute()
-  if (missing(data))        data   <- substitute()
-  if (missing(fun))         fun    <- substitute()
-  if (missing(params))      params <- substitute()
+  if (missing(filter))      filter      <- substitute()
+  if (missing(rows))        rows        <- substitute()
+  if (missing(cols))        cols        <- substitute()
+  if (missing(data))        data        <- substitute()
+  if (missing(fun))         fun         <- substitute()
+  if (missing(params))      params      <- substitute()
   if (missing(pivot_table)) pivot_table <- substitute()
-  if (missing(slicer))      slicer <- substitute()
+  if (missing(slicer))      slicer      <- substitute()
+  if (missing(timeline))    timeline    <- substitute()
 
   wb$clone()$add_pivot_table(
     x           = x,
@@ -469,48 +471,110 @@ wb_add_pivot_table <- function(
     fun         = fun,
     params      = params,
     pivot_table = pivot_table,
-    slicer      = slicer
+    slicer      = slicer,
+    timeline    = timeline
   )
 
 }
 
-#' Add a slicer to a pivot table
+#' Add a slicer/timeline to a pivot table
 #'
-#' Add a slicer to a previously created pivot table. This function is still experimental and might be changed/improved in upcoming releases.
+#' Add a slicer/timeline to a previously created pivot table. This function is still experimental and might be changed/improved in upcoming releases.
 #'
 #' @details
-#' This assumes that the slicer variable initialization has happened before. Unfortunately, it is unlikely that we can guarantee this for loaded workbooks, and we *strictly* discourage users from attempting this. If the variable has not been initialized properly, this may cause the spreadsheet software to crash.
+#' This assumes that the slicer/timeline variable initialization has happened before. Unfortunately, it is unlikely that we can guarantee this for loaded workbooks, and we *strictly* discourage users from attempting this. If the variable has not been initialized properly, this may cause the spreadsheet software to crash.
+#' Although it is documented that slicers should use "TimelineStyleLight\[1-6\]" and "TimelineStyleDark\[1-6\]" they use slicer styles.
 #'
-#' Possible `params` arguments are listed below.
+#' Possible `params` arguments for slicers are listed below.
 #' * edit_as: "twoCell" to place the slicer into the cells
-#' * style: "SlicerStyleLight2"
 #' * column_count: integer used as column count
-#' * caption: string used for a caption
 #' * sort_order: "descending" / "ascending"
 #' * choose: select variables in the form of a named logical vector like
 #'  `c(agegp = 'x > "25-34"')` for the `esoph` dataset.
+#' * locked_position
+#' * start_item
 #'
-#' @param wb A Workbook object containing a #' worksheet.
+#' Possible `params` arguments for timelines are listed below.
+#' * beg_date/end_date: dates when the timeline should begin or end
+#' * choose_beg/choose_end: dates when the selection should begin or end
+#' * scroll_position
+#' * show_selection_label
+#' * show_time_level
+#' * show_horizontal_scrollbar
+#'
+#' Possible common `params`:
+#' * caption: string used for a caption
+#' * style: "SlicerStyleLight\[1-6\]", "SlicerStyleDark\[1-6\]" only for slicer "SlicerStyleOther\[1-2\]"
+#' * level: the granularity of the slicer (for timeline 0 = year, 1 = quarter, 2 = month)
+#' * show_caption: logical if caption should be shown or not
+#'
+#' Removing works on the spreadsheet level. Therefore all slicers/timelines are removed from a worksheet. At the moment the drawing reference remains on the spreadsheet. Therefore spreadsheet software that does not handle slicers/timelines will still show the drawing.
+#'
+#' @param wb A Workbook object containing a worksheet.
 #' @param x A `data.frame` that inherits the [`wb_data`][wb_data()] class.
-#' @param sheet A worksheet containing a #'
+#' @param sheet A worksheet
 #' @param dims The worksheet cell where the pivot table is placed
-#' @param pivot_table The name of a pivot table on the selected sheet
-#' @param slicer A variable used as slicer for the pivot table
+#' @param pivot_table The name of a pivot table
+#' @param slicer,timeline A variable used as slicer/timeline for the pivot table
 #' @param params A list of parameters to modify pivot table creation. See **Details** for available options.
 #' @family workbook wrappers
 #' @family worksheet content functions
 #' @examples
-#' wb <- wb_workbook() %>%
-#'   wb_add_worksheet() %>% wb_add_data(x = mtcars)
+#' # prepare data
+#' df <- data.frame(
+#'   AirPassengers = c(AirPassengers),
+#'   time = seq(from = as.Date("1949-01-01"), to = as.Date("1960-12-01"), by = "month"),
+#'   letters = letters[1:4]
+#' )
 #'
-#' df <- wb_data(wb, sheet = 1)
+#' # create workbook
+#' wb <- wb_workbook()$
+#'   add_worksheet("pivot")$
+#'   add_worksheet("data")$
+#'   add_data(x = df)
 #'
-#' wb <- wb %>%
-#'   wb_add_pivot_table(
-#'     df, dims = "A3", slicer = "vs", rows = "cyl", cols = "gear", data = "disp",
-#'     pivot_table = "mtcars"
-#'   ) %>%
-#'   wb_add_slicer(x = df, slicer = "vs", pivot_table = "mtcars")
+#' # get pivot table data source
+#' df <- wb_data(wb, sheet = "data")
+#'
+#' # create pivot table
+#' wb$add_pivot_table(
+#'   df,
+#'   sheet = "pivot",
+#'   rows = "time",
+#'   cols = "letters",
+#'   data = "AirPassengers",
+#'   pivot_table = "airpassengers",
+#'   params = list(
+#'     compact = FALSE, outline = FALSE, compact_data = FALSE,
+#'     row_grand_totals = FALSE, col_grand_totals = FALSE)
+#' )
+#'
+#' # add slicer
+#' wb$add_slicer(
+#'   df,
+#'   dims = "E1:I7",
+#'   sheet = "pivot",
+#'   slicer = "letters",
+#'   pivot_table = "airpassengers",
+#'   params = list(choose = c(letters = 'x %in% c("a", "b")'))
+#' )
+#'
+#' # add timeline
+#' wb$add_timeline(
+#'   df,
+#'   dims = "E9:I14",
+#'   sheet = "pivot",
+#'   timeline = "time",
+#'   pivot_table = "airpassengers",
+#'   params = list(
+#'     beg_date = as.Date("1954-01-01"),
+#'     end_date = as.Date("1961-01-01"),
+#'     choose_beg = as.Date("1957-01-01"),
+#'     choose_end = as.Date("1958-01-01"),
+#'     level = 0,
+#'     style = "TimeSlicerStyleLight2"
+#'   )
+#' )
 #' @export
 wb_add_slicer <- function(
     wb,
@@ -533,6 +597,55 @@ wb_add_slicer <- function(
     params      = params
   )
 
+}
+
+#' @rdname wb_add_slicer
+#' @export
+wb_remove_slicer <- function(
+    wb,
+    sheet       = current_sheet()
+) {
+  assert_workbook(wb)
+  wb$clone()$remove_slicer(
+    sheet       = sheet
+  )
+}
+
+#' @rdname wb_add_slicer
+#' @export
+wb_add_timeline <- function(
+    wb,
+    x,
+    dims        = "A1",
+    sheet       = current_sheet(),
+    pivot_table,
+    timeline,
+    params
+) {
+  assert_workbook(wb)
+  if (missing(params)) params <- substitute()
+
+  wb$clone()$add_timeline(
+    x           = x,
+    sheet       = sheet,
+    dims        = dims,
+    pivot_table = pivot_table,
+    timeline    = timeline,
+    params      = params
+  )
+
+}
+
+#' @rdname wb_add_slicer
+#' @export
+wb_remove_timeline <- function(
+    wb,
+    sheet       = current_sheet()
+) {
+  assert_workbook(wb)
+  wb$clone()$remove_timeline(
+    sheet       = sheet
+  )
 }
 
 #' Add a formula to a cell range in a worksheet
@@ -2609,7 +2722,7 @@ wb_set_properties <- function(wb, creator = NULL, title = NULL, subject = NULL, 
 #' @export
 wb_add_mips <- function(wb, xml = NULL) {
   assert_workbook(wb)
-  wb$clone()$set_properties(custom = xml)
+  wb$clone()$add_mips(xml = xml)
 }
 
 #' @param single_xml option to define if the string should be exported as single string. helpful if storing as option is desired.
@@ -3707,8 +3820,8 @@ wb_add_form_control <- function(
 #' @param sheet A name or index of a worksheet
 #' @param dims A cell or cell range like "A1" or "A1:B2"
 #' @param rule The condition under which to apply the formatting. See **Examples**.
-#' @param style A style to apply to those cells that satisfy the rule.
-#'   Default is `font_color = "FF9C0006"` and `bg_fill = "FFFFC7CE"`
+#' @param style A name of a style to apply to those cells that satisfy the rule. See [wb_add_dxfs_style()] how to create one.
+#'   The default style has `font_color = "FF9C0006"` and `bg_fill = "FFFFC7CE"`
 #' @param type The type of conditional formatting rule to apply. One of `"expression"`, `"colorScale"` or others mentioned in **Details**.
 #' @param params A list of additional parameters passed.  See **Details** for more.
 #' @param ... additional arguments
@@ -3804,6 +3917,26 @@ wb_add_conditional_formatting <- function(
     type   = type,
     params = params,
     ...    = ...
+  )
+}
+
+#' @rdname wb_add_conditional_formatting
+#' @param first remove the first conditional formatting
+#' @param last remove the last conditional formatting
+#' @export
+wb_remove_conditional_formatting <- function(
+    wb,
+    sheet  = current_sheet(),
+    dims   = NULL,
+    first  = FALSE,
+    last   = FALSE
+) {
+  assert_workbook(wb)
+  wb$clone()$remove_conditional_formatting(
+    sheet  = sheet,
+    dims   = dims,
+    first  = first,
+    last   = last
   )
 }
 

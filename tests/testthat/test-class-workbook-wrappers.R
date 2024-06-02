@@ -403,6 +403,28 @@ test_that("wb_add_slicer() is a wrapper", {
   expect_wrapper("add_slicer", wb = wb, params = list(x = df, slicer = "vs", pivot_table = "pivot1"))
 })
 
+test_that("wb_remove_slicer() is a wrapper", {
+  wb <- wb_workbook()$add_worksheet()
+  expect_wrapper("remove_slicer", wb = wb)
+})
+
+test_that("wb_add_timeline() is a wrapper", {
+  df <- data.frame(
+    date = seq(from = as.Date("2024-01-01"), length.out = 26, by = "month"),
+    amnt = sample(seq(100:150), 26, replace = TRUE)
+  )
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = df)
+  df <- wb_data(wb)
+  wb$add_pivot_table(x = df, data = "amnt", timeline = "date", pivot_table = "pivot1")
+  expect_wrapper("add_timeline", wb = wb, params = list(x = df, timeline = "date", pivot_table = "pivot1"))
+})
+
+test_that("wb_remove_timeline() is a wrapper", {
+  wb <- wb_workbook()$add_worksheet()
+  expect_wrapper("remove_timeline", wb = wb)
+})
+
 test_that("wb_add_formula() is a wrapper", {
   wb <- wb_workbook()$add_worksheet(1)
   expect_wrapper("add_formula",    wb = wb, params = list(sheet = 1, x = "=TODAY()"))
@@ -539,6 +561,16 @@ test_that("wb_add_conditional_formatting() is a wrapper", {
     wb = wb,
     params = params,
     ignore_fields = "styles_mgr"
+  )
+})
+
+# wb_remove_conditional_formatting() -----------------------------------------
+
+test_that("wb_remove_conditional_formatting() is a wrapper", {
+  wb <- wb_workbook()$add_worksheet()
+  expect_wrapper(
+    "remove_conditional_formatting",
+    wb = wb
   )
 })
 

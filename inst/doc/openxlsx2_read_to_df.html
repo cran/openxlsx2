@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>openxlsx2 read to data frame manual</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">openxlsx2 read to data frame manual</h1>
+
+
+
+<div id="importing-data" class="section level2">
+<h2>Importing data</h2>
+<p>Coming from <code>openxlsx</code> you might know about
+<code>read.xlsx()</code> (two functions, one for files and one for
+workbooks) and <code>readWorkbook()</code>. Functions that do different
+things, but mostly the same. In <code>openxlsx2</code> we tried our best
+to reduce the complexity under the hood and for the user as well. In
+<code>openxlsx2</code> they are replaced with <code>read_xlsx()</code>,
+<code>wb_read()</code> and they share the same underlying function
+<code>wb_to_df()</code>.</p>
+<p>For this example we will use example data provided by the package.
+You can locate it in our “inst/extdata” folder. The files are included
+with the package source and you can open them in any calculation
+software as well.</p>
+<div id="basic-import" class="section level3">
+<h3>Basic import</h3>
+<p>We begin with the <code>openxlsx2_example.xlsx</code> file by telling
+R where to find this file on our system</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;openxlsx2_example.xlsx&quot;</span>, <span class="at">package =</span> <span class="st">&quot;openxlsx2&quot;</span>)</span></code></pre></div>
+<p>The object contains a path to the xlsx file and we pass this file to
+our function to read the workbook into R</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># import workbook</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">library</span>(openxlsx2)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">wb_to_df</span>(file)</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 NA  Var3  Var4       Var5         Var6    Var7     Var8</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1 NA     1     a 2023-05-29 3209324 This #DIV/0! 01:27:15</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&gt; 4   TRUE   NA NA #NUM!     b 2023-05-23         &lt;NA&gt;       0 14:02:57</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; 5   TRUE    2 NA  1.34     c 2023-02-01         &lt;NA&gt; #VALUE! 23:01:02</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2 NA  &lt;NA&gt; #NUM!       &lt;NA&gt;         &lt;NA&gt;       2 17:24:53</span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3 NA  1.56     e       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt; 8  FALSE    1 NA   1.7     f 2023-03-02         &lt;NA&gt;     2.7 08:45:58</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt; 9     NA   NA NA  &lt;NA&gt;  &lt;NA&gt;       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    2 NA    23     h 2023-12-24         &lt;NA&gt;      25     &lt;NA&gt;</span></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co">#&gt; 11 FALSE    3 NA  67.3     i 2023-12-25         &lt;NA&gt;       3     &lt;NA&gt;</span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co">#&gt; 12    NA    1 NA   123  &lt;NA&gt; 2023-07-31         &lt;NA&gt;     122     &lt;NA&gt;</span></span></code></pre></div>
+<p>The output is created as a data frame and contains data types date,
+logical, numeric and character. The function to import the file to R,
+<code>wb_to_df()</code> provides similar options as the
+<code>openxlsx</code> functions <code>read.xlsx()</code> and
+<code>readWorkbook()</code> and a few new functions we will go through
+the options. As you might have noticed, we return the column of the xlsx
+file as the row name of the data frame returned. Per default the first
+sheet in the workbook is imported. If you want to switch this, either
+provide the <code>sheet</code> parameter with the correct index or
+provide the sheet name.</p>
+</div>
+<div id="col_names---first-row-as-column-name" class="section level3">
+<h3><code>col_names</code> - first row as column name</h3>
+<p>In the previous example the first imported row was used as column
+name for the data frame. This is the default behavior, but not always
+wanted or expected. Therefore this behavior can be disabled by the
+user.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># do not convert first row to column names</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">col_names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt;        B    C  D     E     F          G            H       I        J</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; 2   Var1 Var2 NA  Var3  Var4       Var5         Var6    Var7     Var8</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1 NA     1     a 2023-05-29 3209324 This #DIV/0! 01:27:15</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; 4   TRUE &lt;NA&gt; NA #NUM!     b 2023-05-23         &lt;NA&gt;       0 14:02:57</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; 5   TRUE    2 NA  1.34     c 2023-02-01         &lt;NA&gt; #VALUE! 23:01:02</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2 NA  &lt;NA&gt; #NUM!       &lt;NA&gt;         &lt;NA&gt;       2 17:24:53</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3 NA  1.56     e       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; 8  FALSE    1 NA   1.7     f 2023-03-02         &lt;NA&gt;     2.7 08:45:58</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt; 9   &lt;NA&gt; &lt;NA&gt; NA  &lt;NA&gt;  &lt;NA&gt;       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    2 NA    23     h 2023-12-24         &lt;NA&gt;      25     &lt;NA&gt;</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt; 11 FALSE    3 NA  67.3     i 2023-12-25         &lt;NA&gt;       3     &lt;NA&gt;</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; 12  &lt;NA&gt;    1 NA   123  &lt;NA&gt; 2023-07-31         &lt;NA&gt;     122     &lt;NA&gt;</span></span></code></pre></div>
+</div>
+<div id="detect_dates---convert-cells-to-r-dates" class="section level3">
+<h3><code>detect_dates</code> - convert cells to R dates</h3>
+<p>The creators of the openxml standard are well known for mistakenly
+treating something as a date and <code>openxlsx2</code> has built in
+ways to identify a cell as a date and will try to convert the value for
+you, but unfortunately this is not always a trivial task and might fail.
+In such a case we provide an option to disable the date conversion
+entirely. In this case the underlying numerical value will be
+returned.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># do not try to identify dates in the data</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">detect_dates =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 NA  Var3  Var4  Var5         Var6    Var7       Var8</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1 NA     1     a 45075 3209324 This #DIV/0! 0.06059028</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; 4   TRUE   NA NA #NUM!     b 45069         &lt;NA&gt;       0 0.58538194</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; 5   TRUE    2 NA  1.34     c 44958         &lt;NA&gt; #VALUE! 0.95905093</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2 NA  &lt;NA&gt; #NUM!    NA         &lt;NA&gt;       2 0.72561343</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3 NA  1.56     e    NA         &lt;NA&gt;    &lt;NA&gt;         NA</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; 8  FALSE    1 NA   1.7     f 44987         &lt;NA&gt;     2.7 0.36525463</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">#&gt; 9     NA   NA NA  &lt;NA&gt;  &lt;NA&gt;    NA         &lt;NA&gt;    &lt;NA&gt;         NA</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    2 NA    23     h 45284         &lt;NA&gt;      25         NA</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt; 11 FALSE    3 NA  67.3     i 45285         &lt;NA&gt;       3         NA</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co">#&gt; 12    NA    1 NA   123  &lt;NA&gt; 45138         &lt;NA&gt;     122         NA</span></span></code></pre></div>
+</div>
+<div id="show_formula---show-formulas-instead-of-results" class="section level3">
+<h3><code>show_formula</code> - show formulas instead of results</h3>
+<p>Sometimes things might feel off. This can be because the openxml
+files are not updating formula results in the sheets unless they are
+opened in software that provides such functionality as certain tabular
+calculation software. Therefore the user might be interested in the
+underlying functions to see what is going on in the sheet. Using
+<code>show_formula</code> this is possible</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># return the underlying Excel formula instead of their values</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">show_formula =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 NA  Var3  Var4       Var5         Var6            Var7     Var8</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1 NA     1     a 2023-05-29 3209324 This            E3/0 01:27:15</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt; 4   TRUE   NA NA #NUM!     b 2023-05-23         &lt;NA&gt;              C4 14:02:57</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; 5   TRUE    2 NA  1.34     c 2023-02-01         &lt;NA&gt;         #VALUE! 23:01:02</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2 NA  &lt;NA&gt; #NUM!       &lt;NA&gt;         &lt;NA&gt;           C6+E6 17:24:53</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3 NA  1.56     e       &lt;NA&gt;         &lt;NA&gt;            &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; 8  FALSE    1 NA   1.7     f 2023-03-02         &lt;NA&gt;           C8+E8 08:45:58</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; 9     NA   NA NA  &lt;NA&gt;  &lt;NA&gt;       &lt;NA&gt;         &lt;NA&gt;            &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    2 NA    23     h 2023-12-24         &lt;NA&gt;    SUM(C10,E10)     &lt;NA&gt;</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; 11 FALSE    3 NA  67.3     i 2023-12-25         &lt;NA&gt; PRODUCT(C11,E3)     &lt;NA&gt;</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; 12    NA    1 NA   123  &lt;NA&gt; 2023-07-31         &lt;NA&gt;         E12-C12     &lt;NA&gt;</span></span></code></pre></div>
+</div>
+<div id="dims---read-specific-dimension" class="section level3">
+<h3><code>dims</code> - read specific dimension</h3>
+<p>Sometimes the entire worksheet contains to much data, in such case we
+provide functions to read only a selected dimension range. Such a range
+consists of either a specific cell like “A1” or a cell range in the
+notion used in the <code>openxml</code> standard</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># read dimension without column names</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">dims =</span> <span class="st">&quot;A2:C5&quot;</span>, <span class="at">col_names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt;    A    B    C</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; 2 NA Var1 Var2</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co">#&gt; 3 NA TRUE    1</span></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt; 4 NA TRUE &lt;NA&gt;</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; 5 NA TRUE    2</span></span></code></pre></div>
+<p>Alternatively, if you don’t know the Excel sheet’s address, you can
+use <code>wb_dims()</code> to specify the dimension. See below or
+in<code>?wb_dims</code> for more details.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># read dimension without column names with `wb_dims()`</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">dims =</span> <span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">5</span>, <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>), <span class="at">col_names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt;    A    B    C</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt; 2 NA Var1 Var2</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; 3 NA TRUE    1</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt; 4 NA TRUE &lt;NA&gt;</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co">#&gt; 5 NA TRUE    2</span></span></code></pre></div>
+</div>
+<div id="cols---read-selected-columns" class="section level3">
+<h3><code>cols</code> - read selected columns</h3>
+<p>If you do not want to read a specific cell, but a cell range you can
+use the column attribute. This attribute takes a numeric vector as
+argument</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># read selected cols</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">cols =</span> <span class="fu">c</span>(<span class="st">&quot;A:B&quot;</span>, <span class="st">&quot;G&quot;</span>))</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">#&gt;    NA  Var1       Var5</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt; 3  NA  TRUE 2023-05-29</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt; 4  NA  TRUE 2023-05-23</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co">#&gt; 5  NA  TRUE 2023-02-01</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co">#&gt; 6  NA FALSE       &lt;NA&gt;</span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt; 7  NA FALSE       &lt;NA&gt;</span></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co">#&gt; 8  NA FALSE 2023-03-02</span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt; 9  NA    NA       &lt;NA&gt;</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt; 10 NA FALSE 2023-12-24</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt; 11 NA FALSE 2023-12-25</span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co">#&gt; 12 NA    NA 2023-07-31</span></span></code></pre></div>
+</div>
+<div id="rows---read-selected-rows" class="section level3">
+<h3><code>rows</code> - read selected rows</h3>
+<p>The same goes with rows. You can select them using numeric
+vectors</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># read selected rows</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">rows =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">6</span>))</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co">#&gt;    Var1 Var2 NA  Var3  Var4       Var5 Var6 Var7     Var8</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt; 4  TRUE   NA NA #NUM!     b 2023-05-23   NA    0 14:02:57</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; 6 FALSE    2 NA  &lt;NA&gt; #NUM!       &lt;NA&gt;   NA    2 17:24:53</span></span></code></pre></div>
+</div>
+<div id="convert---convert-input-to-guessed-type" class="section level3">
+<h3><code>convert</code> - convert input to guessed type</h3>
+<p>In xml exists no difference between value types. All values are per
+default characters. To provide these as numerics, logicals or dates,
+<code>openxlsx2</code> and every other software dealing with xlsx files
+has to make assumptions about the cell type. This is especially tricky
+due to the notion of worksheets. Unlike in a data frame, a worksheet can
+have a wild mix of all types of data. Even though the conversion process
+from character to date or numeric is rather solid, sometimes the user
+might want to see the data without any conversion applied. This might be
+useful in cases where something unexpected happened or the import
+created warnings. In such a case you can look at the raw input data. If
+you want to disable date detection as well, please see the entry
+above.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># convert characters to numerics and date (logical too?)</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">convert =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2   NA  Var3  Var4       Var5         Var6    Var7     Var8</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1 &lt;NA&gt;     1     a 2023-05-29 3209324 This #DIV/0! 01:27:15</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt; 4   TRUE &lt;NA&gt; &lt;NA&gt; #NUM!     b 2023-05-23         &lt;NA&gt;       0 14:02:57</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="co">#&gt; 5   TRUE    2 &lt;NA&gt;  1.34     c 2023-02-01         &lt;NA&gt; #VALUE! 23:01:02</span></span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2 &lt;NA&gt;  &lt;NA&gt; #NUM!       &lt;NA&gt;         &lt;NA&gt;       2 17:24:53</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3 &lt;NA&gt;  1.56     e       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt; 8  FALSE    1 &lt;NA&gt;   1.7     f 2023-03-02         &lt;NA&gt;     2.7 08:45:58</span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="co">#&gt; 9   &lt;NA&gt; &lt;NA&gt; &lt;NA&gt;  &lt;NA&gt;  &lt;NA&gt;       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    2 &lt;NA&gt;    23     h 2023-12-24         &lt;NA&gt;      25     &lt;NA&gt;</span></span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="co">#&gt; 11 FALSE    3 &lt;NA&gt;  67.3     i 2023-12-25         &lt;NA&gt;       3     &lt;NA&gt;</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="co">#&gt; 12  &lt;NA&gt;    1 &lt;NA&gt;   123  &lt;NA&gt; 2023-07-31         &lt;NA&gt;     122     &lt;NA&gt;</span></span></code></pre></div>
+</div>
+<div id="skip_empty_rows---remove-empty-rows" class="section level3">
+<h3><code>skip_empty_rows</code> - remove empty rows</h3>
+<p>Even though <code>openxlsx2</code> imports everything as requested,
+sometimes it might be helpful to remove empty lines from the data. These
+might be either left empty intentional or empty because they are were
+formatted, but the cell value was removed afterwards. This was added
+mostly for backward comparability, but the default has been changed to
+<code>FALSE</code>. The behavior has changed a bit as well. Previously
+empty cells were removed prior to the conversion to R data frames, now
+they are removed after the conversion and are removed only if they are
+completely empty</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># erase empty rows from dataset</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">sheet =</span> <span class="dv">1</span>, <span class="at">skip_empty_rows =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> <span class="fu">tail</span>()</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 NA Var3  Var4       Var5 Var6 Var7     Var8</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2 NA &lt;NA&gt; #NUM!       &lt;NA&gt; &lt;NA&gt;    2 17:24:53</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3 NA 1.56     e       &lt;NA&gt; &lt;NA&gt; &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="co">#&gt; 8  FALSE    1 NA  1.7     f 2023-03-02 &lt;NA&gt;  2.7 08:45:58</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    2 NA   23     h 2023-12-24 &lt;NA&gt;   25     &lt;NA&gt;</span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co">#&gt; 11 FALSE    3 NA 67.3     i 2023-12-25 &lt;NA&gt;    3     &lt;NA&gt;</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co">#&gt; 12    NA    1 NA  123  &lt;NA&gt; 2023-07-31 &lt;NA&gt;  122     &lt;NA&gt;</span></span></code></pre></div>
+</div>
+<div id="skip_empty_cols---remove-empty-columns" class="section level3">
+<h3><code>skip_empty_cols</code> - remove empty columns</h3>
+<p>The same for columns</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># erase empty cols from dataset</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">skip_empty_cols =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2  Var3  Var4       Var5         Var6    Var7     Var8</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1     1     a 2023-05-29 3209324 This #DIV/0! 01:27:15</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt; 4   TRUE   NA #NUM!     b 2023-05-23         &lt;NA&gt;       0 14:02:57</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="co">#&gt; 5   TRUE    2  1.34     c 2023-02-01         &lt;NA&gt; #VALUE! 23:01:02</span></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2  &lt;NA&gt; #NUM!       &lt;NA&gt;         &lt;NA&gt;       2 17:24:53</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3  1.56     e       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="co">#&gt; 8  FALSE    1   1.7     f 2023-03-02         &lt;NA&gt;     2.7 08:45:58</span></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="co">#&gt; 9     NA   NA  &lt;NA&gt;  &lt;NA&gt;       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    2    23     h 2023-12-24         &lt;NA&gt;      25     &lt;NA&gt;</span></span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a><span class="co">#&gt; 11 FALSE    3  67.3     i 2023-12-25         &lt;NA&gt;       3     &lt;NA&gt;</span></span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a><span class="co">#&gt; 12    NA    1   123  &lt;NA&gt; 2023-07-31         &lt;NA&gt;     122     &lt;NA&gt;</span></span></code></pre></div>
+</div>
+<div id="row_names---keep-rownames-from-input" class="section level3">
+<h3><code>row_names</code> - keep rownames from input</h3>
+<p>Sometimes the data source might provide rownames as well. In such a
+case you can <code>openxlsx2</code> to treat the first column as
+rowname</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># convert first row to rownames</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">sheet =</span> <span class="dv">2</span>, <span class="at">dims =</span> <span class="st">&quot;C6:G9&quot;</span>, <span class="at">row_names =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co">#&gt;                mpg cyl disp  hp</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt; Mazda RX4     21.0   6  160 110</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt; Mazda RX4 Wag 21.0   6  160 110</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; Datsun 710    22.8   4  108  93</span></span></code></pre></div>
+</div>
+<div id="types---convert-column-to-specific-type" class="section level3">
+<h3><code>types</code> - convert column to specific type</h3>
+<p>If the user know better than the software what type to expect in a
+worksheet, this can be provided via types. This parameter takes a named
+numeric. <code>0</code> is character, <code>1</code> is numeric and
+<code>2</code> is date</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># define type of the data.frame</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">cols =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">5</span>), <span class="at">types =</span> <span class="fu">c</span>(<span class="st">&quot;Var1&quot;</span> <span class="ot">=</span> <span class="dv">0</span>, <span class="st">&quot;Var3&quot;</span> <span class="ot">=</span> <span class="dv">1</span>))</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#&gt;     Var1   Var3</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="co">#&gt; 3   TRUE   1.00</span></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="co">#&gt; 4   TRUE    NaN</span></span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co">#&gt; 5   TRUE   1.34</span></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="co">#&gt; 6  FALSE     NA</span></span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="co">#&gt; 7  FALSE   1.56</span></span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a><span class="co">#&gt; 8  FALSE   1.70</span></span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a><span class="co">#&gt; 9   &lt;NA&gt;     NA</span></span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a><span class="co">#&gt; 10 FALSE  23.00</span></span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a><span class="co">#&gt; 11 FALSE  67.30</span></span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a><span class="co">#&gt; 12  &lt;NA&gt; 123.00</span></span></code></pre></div>
+</div>
+<div id="start_row---where-to-begin" class="section level3">
+<h3><code>start_row</code> - where to begin</h3>
+<p>Often the creator of the worksheet has used a lot of creativity and
+the data does not begin in the first row, instead it begins somewhere
+else. To define the row where to begin reading, define it via the
+<code>start_row</code> parameter</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># start in row 5</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">start_row =</span> <span class="dv">5</span>, <span class="at">col_names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="co">#&gt;        B  C  D      E     F          G  H       I        J</span></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="co">#&gt; 5   TRUE  2 NA   1.34     c 2023-02-01 NA #VALUE! 23:01:02</span></span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt; 6  FALSE  2 NA     NA #NUM!       &lt;NA&gt; NA       2 17:24:53</span></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co">#&gt; 7  FALSE  3 NA   1.56     e       &lt;NA&gt; NA    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="co">#&gt; 8  FALSE  1 NA   1.70     f 2023-03-02 NA     2.7 08:45:58</span></span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="co">#&gt; 9     NA NA NA     NA  &lt;NA&gt;       &lt;NA&gt; NA    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a><span class="co">#&gt; 10 FALSE  2 NA  23.00     h 2023-12-24 NA      25     &lt;NA&gt;</span></span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a><span class="co">#&gt; 11 FALSE  3 NA  67.30     i 2023-12-25 NA       3     &lt;NA&gt;</span></span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a><span class="co">#&gt; 12    NA  1 NA 123.00  &lt;NA&gt; 2023-07-31 NA     122     &lt;NA&gt;</span></span></code></pre></div>
+</div>
+<div id="na.strings---define-missing-values" class="section level3">
+<h3><code>na.strings</code> - define missing values</h3>
+<p>There is the “#N/A” string, but often the user will be faced with
+custom missing values and other values we are not interested. Such
+strings can be passed as character vector via
+<code>na.strings</code></p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="co"># na strings</span></span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">na.strings =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 NA  Var3  Var4       Var5         Var6    Var7     Var8</span></span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1 NA     1     a 2023-05-29 3209324 This #DIV/0! 01:27:15</span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt; 4   TRUE   NA NA #NUM!     b 2023-05-23         &lt;NA&gt;       0 14:02:57</span></span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co">#&gt; 5   TRUE    2 NA  1.34     c 2023-02-01         &lt;NA&gt; #VALUE! 23:01:02</span></span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2 NA  &lt;NA&gt; #NUM!       &lt;NA&gt;         &lt;NA&gt;       2 17:24:53</span></span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3 NA  1.56     e       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a><span class="co">#&gt; 8  FALSE    1 NA   1.7     f 2023-03-02         &lt;NA&gt;     2.7 08:45:58</span></span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a><span class="co">#&gt; 9     NA   NA NA  &lt;NA&gt;  &lt;NA&gt;       &lt;NA&gt;         &lt;NA&gt;    &lt;NA&gt;     &lt;NA&gt;</span></span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a><span class="co">#&gt; 10 FALSE    2 NA    23     h 2023-12-24         &lt;NA&gt;      25     &lt;NA&gt;</span></span>
+<span id="cb16-12"><a href="#cb16-12" tabindex="-1"></a><span class="co">#&gt; 11 FALSE    3 NA  67.3     i 2023-12-25         &lt;NA&gt;       3     &lt;NA&gt;</span></span>
+<span id="cb16-13"><a href="#cb16-13" tabindex="-1"></a><span class="co">#&gt; 12    NA    1 NA   123  &lt;NA&gt; 2023-07-31         &lt;NA&gt;     122     &lt;NA&gt;</span></span></code></pre></div>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

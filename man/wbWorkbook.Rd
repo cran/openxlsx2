@@ -79,6 +79,8 @@ Note that the documentation is more complete in each of the wrapper functions.
 
 \item{\code{drawings_rels}}{drawings_rels}
 
+\item{\code{docMetadata}}{doc_meta_data}
+
 \item{\code{embeddings}}{embeddings}
 
 \item{\code{externalLinks}}{externalLinks}
@@ -131,6 +133,10 @@ Note that the documentation is more complete in each of the wrapper functions.
 
 \item{\code{threadComments}}{Threaded comments}
 
+\item{\code{timelines}}{timelines}
+
+\item{\code{timelineCaches}}{timelineCaches}
+
 \item{\code{workbook}}{workbook}
 
 \item{\code{workbook.xml.rels}}{workbook.xml.rels}
@@ -160,6 +166,9 @@ worksheet names.}
 \item \href{#method-wbWorkbook-add_data_table}{\code{wbWorkbook$add_data_table()}}
 \item \href{#method-wbWorkbook-add_pivot_table}{\code{wbWorkbook$add_pivot_table()}}
 \item \href{#method-wbWorkbook-add_slicer}{\code{wbWorkbook$add_slicer()}}
+\item \href{#method-wbWorkbook-remove_slicer}{\code{wbWorkbook$remove_slicer()}}
+\item \href{#method-wbWorkbook-add_timeline}{\code{wbWorkbook$add_timeline()}}
+\item \href{#method-wbWorkbook-remove_timeline}{\code{wbWorkbook$remove_timeline()}}
 \item \href{#method-wbWorkbook-add_formula}{\code{wbWorkbook$add_formula()}}
 \item \href{#method-wbWorkbook-add_style}{\code{wbWorkbook$add_style()}}
 \item \href{#method-wbWorkbook-to_df}{\code{wbWorkbook$to_df()}}
@@ -198,6 +207,7 @@ worksheet names.}
 \item \href{#method-wbWorkbook-add_thread}{\code{wbWorkbook$add_thread()}}
 \item \href{#method-wbWorkbook-get_thread}{\code{wbWorkbook$get_thread()}}
 \item \href{#method-wbWorkbook-add_conditional_formatting}{\code{wbWorkbook$add_conditional_formatting()}}
+\item \href{#method-wbWorkbook-remove_conditional_formatting}{\code{wbWorkbook$remove_conditional_formatting()}}
 \item \href{#method-wbWorkbook-add_image}{\code{wbWorkbook$add_image()}}
 \item \href{#method-wbWorkbook-add_plot}{\code{wbWorkbook$add_plot()}}
 \item \href{#method-wbWorkbook-add_drawing}{\code{wbWorkbook$add_drawing()}}
@@ -661,7 +671,8 @@ add pivot table
   fun,
   params,
   pivot_table,
-  slicer
+  slicer,
+  timeline
 )}\if{html}{\out{</div>}}
 }
 
@@ -689,6 +700,8 @@ add pivot table
 \item{\code{pivot_table}}{a character object with a name for the pivot table}
 
 \item{\code{slicer}}{a character object with names used as slicer}
+
+\item{\code{timeline}}{a character object with names used as timeline}
 }
 \if{html}{\out{</div>}}
 }
@@ -731,6 +744,83 @@ add pivot table
 \item{\code{slicer}}{a variable used as slicer for the pivot table}
 
 \item{\code{params}}{a list of parameters to modify pivot table creation}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorkbook} object
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-remove_slicer"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-remove_slicer}{}}}
+\subsection{Method \code{remove_slicer()}}{
+add pivot table
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$remove_slicer(sheet = current_sheet())}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{The name of the sheet}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorkbook} object
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-add_timeline"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-add_timeline}{}}}
+\subsection{Method \code{add_timeline()}}{
+add pivot table
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$add_timeline(
+  x,
+  dims = "A1",
+  sheet = current_sheet(),
+  pivot_table,
+  timeline,
+  params
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{x}}{a wb_data object}
+
+\item{\code{dims}}{the worksheet cell where the pivot table is placed}
+
+\item{\code{sheet}}{The name of the sheet}
+
+\item{\code{pivot_table}}{the name of a pivot table on the selected sheet}
+
+\item{\code{timeline}}{a variable used as timeline for the pivot table}
+
+\item{\code{params}}{a list of parameters to modify pivot table creation}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorkbook} object
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-remove_timeline"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-remove_timeline}{}}}
+\subsection{Method \code{remove_timeline()}}{
+add pivot table
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$remove_timeline(sheet = current_sheet())}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{The name of the sheet}
 }
 \if{html}{\out{</div>}}
 }
@@ -1900,6 +1990,37 @@ Add conditional formatting
 \item{\code{params}}{Additional parameters}
 
 \item{\code{...}}{additional arguments}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorkbook} object
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-remove_conditional_formatting"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-remove_conditional_formatting}{}}}
+\subsection{Method \code{remove_conditional_formatting()}}{
+Remove conditional formatting
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$remove_conditional_formatting(
+  sheet = current_sheet(),
+  dims = NULL,
+  first = FALSE,
+  last = FALSE
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{sheet}}{sheet}
+
+\item{\code{dims}}{dims}
+
+\item{\code{first}}{first}
+
+\item{\code{last}}{last}
 }
 \if{html}{\out{</div>}}
 }

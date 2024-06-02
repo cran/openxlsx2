@@ -6,69 +6,68 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 
-## -----------------------------------------------------------------------------
-file <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
+## ----eval = FALSE-------------------------------------------------------------
+#  install.packages("openxlsx2")
+
+## ----eval = FALSE-------------------------------------------------------------
+#  library(openxlsx2)
+
+## ----eval = FALSE-------------------------------------------------------------
+#  wb <- wb_load("your_file.xlsx")
+
+## ----eval = FALSE-------------------------------------------------------------
+#  wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = your_data)
+
+## ----eval = FALSE-------------------------------------------------------------
+#  wb <- wb_add_data(wb_add_worksheet(wb_workbook()), x = your_data)
 
 ## -----------------------------------------------------------------------------
-# import workbook
-library(openxlsx2)
-wb_to_df(file)
+wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = mtcars)
 
 ## -----------------------------------------------------------------------------
-# do not convert first row to column names
-wb_to_df(file, col_names = FALSE)
+wb
 
 ## -----------------------------------------------------------------------------
-# do not try to identify dates in the data
-wb_to_df(file, detect_dates = FALSE)
+wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_worksheet() %>% wb_add_data(x = mtcars)
 
 ## -----------------------------------------------------------------------------
-# return the underlying Excel formula instead of their values
-wb_to_df(file, show_formula = TRUE)
+wb
 
 ## -----------------------------------------------------------------------------
-# read dimension without column names
-wb_to_df(file, dims = "A2:C5", col_names = FALSE)
+wb %>% wb_to_df() %>% head()
 
 ## -----------------------------------------------------------------------------
-# read dimension without column names with `wb_dims()`
-wb_to_df(file, dims = wb_dims(rows = 2:5, cols = 1:3), col_names = FALSE)
+wb %>% wb_to_df(sheet = "Sheet 2") %>% head()
+
+## ----eval = FALSE-------------------------------------------------------------
+#  wb %>% wb_save(file = "my_first_worksheet.xlsx")
+
+## ----eval = FALSE-------------------------------------------------------------
+#  wb %>% wb_open()
+
+## ----eval = FALSE-------------------------------------------------------------
+#  wb <- wb_workbook()
+#  wb_add_worksheet(wb, sheet = "USexp")
+#  wb_add_data(wb, "USexp", USPersonalExpenditure)
+
+## ----echo = FALSE-------------------------------------------------------------
+wb <- wb_workbook()
+wb_add_worksheet(wb, sheet = "USexp")
+wb_add_data(wb, "USexp", USPersonalExpenditure) %>% try()
 
 ## -----------------------------------------------------------------------------
-# read selected cols
-wb_to_df(file, cols = c("A:B", "G"))
+wb %>% wb_get_sheet_names()
 
 ## -----------------------------------------------------------------------------
-# read selected rows
-wb_to_df(file, rows = c(2, 4, 6))
+wb <- wb_workbook()
+wb <- wb_add_worksheet(wb, sheet = "USexp")
+wb <- wb_add_data(wb, "USexp", USPersonalExpenditure)
+wb_get_sheet_names(wb)
+wb_to_df(wb)
 
 ## -----------------------------------------------------------------------------
-# convert characters to numerics and date (logical too?)
-wb_to_df(file, convert = FALSE)
-
-## -----------------------------------------------------------------------------
-# erase empty rows from dataset
-wb_to_df(file, sheet = 1, skip_empty_rows = TRUE) |> tail()
-
-## -----------------------------------------------------------------------------
-# erase empty cols from dataset
-wb_to_df(file, skip_empty_cols = TRUE)
-
-## -----------------------------------------------------------------------------
-# convert first row to rownames
-wb_to_df(file, sheet = 2, dims = "C6:G9", row_names = TRUE)
-
-## -----------------------------------------------------------------------------
-# define type of the data.frame
-wb_to_df(file, cols = c(2, 5), types = c("Var1" = 0, "Var3" = 1))
-
-## -----------------------------------------------------------------------------
-# start in row 5
-wb_to_df(file, start_row = 5, col_names = FALSE)
-
-## -----------------------------------------------------------------------------
-# na strings
-wb_to_df(file, na.strings = "")
+wb <- wb_workbook()$add_worksheet("USexp")$add_data(x = USPersonalExpenditure)
+wb$to_df()
 
 ## -----------------------------------------------------------------------------
 # the file we are going to load

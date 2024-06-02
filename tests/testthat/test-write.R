@@ -565,6 +565,225 @@ test_that("writing slicers works", {
 
 })
 
+test_that("writing slicers works", {
+
+  dat <- data.frame(
+    date = seq(from = as.Date("2024-01-01"), length.out = 26, by = "month"),
+    amnt = sample(seq(100:150), 26, replace = TRUE),
+    lttr = letters[1:2]
+  )
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = dat)
+  df <- wb_data(wb)
+  wb$add_pivot_table(x = df, cols = "lttr", data = "amnt", timeline = "date", pivot_table = "pivot1")
+  wb$add_timeline(x = df, timeline = "date", pivot_table = "pivot1")
+
+  expect_equal("x15:timelineCacheRefs", xml_node_name(wb$workbook$extLst, "extLst", "ext"))
+  expect_equal("timelines", xml_node_name(wb$timelines))
+  expect_equal("timelineCacheDefinition", xml_node_name(wb$timelineCaches))
+  expect_true(grepl("x15:timelineRefs", wb$worksheets[[2]]$extLst))
+
+  wb$add_slicer(df, slicer = "lttr", pivot_table = "pivot1")
+
+  expect_equal(c("x15:timelineCacheRefs", "x14:slicerCaches"), xml_node_name(wb$workbook$extLst, "extLst", "ext"))
+  expect_equal(c("x15:timelineRefs", "x14:slicerList"), xml_node_name(wb$worksheets[[2]]$extLst, "ext"))
+
+  # and the other way around it works too
+  wb <- wb_workbook()$add_worksheet()$add_data(x = dat)
+  df <- wb_data(wb)
+  wb$add_pivot_table(x = df, cols = "lttr", data = "amnt", timeline = "date", pivot_table = "pivot1")
+  wb$add_slicer(df, slicer = "lttr", pivot_table = "pivot1")
+  wb$add_timeline(x = df, timeline = "date", pivot_table = "pivot1")
+
+  expect_equal(c("x14:slicerCaches", "x15:timelineCacheRefs"), xml_node_name(wb$workbook$extLst, "extLst", "ext"))
+  expect_equal(c("x14:slicerList", "x15:timelineRefs"), xml_node_name(wb$worksheets[[2]]$extLst, "ext"))
+
+})
+
+
+test_that("removing slicers works", {
+
+  ### prepare data
+  df <- data.frame(
+    AirPassengers = c(AirPassengers),
+    time = seq(from = as.Date("1949-01-01"), to = as.Date("1960-12-01"), by = "month"),
+    letters = letters[1:4]
+  )
+
+  ### create workbook
+  wb <- wb_workbook()$
+    add_worksheet("pivot")$
+    add_worksheet("pivot2")$
+    add_worksheet("data")$
+    add_data(x = df)
+
+  ### get pivot table data source
+  df <- wb_data(wb, sheet = "data")
+
+  ### first sheet
+  # create pivot table
+  wb$add_pivot_table(
+    df,
+    sheet = "pivot",
+    rows = "time",
+    cols = "letters",
+    data = "AirPassengers",
+    pivot_table = "airpassengers",
+    params = list(
+      compact = FALSE, outline = FALSE, compact_data = FALSE,
+      row_grand_totals = FALSE, col_grand_totals = FALSE)
+  )
+
+  # add slicer
+  wb$add_slicer(
+    df,
+    dims = "E1:I7",
+    sheet = "pivot",
+    slicer = "letters",
+    pivot_table = "airpassengers",
+    params = list(choose = c(letters = 'x %in% c("a", "b")'))
+  )
+
+  wb$add_slicer(
+    df,
+    dims = "E8:I15",
+    sheet = "pivot",
+    slicer = "time",
+    pivot_table = "airpassengers"
+  )
+
+  ### second sheet
+  # create pivot table
+  wb$add_pivot_table(
+    df,
+    sheet = "pivot2",
+    rows = "time",
+    cols = "letters",
+    data = "AirPassengers",
+    pivot_table = "airpassengers2",
+    params = list(
+      compact = FALSE, outline = FALSE, compact_data = FALSE,
+      row_grand_totals = FALSE, col_grand_totals = FALSE)
+  )
+
+  # add slicer
+  wb$add_slicer(
+    df,
+    dims = "E1:I7",
+    sheet = "pivot2",
+    slicer = "letters",
+    pivot_table = "airpassengers2",
+    params = list(choose = c(letters = 'x %in% c("a", "b")'))
+  )
+
+  wb$add_slicer(
+    df,
+    dims = "E8:I15",
+    sheet = "pivot2",
+    slicer = "time",
+    pivot_table = "airpassengers2"
+  )
+
+  ### remove slicer
+  wb$remove_slicer(sheet = "pivot")
+
+  temp <- temp_xlsx()
+  expect_silent(wb$save(temp)) # no warning, all files written as expected
+
+})
+
+test_that("removing timelines works", {
+
+  ### prepare data
+  df <- data.frame(
+    AirPassengers = c(AirPassengers),
+    time = seq(from = as.Date("1949-01-01"), to = as.Date("1960-12-01"), by = "month"),
+    letters = letters[1:4]
+  )
+
+  ### create workbook
+  wb <- wb_workbook()$
+    add_worksheet("pivot")$
+    add_worksheet("pivot2")$
+    add_worksheet("data")$
+    add_data(x = df)
+
+  ### get pivot table data source
+  df <- wb_data(wb, sheet = "data")
+
+  ### first sheet
+  # create pivot table
+  wb$add_pivot_table(
+    df,
+    sheet = "pivot",
+    rows = "time",
+    cols = "letters",
+    data = "AirPassengers",
+    pivot_table = "airpassengers",
+    params = list(
+      compact = FALSE, outline = FALSE, compact_data = FALSE,
+      row_grand_totals = FALSE, col_grand_totals = FALSE)
+  )
+
+  # add slicer
+  wb$add_slicer(
+    df,
+    dims = "E1:I7",
+    sheet = "pivot",
+    slicer = "letters",
+    pivot_table = "airpassengers"
+  )
+
+  # add timeline
+  wb$add_timeline(
+    df,
+    dims = "E9:I14",
+    sheet = "pivot",
+    timeline = "time",
+    pivot_table = "airpassengers"
+  )
+
+  ### second sheet
+  # create pivot table
+  wb$add_pivot_table(
+    df,
+    sheet = "pivot2",
+    rows = "time",
+    cols = "letters",
+    data = "AirPassengers",
+    pivot_table = "airpassengers2",
+    params = list(
+      compact = FALSE, outline = FALSE, compact_data = FALSE,
+      row_grand_totals = FALSE, col_grand_totals = FALSE)
+  )
+
+  # add slicer
+  wb$add_slicer(
+    df,
+    dims = "E1:I7",
+    sheet = "pivot2",
+    slicer = "letters",
+    pivot_table = "airpassengers2",
+    params = list(choose = c(letters = 'x %in% c("a", "b")'))
+  )
+
+  # add timeline
+  wb$add_timeline(
+    df,
+    dims = "E9:I14",
+    sheet = "pivot2",
+    timeline = "time",
+    pivot_table = "airpassengers2"
+  )
+
+  ### remove slicer
+  wb$remove_timeline(sheet = "pivot")
+
+  temp <- temp_xlsx()
+  expect_silent(wb$save(temp)) # no warning, all files written as expected
+
+})
+
 test_that("writing na.strings = NULL works", {
 
   # write na.strings = na_strings()
@@ -983,6 +1202,34 @@ test_that("writing zero row data frames works", {
 
   exp <- "date"
   got <- names(wb_to_df(wb))
+  expect_equal(exp, got)
+
+})
+
+test_that("non consecutive columns do not overlap", {
+  test_dt <- data.frame(
+    V1 = seq(as.Date("2024-01-01"), as.Date("2024-01-05"), 1),
+    V2 = letters[1:5],
+    V3 = seq(as.Date("2024-01-01"), as.Date("2024-01-05"), 1),
+    V4 = c(letters[3:5], NA, NA),
+    V5 = 1:5,
+    V6 = c(NA, NA, 3, 4, 5),
+    V7 = letters[1:5],
+    V8 = c(letters[3:5], NA, NA),
+    V9 = 1:5,
+    V0 = c(NA, NA, 3, 4, 5)
+  )
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = test_dt)
+
+  # df <- wb_to_df(wb, col_names = F)
+
+  cc <- wb$worksheets[[1]]$sheet_data$cc
+
+  exp <- ""
+  got <- cc[cc$r == "B2", "c_s"]
   expect_equal(exp, got)
 
 })

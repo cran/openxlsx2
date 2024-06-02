@@ -106,6 +106,9 @@ wbWorkbook <- R6::R6Class(
     #' @field drawings_rels drawings_rels
     drawings_rels = NULL,
 
+    #' @field docMetadata doc_meta_data
+    docMetadata = NULL,
+
     # #' @field drawings_vml drawings_vml
     # drawings_vml = NULL,
 
@@ -186,6 +189,12 @@ wbWorkbook <- R6::R6Class(
 
     #' @field threadComments Threaded comments
     threadComments = NULL,
+
+    #' @field timelines timelines
+    timelines = NULL,
+
+    #' @field timelineCaches timelineCaches
+    timelineCaches = NULL,
 
     #' @field workbook workbook
     workbook = genBaseWorkbook(),
@@ -301,9 +310,6 @@ wbWorkbook <- R6::R6Class(
       self$queryTables <- NULL
 
       self$richData <- NULL
-
-      self$slicers <- NULL
-      self$slicerCaches <- NULL
 
       self$sheet_names <- character()
       self$sheetOrder <- integer()
@@ -880,17 +886,10 @@ wbWorkbook <- R6::R6Class(
       ## create sheet.rels to simplify id assignment
       self$worksheets_rels[[newSheetIndex]] <- from$worksheets_rels[[old]]
 
-      old_drawing_sheet <- NULL
+      new_drawing_sheet <- NULL
+      if (length(from$worksheets[[old]]$relships$drawing)) {
 
-      if (length(from$worksheets_rels[[old]])) {
-        relship <- rbindlist(xml_attr(from$worksheets_rels[[old]], "Relationship"))
-        relship$typ <- basename(relship$Type)
-        old_drawing_sheet  <- as.integer(gsub("\\D+", "", relship$Target[relship$typ == "drawing"]))
-      }
-
-      if (length(old_drawing_sheet) && length(from$worksheets[[old_drawing_sheet]]$relships$drawing)) {
-
-        drawing_id <- from$worksheets[[old_drawing_sheet]]$relships$drawing
+        drawing_id <- from$worksheets[[old]]$relships$drawing
 
         new_drawing_sheet <- length(self$drawings) + 1L
 
@@ -955,7 +954,6 @@ wbWorkbook <- R6::R6Class(
             USE.NAMES = FALSE
           )
 
-
         self$append("drawings", from$drawings[[drawing_id]])
       }
 
@@ -975,7 +973,9 @@ wbWorkbook <- R6::R6Class(
 
         newid <- length(self$slicers) + 1
 
-        cloned_slicers <- from$slicers[[old]]
+        old_s_id <- from$worksheets[[old]]$relships$slicer
+
+        cloned_slicers <- from$slicers[[old_s_id]]
         slicer_attr <- xml_attr(cloned_slicers, "slicers")
 
         # Replace name with name_n. This will prevent the slicer from loading,
@@ -986,6 +986,8 @@ wbWorkbook <- R6::R6Class(
         slicer_child <- df_to_xml("slicer", slicer_df)
 
         self$slicers[[newid]] <- xml_node_create("slicers", slicer_child, slicer_attr[[1]])
+
+        self$worksheets[[newSheetIndex]]$relships$slicer <- newid
 
         self$worksheets_rels[[newSheetIndex]] <- c(
           self$worksheets_rels[[newSheetIndex]],
@@ -999,6 +1001,43 @@ wbWorkbook <- R6::R6Class(
           sprintf("<Override PartName=\"/xl/slicers/slicer%s.xml\" ContentType=\"application/vnd.ms-excel.slicer+xml\"/>", newid)
         )
 
+      }
+
+      rid <- as.integer(sub("\\D+", "", get_relship_id(obj = self$worksheets_rels[[newSheetIndex]], "timeline")))
+      if (length(rid)) {
+
+        warning("Cloning timelines is not yet supported. It will not appear on the sheet.")
+        self$worksheets_rels[[newSheetIndex]] <- relship_no(obj = self$worksheets_rels[[newSheetIndex]], x = "timeline")
+
+        newid <- length(self$timelines) + 1L
+
+        old_t_id <- from$worksheets[[old]]$relships$timeline
+
+        cloned_timelines <- from$timelines[[old_t_id]]
+        timeline_attr <- xml_attr(cloned_timelines, "timelines")
+
+        # Replace name with name_n. This will prevent the timeline from loading,
+        # but the xlsx file is not broken
+        timeline_child <- xml_node(cloned_timelines, "timelines", "timeline")
+        timeline_df <- rbindlist(xml_attr(timeline_child, "timeline"))[c("name", "xr10:uid", "cache", "caption", "level", "selectionLevel", "scrollPosition")]
+        timeline_df$name <- paste0(timeline_df$name, suffix)
+        timeline_child <- df_to_xml("timeline", timeline_df)
+
+        self$timelines[[newid]] <- xml_node_create("timelines", timeline_child, timeline_attr[[1]])
+
+        self$worksheets[[newSheetIndex]]$relships$timeline <- newid
+
+        self$worksheets_rels[[newSheetIndex]] <- c(
+          self$worksheets_rels[[newSheetIndex]],
+          sprintf("<Relationship Id=\"rId%s\" Type=\"http://schemas.microsoft.com/office/2011/relationships/timeline\" Target=\"../timelines/timeline%s.xml\"/>",
+                  rid,
+                  newid)
+        )
+
+        self$Content_Types <- c(
+          self$Content_Types,
+          sprintf("<Override PartName=\"/xl/timelines/timeline%s.xml\" ContentType=\"application/vnd.ms-excel.timeline+xml\"/>", newid)
+        )
       }
 
       if (!is.null(self$richData)) {
@@ -1041,7 +1080,7 @@ wbWorkbook <- R6::R6Class(
 
       rid <- as.integer(sub("\\D+", "", get_relship_id(obj = self$worksheets_rels[[newSheetIndex]], x = "drawing")))
 
-      if (length(rid)) {
+      if (length(rid) && !is.null(new_drawing_sheet)) {
 
         self$worksheets_rels[[newSheetIndex]] <- relship_no(obj = self$worksheets_rels[[newSheetIndex]], x = "drawing")
 
@@ -1146,14 +1185,19 @@ wbWorkbook <- R6::R6Class(
             self$append("Content_Types", "<Default Extension=\"jpg\" ContentType=\"image/jpg\"/>")
           }
 
-          # from$worksheet[[old]]$relships$drawing
-          new_drawing_sheet <- self$worksheets[[newSheetIndex]]$relships$drawing
+          # get old drawing id, must not match new drawing id
+          old_drawing_sheet <- from$worksheets[[old]]$relships$drawing
 
-          if (length(new_drawing_sheet)) {
+          if (length(old_drawing_sheet)) {
+
+            # assuming that if drawing was copied, this is the new drawing id
+            new_drawing_sheet <- length(self$drawings)
+            self$worksheets[[newSheetIndex]]$relships$drawing <- new_drawing_sheet
 
             # we pick up the drawing relationship. This is something like: "../media/image1.jpg"
             # because we might end up with multiple files with similar names, we have to rename
             # the media file and update the drawing relationship
+            # TODO has every drawing a drawing_rel of the same size?
             drels <- rbindlist(xml_attr(self$drawings_rels[[new_drawing_sheet]], "Relationship"))
             if (ncol(drels) && any(basename(drels$Type) == "image")) {
               sel <- basename(drels$Type) == "image"
@@ -1181,7 +1225,7 @@ wbWorkbook <- R6::R6Class(
               )
 
               # append media
-              self$media <- append(self$media, media_names)
+              self$append("media", media_names)
             }
           }
         }
@@ -1254,6 +1298,10 @@ wbWorkbook <- R6::R6Class(
         }
 
         # TODO dxfs styles for (pivot) table styles and conditional formatting
+        if (length(from$styles_mgr$get_dxf())) {
+          msg <- "Input file has dxf styles. These are not cloned. Some styles might be broken and spreadsheet software might complain."
+          warning(msg, call. = FALSE)
+        }
 
         clone_shared_strings(from, old, self, newSheetIndex)
       }
@@ -1426,6 +1474,7 @@ wbWorkbook <- R6::R6Class(
     #' @param params a list of parameters to modify pivot table creation
     #' @param pivot_table a character object with a name for the pivot table
     #' @param slicer a character object with names used as slicer
+    #' @param timeline a character object with names used as timeline
     #' @details
     #' `fun` can be either of AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV,
     #' STDEVP, SUM, VAR, VARP
@@ -1441,7 +1490,8 @@ wbWorkbook <- R6::R6Class(
       fun,
       params,
       pivot_table,
-      slicer
+      slicer,
+      timeline
     ) {
 
       if (missing(x))
@@ -1534,11 +1584,12 @@ wbWorkbook <- R6::R6Class(
         numfmts = numfmts
       )
 
-      if (missing(filter)) filter <- ""
-      if (missing(rows))   rows   <- ""
-      if (missing(cols))   cols   <- ""
-      if (missing(data))   data   <- ""
-      if (missing(slicer)) slicer <- ""
+      if (missing(filter))   filter   <- ""
+      if (missing(rows))     rows     <- ""
+      if (missing(cols))     cols     <- ""
+      if (missing(data))     data     <- ""
+      if (missing(slicer))   slicer   <- ""
+      if (missing(timeline)) timeline <- ""
 
       self$append("pivotTables", pivot_table)
       cacheId <- length(self$pivotTables)
@@ -1547,7 +1598,7 @@ wbWorkbook <- R6::R6Class(
         cacheId
       )
 
-      self$append("pivotDefinitions", pivot_def_xml(x, filter, rows, cols, data, slicer, cacheId))
+      self$append("pivotDefinitions", pivot_def_xml(x, filter, rows, cols, data, slicer, timeline, cacheId))
 
       self$append("pivotDefinitionsRels", pivot_def_rel(cacheId))
       self$append("pivotRecords", pivot_rec_xml(x))
@@ -1626,7 +1677,8 @@ wbWorkbook <- R6::R6Class(
       } else {
         arguments <- c(
           "caption", "choose", "column_count", "cross_filter", "edit_as",
-          "row_height", "show_missing", "sort_order", "style"
+          "level", "locked_position", "row_height", "show_caption",
+          "show_missing", "sort_order", "start_item", "style"
         )
         params <- standardize_case_names(params, arguments = arguments, return = TRUE)
       }
@@ -1733,16 +1785,36 @@ wbWorkbook <- R6::R6Class(
       if (!is.null(params$style))
         style <- params$style
 
+      startItem <- NULL
+      if (!is.null(params$start_item))
+        startItem <- params$start_item
+
+      showCaption <- NULL
+      if (!is.null(params$show_caption))
+        showCaption <- params$show_caption
+
+      level <- NULL
+      if (!is.null(params$level))
+        level <- params$level
+
+      lockedPosition <- NULL
+      if (!is.null(params$locked_position))
+        lockedPosition <- params$locked_position
+
       slicer_xml <- xml_node_create(
         "slicer",
         xml_attributes = c(
-          name        = uni_name,
-          `xr10:uid`  = st_guid(),
-          cache       = paste0("Slicer_", uni_name),
-          caption     = caption,
-          rowHeight   = as_xml_attr(row_height),
-          columnCount = as_xml_attr(column_count),
-          style       = style
+          name           = uni_name,
+          `xr10:uid`     = st_guid(),
+          cache          = paste0("Slicer_", uni_name),
+          caption        = caption,
+          rowHeight      = as_xml_attr(row_height),
+          columnCount    = as_xml_attr(column_count),
+          startItem      = as_xml_attr(startItem),
+          showCaption    = as_xml_attr(showCaption),
+          level          = as_xml_attr(level),
+          lockedPosition = as_xml_attr(lockedPosition),
+          style          = style
         )
       )
 
@@ -1765,26 +1837,31 @@ wbWorkbook <- R6::R6Class(
 
       # add the workbook extension list
       if (is.null(self$workbook$extLst)) {
-        self$workbook$extLst <- '
-          <extLst>
-          <ext uri="{BBE1A952-AA13-448e-AADC-164F8A28A991}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main">
-          <x14:slicerCaches></x14:slicerCaches>
-          </ext>
-          </extLst>
-          '
-      } else if (!grepl("<x14:slicerCaches>", self$workbook$extLst)) {
-          self$workbook$extLst <- xml_add_child(
-            self$workbook$extLst,
-            level = "ext",
-            xml_child = xml_node_create("x14:slicerCaches")
-          )
+        self$workbook$extLst <- xml_node_create("extLst")
       }
 
-      self$workbook$extLst <- xml_add_child(
-        self$workbook$extLst,
+      if (!grepl("xmlns:x14", self$workbook$extLst)) {
+        self$workbook$extLst <- xml_add_child(self$workbook$extLst, xml_child = '<ext uri="{BBE1A952-AA13-448e-AADC-164F8A28A991}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"></ext>')
+      }
+
+      extLst_xml <- xml_node(self$workbook$extLst, "extLst", "ext")
+      is_ext_x14 <- grepl("xmlns:x14", extLst_xml)
+
+      # check if node has x14:slicerCaches
+      if (!grepl("<x14:slicerCaches>", extLst_xml[is_ext_x14])) {
+        extLst_xml[is_ext_x14] <- xml_add_child(
+          extLst_xml[is_ext_x14],
+          xml_child = xml_node_create("x14:slicerCaches")
+        )
+      }
+
+      extLst_xml[is_ext_x14] <- xml_add_child(
+        extLst_xml[is_ext_x14],
         xml_child = sprintf('<x14:slicerCache r:id="rId%s" />', 100000 + slicer_id),
-        level = c("ext", "x14:slicerCaches")
+        level = "x14:slicerCaches"
       )
+
+      self$workbook$extLst <- xml_node_create("extLst", xml_children = extLst_xml)
 
       # add a drawing for the slicer
       drawing_xml <- read_xml(sprintf('
@@ -1825,6 +1902,7 @@ wbWorkbook <- R6::R6Class(
       next_id <- get_next_id(self$worksheets_rels[[sheet]])
 
       # add the pivot table and the drawing to the worksheet
+      is_ext_x14 <- grepl("xmlns:x14", self$worksheets[[sheet]]$extLst)
       if (!any(grepl(sprintf("Target=\"../slicers/slicer%s.xml\"", self$worksheets[[sheet]]$relships$slicer), self$worksheets_rels[[sheet]]))) {
 
         slicer_list_xml <- sprintf(
@@ -1833,18 +1911,23 @@ wbWorkbook <- R6::R6Class(
         )
 
         # add the extension list to the worksheet
-        if (length(self$worksheets[[sheet]]$extLst) == 0) {
-          self$worksheets[[sheet]]$extLst <- sprintf(
-            "<ext uri=\"{A8765BA9-456A-4dab-B4F3-ACF838C121DE}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">
-            %s
-            </ext>", slicer_list_xml
+        if (length(self$worksheets[[sheet]]$extLst) == 0 || !any(is_ext_x14)) {
+
+          ext_x14 <- "<ext uri=\"{A8765BA9-456A-4dab-B4F3-ACF838C121DE}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\"></ext>"
+
+          self$worksheets[[sheet]]$append(
+            "extLst",
+            ext_x14
           )
-        } else if (!grepl("<x14:slicerList>", self$worksheets[[sheet]]$extLst)) {
-          self$worksheets[[sheet]]$extLst <- xml_add_child(
-            self$worksheets[[sheet]]$extLst,
-            xml_children = slicer_list_xml
-          )
+
+          is_ext_x14 <- grepl("xmlns:x14", self$worksheets[[sheet]]$extLst)
+
         }
+
+        self$worksheets[[sheet]]$extLst[is_ext_x14] <- xml_add_child(
+          self$worksheets[[sheet]]$extLst[is_ext_x14],
+          xml_child = slicer_list_xml
+        )
 
         self$worksheets_rels[[sheet]] <- append(
           self$worksheets_rels[[sheet]],
@@ -1876,6 +1959,434 @@ wbWorkbook <- R6::R6Class(
       self$append(
         "Content_Types", value
       )
+
+      invisible(self)
+    },
+
+    #' @description add pivot table
+    #' @return The `wbWorkbook` object
+    remove_slicer = function(sheet = current_sheet()) {
+      sheet <- private$get_sheet_index(sheet)
+
+      # get indices
+      slicer_id       <- self$worksheets[[sheet]]$relships$slicer
+
+      # skip if nothing to do
+      if (identical(slicer_id, integer())) return(invisible(self))
+
+      cache_names     <- unname(sapply(xml_attr(self$slicers[slicer_id], "slicers", "slicer"), "[", "cache"))
+      slicer_names    <- unname(sapply(xml_attr(self$slicerCaches, "slicerCacheDefinition"), "[", "name"))
+      slicer_cache_id <- which(cache_names %in% slicer_names)
+
+      # strings to grep
+      slicer_xml <- sprintf("slicers/slicer%s.xml", slicer_id)
+      caches_xml <- sprintf("slicerCaches/slicerCache%s.xml", slicer_cache_id)
+
+      # empty slicer
+      self$slicers[slicer_id]                  <- ""
+      # empty slicerCache
+      self$slicerCaches[slicer_cache_id]       <- ""
+
+      # remove slicer cache relship
+      self$worksheets[[sheet]]$relships$slicer <- integer()
+      # remove worksheet relationship
+      self$worksheets_rels[[sheet]]            <- self$worksheets_rels[[sheet]][!grepl(slicer_xml, self$worksheets_rels[[sheet]])]
+      # remove "x14:slicerList"
+      is_ext_x14 <- grepl("xmlns:x14", self$worksheets[[sheet]]$extLst)
+      extLst     <- xml_rm_child(self$worksheets[[sheet]]$extLst[is_ext_x14], xml_child = "x14:slicerList")
+      self$worksheets[[sheet]]$extLst[is_ext_x14] <- extLst
+
+      # clear workbook.xml.rels
+      self$workbook.xml.rels                   <- self$workbook.xml.rels[!grepl(paste0(caches_xml, collapse = "|"), self$workbook.xml.rels)]
+
+      # clear Content_Types
+      self$Content_Types                       <- self$Content_Types[!grepl(paste0(c(slicer_xml, caches_xml), collapse = "|"), self$Content_Types)]
+
+      invisible(self)
+    },
+
+    #' @description add pivot table
+    #' @param x a wb_data object
+    #' @param dims the worksheet cell where the pivot table is placed
+    #' @param pivot_table the name of a pivot table on the selected sheet
+    #' @param timeline a variable used as timeline for the pivot table
+    #' @param params a list of parameters to modify pivot table creation
+    #' @return The `wbWorkbook` object
+    add_timeline = function(x, dims = "A1", sheet = current_sheet(), pivot_table, timeline, params) {
+
+      if (!grepl(":", dims)) {
+        ddims <- dims_to_rowcol(dims, as_integer = TRUE)
+
+        dims <- rowcol_to_dims(
+          row = c(ddims[[2]], ddims[[2]] + 12L),
+          col = c(ddims[[1]], ddims[[1]] + 1L)
+        )
+      }
+
+      if (missing(x))
+        stop("x cannot be missing in add_timeline")
+
+      assert_class(x, "wb_data")
+      if (missing(params)) {
+        params <- NULL
+      } else {
+        arguments <- c(
+          "beg_date", "caption", "choose_beg", "choose_end", "column_count",
+          "cross_filter", "edit_as", "end_date", "level", "row_height",
+          "scroll_position", "selection_level", "show_header",
+          "show_horizontal_scrollbar", "show_missing", "show_selection_label",
+          "show_time_level", "sort_order", "style"
+        )
+        params <- standardize_case_names(params, arguments = arguments, return = TRUE)
+      }
+
+      sheet <- private$get_sheet_index(sheet)
+
+      pt <- rbindlist(xml_attr(self$pivotTables, "pivotTableDefinition"))
+      sel <- which(pt$name == pivot_table)
+      cid <- pt$cacheId[sel]
+
+      uni_name <- paste0(stringi::stri_replace_all_fixed(timeline, " ", "_"), cid)
+
+      # TODO we might be able to initialize the field from here. Something like
+      # get_item(...) and insert it to the pivotDefinition
+
+      # test that slicer is initalized in wb$pivotDefinitions.
+      pt  <- self$worksheets[[sheet]]$relships$pivotTable
+      ptl <- rbindlist(xml_attr(self$pivotTables[pt], "pivotTableDefinition"))
+      pt  <- pt[which(ptl$name == pivot_table)]
+
+      fields <- xml_node(self$pivotDefinitions[pt], "pivotCacheDefinition", "cacheFields", "cacheField")
+      names(fields) <- vapply(xml_attr(fields, "cacheField"), function(x) x[["name"]], "")
+
+      if (is.na(xml_attr(fields[timeline], "cacheField", "sharedItems")[[1]]["count"])) {
+        stop("timeline was not initialized in pivot table!")
+      }
+
+      if (!inherits(x[[timeline]], "Date") && !inherits(x[[timeline]], "POSIXt")) {
+        stop("a timeline must be a date or a POSIXt object")
+      } else {
+        startDate <- min(x[[timeline]],  na.rm = TRUE)
+        endDate   <- max(x[[timeline]],  na.rm = TRUE)
+        meanDate  <- mean(x[[timeline]], na.rm = TRUE)
+      }
+
+      beg_date <- params$beg_date
+      if (!is.null(beg_date)) {
+        startDate <- beg_date
+      }
+
+      end_date <- params$end_date
+      if (!is.null(end_date)) {
+        endDate <- end_date
+      }
+
+      choose_beg <- params$choose_beg
+      if (is.null(choose_beg)) {
+        choose_beg <- startDate
+      }
+      if (!inherits(choose_beg, "Date") && !inherits(choose_beg, "POSIXt")) {
+        stop("choose_beg: a timeline must be a date or a POSIXt object")
+      }
+
+      choose_end <- params$choose_end
+      if (is.null(choose_end)) {
+        choose_end <- endDate
+      }
+      if (!inherits(choose_end, "Date") && !inherits(choose_end, "POSIXt")) {
+        stop("choose_end: a timeline must be a date or a POSIXt object")
+      }
+
+
+      selection_xml <- xml_node_create(
+        "selection",
+        xml_attributes = c(
+          startDate = format(as_POSIXct_utc(choose_beg), "%Y-%m-%dT%H:%M:%SZ"),
+          endDate   = format(as_POSIXct_utc(choose_end), "%Y-%m-%dT%H:%M:%SZ")
+        )
+      )
+
+      bounds_xml <- xml_node_create(
+        "bounds",
+        xml_attributes = c(
+          startDate = format(as_POSIXct_utc(startDate), "%Y-%m-%dT%H:%M:%SZ"),
+          endDate   = format(as_POSIXct_utc(endDate),   "%Y-%m-%dT%H:%M:%SZ")
+        )
+      )
+
+      # without choose: filterType = unknown
+      timeline_cache <- read_xml(sprintf(
+        '<timelineCacheDefinition xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:xr10="http://schemas.microsoft.com/office/spreadsheetml/2016/revision10" mc:Ignorable="xr10" name="NativeTimeline_%s" xr10:uid="%s" sourceName="%s">
+          <pivotTables>
+            <pivotTable tabId="%s" name="%s" />
+          </pivotTables>
+          <state minimalRefreshVersion="6" lastRefreshVersion="6" pivotCacheId="%s" filterType="dateBetween">
+            %s
+            %s
+          </state>
+        </timelineCacheDefinition>',
+        uni_name,
+        st_guid(),
+        timeline,
+        sheet,
+        pivot_table,
+        cid,
+        selection_xml,
+        bounds_xml
+      ), pointer = FALSE)
+
+      # we need the timeline cache
+      self$append(
+        "timelineCaches",
+        timeline_cache
+      )
+
+      # and the actual slicer
+      if (length(self$worksheets[[sheet]]$relships$timeline) == 0) {
+        self$append(
+          "timelines",
+          '<timelines xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:xr10="http://schemas.microsoft.com/office/spreadsheetml/2016/revision10" mc:Ignorable="x xr10"></timelines>'
+        )
+        self$worksheets[[sheet]]$relships$timeline <- length(self$timelines)
+      }
+
+      caption <- timeline
+      if (!is.null(params$caption))
+        caption <- params$caption
+
+      level <- 2
+      if (!is.null(params$level))
+        level <- params$level
+
+      selection_level <- 2
+      if (!is.null(params$selection_level))
+        selection_level <- params$selection_level
+
+      scroll_position <- meanDate
+      if (!is.null(params$scroll_position))
+        scroll_position <- params$scroll_position
+
+      style <- NULL
+      if (!is.null(params$style))
+        style <- params$style
+
+      showHeader <- NULL
+      if (!is.null(params$show_header))
+        showHeader <- params$show_header
+
+      showSelectionLabel <- NULL
+      if (!is.null(params$show_selection_label))
+        showSelectionLabel <- params$show_selection_label
+
+      showTimeLevel <- NULL
+      if (!is.null(params$show_time_level))
+        showTimeLevel <- params$show_time_level
+
+      showHorizontalScrollbar <- NULL
+      if (!is.null(params$show_horizontal_scrollbar))
+        showHorizontalScrollbar <- params$show_horizontal_scrollbar
+
+      timeline_xml <- xml_node_create(
+        "timeline",
+        xml_attributes = c(
+          name                    = uni_name,
+          `xr10:uid`              = st_guid(),
+          cache                   = paste0("NativeTimeline_", uni_name),
+          caption                 = caption,
+          level                   = as_xml_attr(level),
+          selectionLevel          = as_xml_attr(selection_level),
+          scrollPosition          = format(as_POSIXct_utc(scroll_position), "%Y-%m-%dT%H:%M:%SZ"),
+          showHeader              = as_xml_attr(showHeader),
+          showSelectionLabel      = as_xml_attr(showSelectionLabel),
+          showTimeLevel           = as_xml_attr(showTimeLevel),
+          showHorizontalScrollbar = as_xml_attr(showHorizontalScrollbar),
+          style                   = style
+        )
+      )
+
+      sel <- self$worksheets[[sheet]]$relships$timeline
+      self$timelines[sel] <- xml_add_child(self$timelines[sel], xml_child = timeline_xml)
+
+      timeline_id <- length(self$timelineCaches)
+      # append it to the workbook.xml.rels
+      self$append(
+        "workbook.xml.rels",
+        sprintf("<Relationship Id=\"rId%s\" Type=\"http://schemas.microsoft.com/office/2011/relationships/timelineCache\" Target=\"timelineCaches/timelineCache%s.xml\"/>",
+                200000 + timeline_id, timeline_id)
+      )
+
+      # add this defined name
+      self$workbook$definedNames <- append(
+        self$workbook$definedNames,
+        sprintf("<definedName name=\"NativeTimeline_%s\">#N/A</definedName>", uni_name)
+      )
+
+      # add the workbook extension list
+      if (is.null(self$workbook$extLst)) {
+        self$workbook$extLst <- xml_node_create("extLst")
+      }
+
+      if (!grepl("xmlns:x15", self$workbook$extLst)) {
+        self$workbook$extLst <- xml_add_child(self$workbook$extLst, xml_child = '<ext xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" uri="{D0CA8CA8-9F24-4464-BF8E-62219DCF47F9}"></ext>')
+      }
+
+      extLst_xml <- xml_node(self$workbook$extLst, "extLst", "ext")
+      is_ext_x15 <- grepl("xmlns:x15", extLst_xml)
+
+      # check if node has x15:timelineCacheRefs
+      if (!grepl("<x15:timelineCacheRefs>", extLst_xml[is_ext_x15])) {
+        extLst_xml[is_ext_x15] <- xml_add_child(
+          extLst_xml[is_ext_x15],
+          xml_child = xml_node_create("x15:timelineCacheRefs")
+        )
+      }
+
+      extLst_xml[is_ext_x15] <- xml_add_child(
+        extLst_xml[is_ext_x15],
+        xml_child = sprintf('<x15:timelineCacheRef r:id="rId%s" />', 200000 + timeline_id),
+        level = "x15:timelineCacheRefs"
+      )
+
+      self$workbook$extLst <- xml_node_create("extLst", xml_children = extLst_xml)
+
+      # add a drawing for the slicer
+      drawing_xml <- read_xml(sprintf('
+        <xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">
+          <xdr:absoluteAnchor>
+            <xdr:pos x="0" y="0" />
+            <xdr:ext cx="9313333" cy="6070985" />
+            <mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">
+              <mc:Choice xmlns:tsle=\"http://schemas.microsoft.com/office/drawing/2012/timeslicer\" Requires=\"tsle\">
+                <xdr:graphicFrame macro=\"\">
+                  <xdr:nvGraphicFramePr>
+                    <xdr:cNvPr id=\"2\" name="%s">
+                      <a:extLst><a:ext uri=\"{FF2B5EF4-FFF2-40B4-BE49-F238E27FC236}\"><a16:creationId xmlns:a16=\"http://schemas.microsoft.com/office/drawing/2014/main\" id=\"{F0ED9F26-D0CD-D3F1-9FDD-EABC216430BF}\"/></a:ext></a:extLst>
+                    </xdr:cNvPr>
+                    <xdr:cNvGraphicFramePr/>
+                  </xdr:nvGraphicFramePr>
+                  <xdr:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></xdr:xfrm>
+                  <a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/drawing/2012/timeslicer\"><tsle:timeslicer xmlns:tsle=\"http://schemas.microsoft.com/office/drawing/2012/timeslicer\" name=\"%s\"/></a:graphicData></a:graphic>
+                </xdr:graphicFrame>
+              </mc:Choice>
+              <mc:Fallback><xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr><xdr:cNvPr id=\"0\" name=\"\"/><xdr:cNvSpPr><a:spLocks noTextEdit=\"1\"/></xdr:cNvSpPr></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x=\"6019800\" y=\"3632200\"/><a:ext cx=\"3340100\" cy=\"1320800\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:solidFill><a:prstClr val=\"white\"/></a:solidFill><a:ln w=\"1\"><a:solidFill><a:prstClr val=\"green\"/></a:solidFill></a:ln></xdr:spPr><xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\"/><a:lstStyle/><a:p><a:r><a:rPr lang=\"en-GB\" sz=\"1100\"/><a:t>Timeline: Works in Excel 2013 or higher. Do not move or resize.</a:t></a:r></a:p></xdr:txBody></xdr:sp></mc:Fallback>
+            </mc:AlternateContent>
+            <xdr:clientData/>
+          </xdr:absoluteAnchor>
+        </xdr:wsDr>
+        ', uni_name, uni_name
+      ), pointer = FALSE)
+
+
+      edit_as <- "oneCell"
+      if (!is.null(params$edit_as))
+        edit_as <- params$edit_as
+
+      # place the drawing
+      self$add_drawing(dims = dims, sheet = sheet, xml = drawing_xml, edit_as = edit_as)
+
+
+      next_id <- get_next_id(self$worksheets_rels[[sheet]])
+
+      # add the pivot table and the drawing to the worksheet
+      if (!any(grepl(sprintf("Target=\"../timelines/timeline%s.xml\"", self$worksheets[[sheet]]$relships$timeline), self$worksheets_rels[[sheet]]))) {
+
+        timeline_list_xml <- sprintf(
+          '<x15:timelineRefs><x15:timelineRef r:id=\"%s\"/></x15:timelineRefs>',
+          next_id
+        )
+
+        # add the extension list to the worksheet
+        is_ext_x15 <- grepl("xmlns:x15", self$worksheets[[sheet]]$extLst)
+        if (length(self$worksheets[[sheet]]$extLst) == 0 || !any(is_ext_x15)) {
+
+          ext_x15 <- "<ext uri=\"{7E03D99C-DC04-49d9-9315-930204A7B6E9}\" xmlns:x15=\"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main\"></ext>"
+
+          self$worksheets[[sheet]]$append(
+            "extLst",
+            ext_x15
+          )
+
+          is_ext_x15 <- grepl("xmlns:x15", self$worksheets[[sheet]]$extLst)
+
+        }
+
+        self$worksheets[[sheet]]$extLst[is_ext_x15] <- xml_add_child(
+          self$worksheets[[sheet]]$extLst[is_ext_x15],
+          xml_child = timeline_list_xml
+        )
+
+        self$worksheets_rels[[sheet]] <- append(
+          self$worksheets_rels[[sheet]],
+          sprintf(
+            "<Relationship Id=\"%s\" Type=\"http://schemas.microsoft.com/office/2011/relationships/timeline\" Target=\"../timelines/timeline%s.xml\"/>",
+            next_id, self$worksheets[[sheet]]$relships$timeline
+          )
+        )
+
+      }
+
+      timeline_xml <- sprintf(
+        "<Override PartName=\"/xl/timelines/timeline%s.xml\" ContentType=\"application/vnd.ms-excel.timeline+xml\"/>",
+        self$worksheets[[sheet]]$relships$timeline
+      )
+
+      if (!any(self$Content_Types == timeline_xml)) {
+        self$append(
+          "Content_Types",
+          timeline_xml
+        )
+      }
+
+      value <- sprintf(
+        "<Override PartName=\"/xl/timelineCaches/timelineCache%s.xml\" ContentType=\"application/vnd.ms-excel.timelineCache+xml\"/>",
+        timeline_id
+      )
+
+      self$append(
+        "Content_Types", value
+      )
+
+      invisible(self)
+    },
+
+    #' @description add pivot table
+    #' @return The `wbWorkbook` object
+    remove_timeline = function(sheet = current_sheet()) {
+      sheet <- private$get_sheet_index(sheet)
+
+      # get indices
+      timeline_id       <- self$worksheets[[sheet]]$relships$timeline
+
+      # skip if nothing to do
+      if (identical(timeline_id, integer())) return(invisible(self))
+
+      cache_names       <- unname(sapply(xml_attr(self$timelines[timeline_id], "timelines", "timeline"), "[", "cache"))
+      timeline_names    <- unname(sapply(xml_attr(self$timelineCaches, "timelineCacheDefinition"), "[", "name"))
+      timeline_cache_id <- which(cache_names %in% timeline_names)
+
+      # strings to grep
+      timeline_xml <- sprintf("timelines/timeline%s.xml", timeline_id)
+      caches_xml   <- sprintf("timelineCaches/timelineCache%s.xml", timeline_cache_id)
+
+      # empty timelines
+      self$timelines[timeline_id]                <- ""
+      # empty timelineCache
+      self$timelineCaches[timeline_cache_id]     <- ""
+
+      # remove timeline cache relship
+      self$worksheets[[sheet]]$relships$timeline <- integer()
+      # remove worksheet relationship
+      self$worksheets_rels[[sheet]]              <- self$worksheets_rels[[sheet]][!grepl(timeline_xml, self$worksheets_rels[[sheet]])]
+      # remove "x15:timelineRefs"
+      is_ext_x15 <- grepl("xmlns:x15", self$worksheets[[sheet]]$extLst)
+      extLst     <- xml_rm_child(self$worksheets[[sheet]]$extLst[is_ext_x15], xml_child = "x15:timelineRefs")
+      self$worksheets[[sheet]]$extLst[is_ext_x15] <- extLst
+
+      # clear workbook.xml.rels
+      self$workbook.xml.rels                     <- self$workbook.xml.rels[!grepl(paste0(caches_xml, collapse = "|"), self$workbook.xml.rels)]
+
+      # clear Content_Types
+      self$Content_Types                         <- self$Content_Types[!grepl(paste0(c(timeline_xml, caches_xml), collapse = "|"), self$Content_Types)]
 
       invisible(self)
     },
@@ -2090,6 +2601,7 @@ wbWorkbook <- R6::R6Class(
       nThemes         <- length(self$theme)
       nPivots         <- length(self$pivotDefinitions)
       nSlicers        <- length(self$slicers)
+      nTimelines      <- length(self$timelines)
       nComments       <- length(self$comments)
       nThreadComments <- sum(lengths(self$threadComments) > 0)
       nPersons        <- length(self$persons)
@@ -2239,15 +2751,16 @@ wbWorkbook <- R6::R6Class(
         slicersDir      <- dir_create(tmpDir, "xl", "slicers")
         slicerCachesDir <- dir_create(tmpDir, "xl", "slicerCaches")
 
-        slicer <- self$slicers[self$slicers != ""]
-        for (i in seq_along(slicer)) {
+        slicer_id <- which(self$slicers != "")
+        for (i in slicer_id) {
           write_file(
-            body = slicer[i],
+            body = self$slicers[i],
             fl = file.path(slicersDir, sprintf("slicer%s.xml", i))
           )
         }
 
-        for (i in seq_along(self$slicerCaches)) {
+        caches_id <- which(self$slicerCaches != "")
+        for (i in caches_id) {
           write_file(
             body = self$slicerCaches[[i]],
             fl = file.path(slicerCachesDir, sprintf("slicerCache%s.xml", i))
@@ -2255,6 +2768,27 @@ wbWorkbook <- R6::R6Class(
         }
       }
 
+      # timelines
+      if (nTimelines) {
+        timelinesDir      <- dir_create(tmpDir, "xl", "timelines")
+        timelineCachesDir <- dir_create(tmpDir, "xl", "timelineCaches")
+
+        timeline_id <- which(self$timelines != "")
+        for (i in timeline_id) {
+          write_file(
+            body = self$timelines[i],
+            fl = file.path(timelinesDir, sprintf("timeline%s.xml", i))
+          )
+        }
+
+        caches_id <- which(self$timelineCaches != "")
+        for (i in caches_id) {
+          write_file(
+            body = self$timelineCaches[[i]],
+            fl = file.path(timelineCachesDir, sprintf("timelineCache%s.xml", i))
+          )
+        }
+      }
 
       ## Write content
 
@@ -2275,6 +2809,16 @@ wbWorkbook <- R6::R6Class(
           "http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties"
         )
         Targets <- c(Targets, "docProps/custom.xml")
+      }
+
+      # At the moment there is only a single known docMetadata file
+      if (length(self$docMetadata)) {
+        Ids <- c(Ids, paste0("rId", length(Ids) + 1L))
+        Types <- c(
+          Types,
+          "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels"
+        )
+        Targets <- c(Targets, "docMetadata/LabelInfo.xml")
       }
 
       relship <- df_to_xml("Relationship",
@@ -2421,6 +2965,14 @@ wbWorkbook <- R6::R6Class(
         for (fl in self$customXml[grepl(".xml.rels$", self$customXml)]) {
           file.copy(fl, customXmlRelsDir, overwrite = TRUE)
         }
+      }
+
+      if (length(self$docMetadata)) {
+        docMetadataDir     <- dir_create(tmpDir, "docMetadata")
+
+        write_file(body = self$docMetadata, fl = file.path(docMetadataDir, "LabelInfo.xml"))
+
+        ct <- append(ct, '<Override PartName="/docMetadata/LabelInfo.xml" ContentType="application/vnd.ms-office.classificationlabels+xml"/>')
       }
 
       ## externalLinks
@@ -4119,6 +4671,11 @@ wbWorkbook <- R6::R6Class(
         self$workbook.xml.rels <- self$workbook.xml.rels[!grepl(sprintf("(slicerCache%s\\.xml)", sheet), self$workbook.xml.rels)]
       }
 
+      if (any(grepl("timelines", self$worksheets_rels[[sheet]]))) {
+        # don't change to a grep(value = TRUE)
+        self$workbook.xml.rels <- self$workbook.xml.rels[!grepl(sprintf("(timelineCache%s\\.xml)", sheet), self$workbook.xml.rels)]
+      }
+
       ## wont't remove tables and then won't need to reassign table r:id's but will rename them!
       self$worksheets[[sheet]] <- NULL
       self$worksheets_rels[[sheet]] <- NULL
@@ -4744,8 +5301,6 @@ wbWorkbook <- R6::R6Class(
 
     ## conditional formatting ----
 
-    # TODO remove_conditional_formatting?
-
     #' @description Add conditional formatting
     #' @param rule rule
     #' @param style style
@@ -5063,6 +5618,41 @@ wbWorkbook <- R6::R6Class(
         values   = values,
         params   = params
       )
+
+      invisible(self)
+    },
+
+    #' @description Remove conditional formatting
+    #' @param sheet sheet
+    #' @param dims dims
+    #' @param first first
+    #' @param last last
+    #' @return The `wbWorkbook` object
+    remove_conditional_formatting = function(
+        sheet  = current_sheet(),
+        dims   = NULL,
+        first  = FALSE,
+        last   = FALSE
+    ) {
+
+      sheet <- private$get_sheet_index(sheet)
+
+      if (is.null(dims) && isFALSE(first) && isFALSE(last)) {
+        self$worksheets[[sheet]]$conditionalFormatting <- character()
+      } else {
+
+        cf <- self$worksheets[[sheet]]$conditionalFormatting
+
+        if (!is.null(dims)) {
+          if (any(sel <- names(cf) %in% dims)) {
+            self$worksheets[[sheet]]$conditionalFormatting <- cf[!sel]
+          }
+        } else if (first) {
+            self$worksheets[[sheet]]$conditionalFormatting <- cf[-1]
+        } else if (last) {
+            self$worksheets[[sheet]]$conditionalFormatting <- cf[-length(cf)]
+        }
+      }
 
       invisible(self)
     },
@@ -6176,9 +6766,17 @@ wbWorkbook <- R6::R6Class(
       # get option and make sure that it can be imported as xml
       mips <- xml %||% getOption("openxlsx2.mips_xml_string")
       if (is.null(mips)) stop("no mips xml provided")
-      mips <- xml_node(mips, "property")
 
-      self$set_properties(custom = mips)
+      nam <- xml_node_name(mips)
+
+      if (all(nam == "clbl:labelList")) {
+        self$docMetadata <- xml_node(mips, nam)
+      } else {
+        mips <- xml_node(mips, "property")
+        self$set_properties(custom = mips)
+      }
+
+      invisible(self)
     },
 
     #' @description get mips string
@@ -6189,11 +6787,18 @@ wbWorkbook <- R6::R6Class(
         prop_nams <- grepl("MSIP_Label_", rbindlist(xml_attr(props, "property"))$name)
 
         name <- grepl("_Name$", rbindlist(xml_attr(props[prop_nams], "property"))$name)
-
         name <- xml_value(props[prop_nams][name], "property", "vt:lpwstr")
+        mips <- props[prop_nams]
+
+        if (length(name) == 0 && length(self$docMetadata)) {
+          name <- xml_attr(self$docMetadata, "clbl:labelList", "clbl:label")[[1]][["id"]]
+          mips <- self$docMetadata
+          # names(mips) <- "docMetadata"
+          single_xml <- FALSE
+        }
+
         if (!quiet) message("Found MIPS section: ", name)
 
-        mips <- props[prop_nams]
         if (single_xml)
           paste0(mips, collapse = "")
         else
@@ -8991,6 +9596,7 @@ wbWorkbook <- R6::R6Class(
       ## don't want to re-assign rIds for pivot tables or slicer caches
       pivotNode        <- grep("pivotCache/pivotCacheDefinition[0-9]+.xml", self$workbook.xml.rels, value = TRUE)
       slicerNode       <- grep("slicerCache[0-9]+.xml",                     self$workbook.xml.rels, value = TRUE)
+      timelineNode     <- grep("timelineCache[0-9]+.xml",                   self$workbook.xml.rels, value = TRUE)
 
       ## Reorder children of workbook.xml.rels
       self$workbook.xml.rels <-
@@ -9021,7 +9627,7 @@ wbWorkbook <- R6::R6Class(
           }
         )
 
-      self$append("workbook.xml.rels", c(pivotNode, slicerNode))
+      self$append("workbook.xml.rels", c(pivotNode, slicerNode, timelineNode))
 
       if (length(self$metadata)) {
         self$append("workbook.xml.rels",
@@ -9118,7 +9724,7 @@ wbWorkbook <- R6::R6Class(
         if (length(need_cells) == 1 && grepl(":|;", need_cells))
           need_cells <- dims_to_dataframe(dims, fill = TRUE)
 
-        exp_cells <- unname(unlist(need_cells))
+        exp_cells <- unname(unlist(need_cells[need_cells != ""]))
         got_cells <- self$worksheets[[sheet]]$sheet_data$cc$r
 
         # initialize cell

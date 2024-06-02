@@ -1,3 +1,26 @@
+# openxlsx2 1.7
+
+## New features
+
+* Add function to remove conditional formatting from worksheet `wb_remove_conditional_formatting()` [1011](https://github.com/JanMarvin/openxlsx2/pull/1011)
+
+* Silence a warning triggered by a folder called `"[trash]"`. [1012](https://github.com/JanMarvin/openxlsx2/pull/1012)
+
+* Initial support for pivot table timelines. [1016](https://github.com/JanMarvin/openxlsx2/pull/1016)
+
+* Add `wb_add_timeline()` and extend `wb_add_slicer()`. [1017](https://github.com/JanMarvin/openxlsx2/pull/1017)
+
+## Fixes
+
+* Fixed an issue with non consecutive dims, where columns or rows were silently dropped. [1015](https://github.com/JanMarvin/openxlsx2/pull/1015)
+
+* Fixes to `wb_clone_worksheet()` cloning drawings and images should be restored. [1016](https://github.com/JanMarvin/openxlsx2/pull/1016)
+
+* Fixed an issue where non consecutive columns with special types would overlap. If columns A and C were dates, column B would be formatted as date too. [1026](https://github.com/JanMarvin/openxlsx2/pull/1026)
+
+
+***************************************************************************
+
 # openxlsx2 1.6
 
 ## New features
