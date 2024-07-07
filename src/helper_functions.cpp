@@ -330,17 +330,19 @@ Rcpp::CharacterVector needed_cells(const std::string& range) {
   return Rcpp::wrap(cells);
 }
 
-bool has_cell(const std::string& str, const Rcpp::CharacterVector& vec) {
-  return std::find(vec.begin(), vec.end(), str) != vec.end();
+bool has_cell(const std::string& str, const std::unordered_set<std::string>& vec) {
+  return vec.find(str) != vec.end();
 }
 
 // provide a basic rbindlist for lists of named characters
 // [[Rcpp::export]]
-SEXP dims_to_df(Rcpp::IntegerVector rows, Rcpp::CharacterVector cols, Rcpp::Nullable<Rcpp::CharacterVector> filled, bool fill) {
+SEXP dims_to_df(Rcpp::IntegerVector rows, Rcpp::CharacterVector cols, Rcpp::Nullable<Rcpp::CharacterVector> filled, bool fill,
+                Rcpp::Nullable<Rcpp::IntegerVector> fcols) {
 
   size_t kk = cols.size();
   size_t nn = rows.size();
 
+  bool has_fcols  = fcols.isNotNull();
   bool has_filled = filled.isNotNull();
 
   // 1. create the list
@@ -353,28 +355,38 @@ SEXP dims_to_df(Rcpp::IntegerVector rows, Rcpp::CharacterVector cols, Rcpp::Null
       SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(nn, NA_STRING));
   }
 
-  if (has_filled) {
+  if (fill) {
+    if (has_filled) {
 
-    // with has_filled we always have to run this loop
-    for (size_t i = 0; i < kk; ++i) {
-      Rcpp::CharacterVector cvec = Rcpp::as<Rcpp::CharacterVector>(df[i]);
-      std::string coli = Rcpp::as<std::string>(cols[i]);
-      for (size_t j = 0; j < nn; ++j) {
-        std::string cell = coli + std::to_string(rows[j]);
-        if (!has_cell(cell, filled.get()))
-          cvec[j] = "";
-        else if (fill)
-          cvec[j] = coli + std::to_string(rows[j]);
+      std::vector<std::string> flld = Rcpp::as<std::vector<std::string>>(filled.get());
+      std::unordered_set<std::string> flls(flld.begin(), flld.end());
+
+      // with has_filled we always have to run this loop
+      for (size_t i = 0; i < kk; ++i) {
+        Rcpp::CharacterVector cvec = Rcpp::as<Rcpp::CharacterVector>(df[i]);
+        std::string coli = Rcpp::as<std::string>(cols[i]);
+        for (size_t j = 0; j < nn; ++j) {
+          std::string cell = coli + std::to_string(rows[j]);
+          if (has_cell(cell, flls))
+            cvec[j] = cell;
+        }
       }
-    }
 
-  } else if (fill) { // insert cells into data frame
+    } else { // insert cells into data frame
 
-    for (size_t i = 0; i < kk; ++i) {
-      Rcpp::CharacterVector cvec = Rcpp::as<Rcpp::CharacterVector>(df[i]);
-      std::string coli = Rcpp::as<std::string>(cols[i]);
-      for (size_t j = 0; j < nn; ++j) {
-        cvec[j] = coli + std::to_string(rows[j]);
+      std::vector<size_t> fcls;
+      if (has_fcols) {
+        fcls = Rcpp::as<std::vector<size_t>>(fcols.get());
+      }
+
+      for (size_t i = 0; i < kk; ++i) {
+        if (has_fcols && std::find(fcls.begin(), fcls.end(), i) == fcls.end())
+          continue;
+        Rcpp::CharacterVector cvec = Rcpp::as<Rcpp::CharacterVector>(df[i]);
+        std::string coli = Rcpp::as<std::string>(cols[i]);
+        for (size_t j = 0; j < nn; ++j) {
+          cvec[j] = coli + std::to_string(rows[j]);
+        }
       }
     }
 
@@ -465,6 +477,8 @@ void wide_to_long(
 
   auto startcol = start_col;
 
+  int32_t in_string_nums = string_nums;
+
   // pointer magic. even though these are extracted, they just point to the
   // memory in the data frame
   Rcpp::CharacterVector zz_row_r = Rcpp::as<Rcpp::CharacterVector>(zz["row_r"]);
@@ -502,7 +516,7 @@ void wide_to_long(
 
       int8_t vtyp = (int8_t)vtyps[i];
       // if colname is provided, the first row is always a character
-      if (ColNames & (j == 0)) vtyp = character;
+      if (ColNames && j == 0) vtyp = character;
       std::string vals = Rcpp::as<std::string>(cvec[j]);
       std::string row = std::to_string(startrow);
 
@@ -512,8 +526,13 @@ void wide_to_long(
       if (ref_str.compare("0") == 0)
       ref_str = col + row;
 
-      // factors can be numeric or string or both
-      if (vtyp == factor) string_nums = true;
+      // factors can be numeric or string or both. tables require the
+      // column name to be character and once we have overwritten for
+      // a factor, we have to reset string_nums.
+      if (!(ColNames && j == 0) && vtyp == factor)
+        string_nums = 1;
+      else
+        string_nums = in_string_nums;
 
       // create struct
       celltyp cell;

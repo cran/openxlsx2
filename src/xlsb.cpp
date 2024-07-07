@@ -628,6 +628,7 @@ int table_bin(std::string filePath, std::string outPath, bool debug) {
   if (bin) {
     bin.seekg(0, std::ios_base::beg);
     bool end_of_table = false;
+    bool has_revision_record = false;
 
     while(!end_of_table) {
       Rcpp::checkUserInterrupt();
@@ -893,11 +894,15 @@ int table_bin(std::string filePath, std::string outPath, bool debug) {
         std::string fml;
         flags = readbin(flags, bin, swapit);
         int sharedFormula = false;
-        fml = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula);
+        fml = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
 
         // need to write this formula somehwere
-        if (debug )Rcpp::Rcout << fml << std::endl;
-        Rcpp::warning("Table formulas are not implemented.");
+        // if (debug) Rcpp::Rcout << fml << std::endl;
+        if (debug) Rcpp::warning("Table formulas are not fully implemented.");
+
+        out << "<calculatedColumnFormula>";
+        out << fml;
+        out << "</calculatedColumnFormula>" << std::endl;
 
         break;
       }
@@ -911,13 +916,25 @@ int table_bin(std::string filePath, std::string outPath, bool debug) {
         BrtTableStyleClientFields *fields = (BrtTableStyleClientFields*)&flags;
 
         out << "<tableStyleInfo name=\""<< stStyleName << "\"";
-        out <<" showColHeaders=\"" << fields->fColumnHeaders << "\"";
+        // out <<" showColHeaders=\"" << fields->fColumnHeaders << "\""; // not part of tableStyleInfo?
         out <<" showFirstColumn=\"" << fields->fFirstColumn << "\"";
         out <<" showLastColumn=\"" << fields->fLastColumn << "\"";
-        out <<" showRowHeaders=\"" << fields->fRowHeaders << "\"";
+        // out <<" showRowHeaders=\"" << fields->fRowHeaders << "\""; // not part of tableStyleInfo?
         out <<" showRowStripes=\"" << fields->fRowStripes << "\"";
         out <<" showColumnStripes=\"" << fields->fColumnStripes << "\"";
         out << " />" << std::endl;
+        break;
+      }
+
+      case BrtRRChgCell:
+      case BrtRRDefName:
+      {
+        has_revision_record = true;
+        // -- have not seen this yet. if it appears, treat it as if a revision record was found --
+        // rgce.rgce or rgceOld.rgce in BrtRRDefName
+        if (debug) Rcpp::Rcout << "BrtRRChgCell or BrtRRDefName" << std::endl;
+        Rcpp::warning("Assuming revision record.");
+        bin.seekg(size, bin.cur);
         break;
       }
 
@@ -1045,7 +1062,8 @@ int comments_bin(std::string filePath, std::string outPath, bool debug) {
       {
         // we do not handle RichStr correctly. Ignore all formatting
         std::string commentText = RichStr(bin, swapit);
-        out << "<text><r><rPr><sz val=\"10\"/><color rgb=\"FF000000\"/><rFont val=\"Tahoma\"/><family val=\"2\"/></rPr><t>" << escape_xml(commentText) << "</t></r></text>" << std::endl;
+        // out << "<text><r><rPr><sz val=\"10\"/><color rgb=\"FF000000\"/><rFont val=\"Tahoma\"/><family val=\"2\"/></rPr><t>" << escape_xml(commentText) << "</t></r></text>" << std::endl;
+        out << "<text>" << commentText << "</text>" << std::endl;
         break;
       }
 
@@ -1271,6 +1289,15 @@ int externalreferences_bin(std::string filePath, std::string outPath, bool debug
         break;
       }
 
+      case BrtACBegin:
+      case BrtExternalLinksAlternateUrls:
+      case BrtACEnd:
+      {
+        // unhandled
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
       default:
       {
         // if (debug) {
@@ -1347,8 +1374,7 @@ int sharedstrings_bin(std::string filePath, std::string outPath, bool debug) {
           bin.seekg(pos, bin.beg);
         }
         // if (debug)
-        out << "<si><t>" << escape_xml(val) <<
-          "</t></si>" << std::endl;
+        out << "<si>" << val << "</si>" << std::endl;
         break;
       }
 
@@ -1395,6 +1421,7 @@ int workbook_bin(std::string filePath, std::string outPath, bool debug) {
     bin.seekg(0, std::ios_base::beg);
     bool end_of_workbook = false;
     bool first_extern_sheet = true;
+    bool has_revision_record = false;
 
     std::vector<std::string> defNams, xtis, reference_type;
     defNams.push_back("<definedNames>");
@@ -1654,7 +1681,7 @@ int workbook_bin(std::string filePath, std::string outPath, bool debug) {
         std::string fml = "", comment = "";
 
         int sharedFormula = false;
-        fml = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula);
+        fml = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
 
         comment = XLNullableWideString(bin, swapit);
 
@@ -1920,6 +1947,18 @@ int workbook_bin(std::string filePath, std::string outPath, bool debug) {
         break;
       }
 
+      case BrtRRChgCell:
+      case BrtRRDefName:
+      {
+        has_revision_record = true;
+        // -- have not seen this yet. if it appears, treat it as if a revision record was found --
+        // rgce.rgce or rgceOld.rgce in BrtRRDefName
+        if (debug) Rcpp::Rcout << "BrtRRChgCell or BrtRRDefName" << std::endl;
+        Rcpp::warning("Assuming revision record.");
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
       default:
       {
         if (debug) {
@@ -1961,6 +2000,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
     bool first_row = true;
     bool in_sheet_data = false;
     bool end_of_worksheet = false;
+    bool has_revision_record = false;
     std::string fml_type;
 
     uint32_t row = 0;
@@ -1986,6 +2026,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
       if (debug) Rcpp::Rcout << "." << std::endl;
 
       RECORD(x, size, bin, swapit);
+      if (debug) Rcpp::Rcout << x << ": " << size << std::endl;
 
       switch(x) {
 
@@ -1997,6 +2038,38 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
           out << "<worksheet>" << std::endl;
 
         if (debug) Rcpp::Rcout << "Begin of <worksheet>: " << bin.tellg() << std::endl;
+        break;
+      }
+
+      case BrtCsProp:
+      {
+        if (debug) Rcpp::Rcout << "CsProp: " << bin.tellg() << std::endl;
+
+        uint16_t A = 0;
+        A = readbin(A, bin, swapit);
+
+        std::vector<int> color = brtColor(bin, swapit);
+        std::string strName = XLWideString(bin, swapit);
+
+        // for now we only handle color in sheetPR
+        if (color[0] >= 1 && color[0] <= 3) {
+          out << "<sheetPr>" << std::endl;
+
+          if (color[0] == 0x01) {
+            out << "<tabColor indexed=\"" << color[1] << "\" />" << std::endl;
+          }
+
+          if (color[0] == 0x02) {
+            out << "<tabColor rgb=\"" << to_argb(color[6], color[3], color[4], color[5]) << "\" />" << std::endl;
+          }
+
+          if (color[0] == 0x03) {
+            out << "<tabColor theme=\"" << color[1] << "\" />" << std::endl; //  << "\" tint=\""<< color[2]
+          }
+
+          out << "</sheetPr>" << std::endl;
+        }
+
         break;
       }
 
@@ -2114,6 +2187,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtPane:
       {
+        if (debug) Rcpp::Rcout << "BrtPane: " << std::endl;
         uint8_t flags = 0;
         uint32_t rwTop = 0, colLeft = 0, pnnAct = 0;
         double xnumXSplit = 0.0, xnumYSplit = 0.0;
@@ -2232,6 +2306,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtPageSetup:
       {
+        if (debug) Rcpp::Rcout << "BrtPageSetup: " << std::endl;
         uint16_t flags = 0;
         uint32_t iPaperSize = 0, iScale = 0, iRes = 0, iVRes = 0, iCopies = 0, iPageStart = 0, iFitWidth = 0, iFitHeight = 0;
 
@@ -2273,6 +2348,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtPhoneticInfo:
       {
+        if (debug) Rcpp::Rcout << "BrtPhoneticInfo: " << std::endl;
         uint16_t iFnt = 0;
         uint32_t phType = 0, phAll = 0;
         iFnt = readbin(iFnt, bin, swapit);
@@ -2287,6 +2363,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtBeginHeaderFooter:
       {
+        if (debug) Rcpp::Rcout << "BrtBeginHeaderFooter: " << std::endl;
         uint16_t flags = 0;
         flags = readbin(flags, bin, swapit); // unused
 
@@ -2495,7 +2572,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
           for (size_t i = 0; i < colvec.size(); ++i) {
             out << "<c r=\"" << colvec[i].c_r << "\" s=\"" << colvec[i].c_s << "\" t=\""<< colvec[i].c_t << "\">" << std::endl;
             out << "<v>" << escape_xml(colvec[i].v) << "</v>" << std::endl;
-            out << "<f ref=\"" << colvec[i].f_ref << "\" si=\""<< colvec[i].f_si << "\" t=\"" << colvec[i].f_t << "\" >" << colvec[i].f << "</f>" << std::endl;
+            out << "<f ref=\"" << colvec[i].f_ref << "\" ca=\"" << colvec[i].f_ca << "\" si=\""<< colvec[i].f_si << "\" t=\"" << colvec[i].f_t << "\" >" << colvec[i].f << "</f>" << std::endl;
             out << "</c>" << std::endl;
           }
 
@@ -2587,7 +2664,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         out << " spans=\"" << spans << "\"";
 
       if (fields->iOutLevel > 0) {
-        out << " outlineLevel=\"" << fields->iOutLevel << "\"";
+        out << " outlineLevel=\"" << (uint16_t)fields->iOutLevel << "\"";
       }
 
       if (fields->fCollapsed) {
@@ -2611,7 +2688,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
       row = rw;
 
       if (debug)
-        Rcpp::Rcout << (rw) << " : " << ixfe << " : " << miyRw << " : " << (int32_t)fExtraAsc << " : " <<
+        Rcpp::Rcout << "ROW:" << (rw +1) << " : " << ixfe << " : " << miyRw << " : " << (int32_t)fExtraAsc << " : " <<
           (int32_t)fExtraDsc << " : " << unk32 << " : " << (int32_t)fCollapsed << " : " << (int32_t)fDyZero << " : " <<
             (int32_t)fUnsynced << " : " << (int32_t)fGhostDirty << " : " << (int32_t)fReserved << " : " <<
               (int32_t)fPhShow << " : " << ccolspan << "; " << bin.tellg() << std::endl;
@@ -2809,25 +2886,32 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         uint16_t grbitFlags = 0;
         grbitFlags = readbin(grbitFlags, bin, swapit);
 
+        GrbitFmlaFields *fields = (GrbitFmlaFields *)&grbitFlags;
+
         // GrbitFmlaFields *fields = (GrbitFmlaFields *)&grbitFlags;
-        std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula);
-
-
+        std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record);
 
         xml_col column;
         column.v = std::to_string((int32_t)val);
+
+        std::string a0 = int_to_col(cell[0] + 1) + std::to_string(row);
         std::string a1 = int_to_col(cell[0] + 1) + std::to_string(row + 1);
 
-        auto sfml = shared_cells.find(a1);
-        if (sfml != shared_cells.end()) {
+        auto sfml = shared_cells.find(fml);
+        auto sfml1 = shared_cells.find(a0);
+        if ((fml.empty() || sfml != shared_cells.end()) && sfml1 != shared_cells.end()) {
           column.f_t = fml_type;
-          column.f_si = std::to_string(sfml->second);
+          if (sfml != shared_cells.end())
+            column.f_si = std::to_string(sfml->second);
+          else
+            column.f_si = std::to_string(sfml1->second);
         } else {
           column.f = fml;
         }
         if (cell[1]) column.c_s = std::to_string(cell[1]);
         column.c_t = "b";
         column.c_r = a1;
+        if (fields->fAlwaysCalc) column.f_ca = std::to_string(fields->fAlwaysCalc);
         colvec.push_back(column);
 
         break;
@@ -2850,27 +2934,34 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         uint16_t grbitFlags = 0;
         grbitFlags = readbin(grbitFlags, bin, swapit);
 
-        // GrbitFmlaFields *fields = (GrbitFmlaFields *)&grbitFlags;
+        GrbitFmlaFields *fields = (GrbitFmlaFields *)&grbitFlags;
 
         // int32_t len = size - 4 * 32 - 2 * 8;
         // std::string fml(len, '\0');
 
-        std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula);
+        std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record);
 
         xml_col column;
         column.v = fErr;
+
+        std::string a0 = int_to_col(cell[0] + 1) + std::to_string(row);
         std::string a1 = int_to_col(cell[0] + 1) + std::to_string(row + 1);
 
-        auto sfml = shared_cells.find(a1);
-        if (sfml != shared_cells.end()) {
+        auto sfml = shared_cells.find(fml);
+        auto sfml1 = shared_cells.find(a0);
+        if ((fml.empty() || sfml != shared_cells.end()) && sfml1 != shared_cells.end()) {
           column.f_t = fml_type;
-          column.f_si = std::to_string(sfml->second);
+          if (sfml != shared_cells.end())
+            column.f_si = std::to_string(sfml->second);
+          else
+            column.f_si = std::to_string(sfml1->second);
         } else {
           column.f = fml;
         }
         if (cell[1]) column.c_s = std::to_string(cell[1]);
         column.c_t = "e";
         column.c_r = a1;
+        if (fields->fAlwaysCalc) column.f_ca = std::to_string(fields->fAlwaysCalc);
         colvec.push_back(column);
 
         break;
@@ -2893,32 +2984,40 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         uint16_t grbitFlags = 0;
         grbitFlags = readbin(grbitFlags, bin, swapit);
 
-        // GrbitFmlaFields *fields = (GrbitFmlaFields *)&grbitFlags;
+        GrbitFmlaFields *fields = (GrbitFmlaFields *)&grbitFlags;
 
         // Rprintf("%d, %d, %d\n",
         //         fields->reserved,
         //         fields->fAlwaysCalc,
         //         fields->unused);
 
-        std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula);
+        std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record);
 
         std::stringstream stream;
         stream << std::setprecision(16) << xnum;
+        std::string a0 = int_to_col(cell[0] + 1) + std::to_string(row);
         std::string a1 = int_to_col(cell[0] + 1) + std::to_string(row + 1);
 
         xml_col column;
         column.v = stream.str();
 
-        auto sfml = shared_cells.find(a1);
-        if (sfml != shared_cells.end()) {
+        // fml is a reference to another cell in shared formula case?
+
+        auto sfml = shared_cells.find(fml);
+        auto sfml1 = shared_cells.find(a0);
+        if ((fml.empty() || sfml != shared_cells.end()) && sfml1 != shared_cells.end()) {
           column.f_t = fml_type;
-          column.f_si = std::to_string(sfml->second);
+          if (sfml != shared_cells.end())
+            column.f_si = std::to_string(sfml->second);
+          else
+            column.f_si = std::to_string(sfml1->second);
         } else {
           column.f = fml;
         }
         if (cell[1]) column.c_s = std::to_string(cell[1]);
         // column.c_t = "e";
         column.c_r = a1;
+        if (fields->fAlwaysCalc) column.f_ca = std::to_string(fields->fAlwaysCalc);
         colvec.push_back(column);
 
         break;
@@ -2941,21 +3040,28 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         uint16_t grbitFlags = 0;
         grbitFlags = readbin(grbitFlags, bin, swapit);
 
+        GrbitFmlaFields *fields = (GrbitFmlaFields *)&grbitFlags;
 
-        std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula);
+        std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record);
 
         // if (is_shared_formula) {
         //   Rcpp::Rcout << fml << std::endl;
         // }
 
+
+        std::string a0 = int_to_col(cell[0] + 1) + std::to_string(row);
         std::string a1 = int_to_col(cell[0] + 1) + std::to_string(row + 1);
 
-        auto sfml = shared_cells.find(a1);
-
         xml_col column;
-        if (sfml != shared_cells.end()) {
+
+        auto sfml = shared_cells.find(fml);
+        auto sfml1 = shared_cells.find(a0);
+        if ((fml.empty() || sfml != shared_cells.end()) && sfml1 != shared_cells.end()) {
           column.f_t = fml_type;
-          column.f_si = std::to_string(sfml->second);
+          if (sfml != shared_cells.end())
+            column.f_si = std::to_string(sfml->second);
+          else
+            column.f_si = std::to_string(sfml1->second);
         } else {
           column.f = fml;
         }
@@ -2963,6 +3069,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         if (cell[1]) column.c_s = std::to_string(cell[1]);
         column.c_t = "str";
         column.c_r = a1;
+        if (fields->fAlwaysCalc) column.f_ca = std::to_string(fields->fAlwaysCalc);
         colvec.push_back(column);
 
         break;
@@ -2970,6 +3077,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtArrFmla:
       {
+        if (debug) Rcpp::Rcout << "BrtArrFmla: " << bin.tellg() << std::endl;
         int is_shared_formula = false;
 
         uint8_t flags = 0;
@@ -2993,7 +3101,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
         flags = readbin(flags, bin, 0);
 
-        std::string fml = CellParsedFormula(bin, swapit, debug, col, row, is_shared_formula);
+        std::string fml = CellParsedFormula(bin, swapit, debug, col, row, is_shared_formula, has_revision_record);
         if (debug) Rcpp::Rcout << "BrtArrFmla: " << fml << std::endl;
 
         // add to the last colvec element
@@ -3012,8 +3120,8 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         int is_shared_formula = false;
 
         uint32_t rwFirst = 0, rwLast = 0, colFirst = 0, colLast = 0;
-        rwFirst  = UncheckedRw(bin, swapit) +1;
-        rwLast   = UncheckedRw(bin, swapit) +1;
+        rwFirst  = UncheckedRw(bin, swapit); // +1
+        rwLast   = UncheckedRw(bin, swapit); // +1
         colFirst = UncheckedCol(bin, swapit) +1;
         colLast  = UncheckedCol(bin, swapit) +1;
 
@@ -3021,12 +3129,13 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
         // fill the unordered map
         for (size_t i = 0; i < cells.size(); ++i) {
-          // Rcpp::Rcout << cells[i] << "\n";
           shared_cells[cells[i]] = shared_cell_cntr;
         }
 
-        std::string lref = int_to_col(colFirst) + std::to_string(rwFirst);
-        std::string rref = int_to_col(colLast) + std::to_string(rwLast);
+        // shared_cells needs to compare against fml. fml is (row - 1)
+        // reference must be row
+        std::string lref = int_to_col(colFirst) + std::to_string(rwFirst + 1);
+        std::string rref = int_to_col(colLast) + std::to_string(rwLast + 1);
 
         std::string ref;
         if (lref.compare(rref) == 0) {
@@ -3037,7 +3146,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
         if (debug) Rcpp::Rcout << "ref: " << ref << std::endl;
 
-        std::string fml = CellParsedFormula(bin, swapit, debug, col, row, is_shared_formula);
+        std::string fml = CellParsedFormula(bin, swapit, debug, col, row, is_shared_formula, has_revision_record);
         if (debug) Rcpp::Rcout << "BrtShrFmla: " << fml << std::endl;
 
         fml_type = "shared";
@@ -3064,7 +3173,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
           for (size_t i = 0; i < colvec.size(); ++i) {
             out << "<c r=\"" << colvec[i].c_r << "\" s=\"" << colvec[i].c_s << "\" t=\""<< colvec[i].c_t << "\">" << std::endl;
             out << "<v>" << escape_xml(colvec[i].v) << "</v>" << std::endl;
-            out << "<f ref=\"" << colvec[i].f_ref << "\" si=\""<< colvec[i].f_si << "\" t=\"" << colvec[i].f_t << "\" >" << colvec[i].f << "</f>" << std::endl;
+            out << "<f ref=\"" << colvec[i].f_ref << "\" ca=\"" << colvec[i].f_ca << "\" si=\""<< colvec[i].f_si << "\" t=\"" << colvec[i].f_t << "\" >" << colvec[i].f << "</f>" << std::endl;
             out << "</c>" << std::endl;
           }
 
@@ -3150,14 +3259,21 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         xnumHeader = Xnum(bin, swapit);
         xnumFooter = Xnum(bin, swapit);
 
-        out << "<pageMargins";
-        out << " left=\"" << xnumLeft << "\"";
-        out << " right=\"" << xnumRight << "\"";
-        out << " top=\"" << xnumTop << "\"";
-        out << " bottom=\"" << xnumBottom << "\"";
-        out << " header=\"" << xnumHeader << "\"";
-        out << " footer=\"" << xnumFooter << "\"";
-        out << " />" << std::endl;
+        if (xnumLeft < 0   || xnumLeft > 49)   Rcpp::stop("xnumLeft size out of bounds");
+        if (xnumRight < 0  || xnumRight > 49)  Rcpp::stop("xnumRight size out of bounds");
+        if (xnumTop < 0    || xnumTop > 49)    Rcpp::stop("xnumTop size out of bounds");
+        if (xnumBottom < 0 || xnumBottom > 49) Rcpp::stop("xnumBottom size out of bounds");
+        if (xnumHeader < 0 || xnumHeader > 49) Rcpp::stop("xnumHeader size out of bounds");
+        if (xnumFooter < 0 || xnumFooter > 49) Rcpp::stop("xnumFooter size out of bounds");
+
+        out << "<pageMargins" <<
+          " left=\"" << xnumLeft << "\"" <<
+          " right=\"" << xnumRight << "\"" <<
+          " top=\"" << xnumTop << "\"" <<
+          " bottom=\"" << xnumBottom << "\"" <<
+          " header=\"" << xnumHeader << "\"" <<
+          " footer=\"" << xnumFooter << "\"" <<
+          " />" << std::endl;
 
         break;
       }
@@ -3171,7 +3287,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtDrawing:
       {
-        if (debug) Rcpp::Rcout << "<drawing>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtDrawing" << std::endl;
         std::string stRelId = XLNullableWideString(bin, swapit);
         out << "<drawing r:id=\"" << stRelId << "\" />" << std::endl;
         break;
@@ -3179,7 +3295,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtLegacyDrawing:
       {
-        if (debug) Rcpp::Rcout << "<legacyDrawing>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtLegacyDrawing" << std::endl;
         std::string stRelId = XLNullableWideString(bin, swapit);
         out << "<legacyDrawing r:id=\"" << stRelId << "\" />" << std::endl;
         break;
@@ -3187,7 +3303,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtLegacyDrawingHF:
       {
-        if (debug) Rcpp::Rcout << "<BrtLegacyDrawingHF>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtLegacyDrawingHF" << std::endl;
         std::string stRelId = XLNullableWideString(bin, swapit);
         out << "<legacyDrawingHF r:id=\"" << stRelId << "\" />" << std::endl;
         break;
@@ -3195,7 +3311,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtHLink:
       {
-        if (debug) Rcpp::Rcout << "<BrtHLink>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtHLink" << std::endl;
 
         std::vector<int> rfx = UncheckedRfX(bin, swapit);
         std::string relId = XLNullableWideString(bin, swapit);
@@ -3222,7 +3338,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtBeginAFilter:
       {
-        if (debug) Rcpp::Rcout << "<autofilter>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtBeginAFilter" << std::endl;
         std::vector<int> rfx = UncheckedRfX(bin, swapit);
 
         std::string lref = int_to_col(rfx[2] + 1) + std::to_string(rfx[0] + 1);
@@ -3245,7 +3361,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtBeginFilterColumn:
       {
-        if (debug) Rcpp::Rcout << "<filterColumn>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtBeginFilterColumn" << std::endl;
 
         uint16_t flags = 0;
         uint32_t dwCol = 0;
@@ -3261,7 +3377,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtBeginFilters:
       {
-        if (debug) Rcpp::Rcout << "<filters>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtBeginFilters" << std::endl;
         // bin.seekg(size, bin.cur);
 
         uint32_t fBlank = 0, unused = 0;
@@ -3273,7 +3389,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtFilter:
       {
-        if (debug) Rcpp::Rcout << "<BrtFilter>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtFilter" << std::endl;
         std::string rgch = XLWideString(bin, swapit);
         out << "<filter val=\"" << rgch << "\" />" << std::endl;
         // bin.seekg(size, bin.cur);
@@ -3282,7 +3398,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtEndFilters:
       {
-        if (debug) Rcpp::Rcout << "</filters>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtEndFilters" << std::endl;
         out << "</filters>" << std::endl;
         bin.seekg(size, bin.cur);
         break;
@@ -3290,7 +3406,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtColorFilter:
       {
-        if (debug) Rcpp::Rcout << "<BrtColorFilter>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtColorFilter" << std::endl;
         uint32_t dxfid = 0, fCellColor = 0;
         dxfid = readbin(dxfid, bin, swapit);
         fCellColor = readbin(fCellColor, bin, swapit);
@@ -3304,6 +3420,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
       case BrtBeginCustomFilters14:
       case BrtBeginCustomRichFilters:
       {
+        if (debug) Rcpp::Rcout << "BrtBeginCustom..." << std::endl;
         Rcpp::warning("Custom Filter found. This is not handled.");
         bin.seekg(size, bin.cur);
 
@@ -3312,6 +3429,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtDynamicFilter:
       {
+        if (debug) Rcpp::Rcout << "BrtDynamicFilter" << std::endl;
         Rcpp::warning("Dynamic Filter found. This is not handled.");
         bin.seekg(size, bin.cur);
         break;
@@ -3335,7 +3453,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtEndFilterColumn:
       {
-        if (debug) Rcpp::Rcout << "</filterColumn>" << std::endl;
+        if (debug) Rcpp::Rcout << "BrtEndFilterColumn" << std::endl;
         out << "</filterColumn>" << std::endl;
         bin.seekg(size, bin.cur);
         break;
@@ -3395,7 +3513,7 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         std::string strProgID = XLNullableWideString(bin, swapit);
 
         int sharedFormula = false;
-        if (fLinked) std::string link = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula);
+        if (fLinked) std::string link = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
 
         std::string stRelID = XLNullableWideString(bin, swapit);
         out << "<oleObject progId=\"" << strProgID << "\" shapeId=\"" << shapeId << "\" r:id=\"" << stRelID << "\" />" << std::endl;
@@ -3411,30 +3529,288 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
       }
 
       case BrtBeginDVals:
-      case BrtBeginDVals14:
       {
-        Rcpp::warning("Worksheet contains unhandled data validation.");
-        bin.seekg(size, bin.cur);
+        if (debug) Rcpp::Rcout << "BrtBeginDVals" << std::endl;
+
+        uint16_t flags = 0;
+        uint32_t xLeft = 0, yTop = 0, unused3 = 0, idvMac = 0;
+
+        // openxlsx2 does not handle this?
+        flags   = readbin(flags, bin, swapit);
+        xLeft   = readbin(xLeft, bin, swapit);
+        yTop    = readbin(yTop, bin, swapit);
+        unused3 = readbin(unused3, bin, swapit);
+        idvMac  = readbin(idvMac, bin, swapit);
+
+        if (idvMac > 65534) Rcpp::stop("idvMac to big");
+
+        out << "<dataValidations>" << std::endl;
         break;
       }
+
 
       case BrtDVal:
-      case BrtDVal14:
-      case BrtDValList:
-      case BrtBeginDCon:
-      case BrtEndDCon:
-      case BrtEndDVals:
-      case BrtEndDVals14:
       {
+        if (debug) Rcpp::Rcout << "BrtDVal" << std::endl;
+
+        uint32_t flags = 0;
+        std::vector<int> sqrfx;
+        std::string strErrorTitle = "", strError = "", strPromptTitle = "", strPrompt = "";
+
+        flags = readbin(flags, bin, swapit);
+
+        BrtDValFields *fields = (BrtDValFields *)&flags;
+
+        sqrfx          = UncheckedSqRfX(bin, swapit);
+        strErrorTitle  = XLNullableWideString(bin, swapit);
+        strError       = XLNullableWideString(bin, swapit);
+        strPromptTitle = XLNullableWideString(bin, swapit);
+        strPrompt      = XLNullableWideString(bin, swapit);
+
+        int sharedFormula = false;
+        std::string formula1 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+        std::string formula2 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+
+        std::string lref = int_to_col(sqrfx[3] + 1) + std::to_string(sqrfx[1] + 1);
+        std::string rref = int_to_col(sqrfx[4] + 1) + std::to_string(sqrfx[2] + 1);
+
+        std::string sqref;
+        if (lref.compare(rref) == 0) {
+          sqref = lref;
+        } else {
+          sqref =  lref + ":" + rref;
+        }
+
+        out << "<dataValidation " <<
+         "type=\"" << valType(fields->valType) << "\" " <<
+         "operator=\"" << typOperator(fields->typOperator) << "\" " <<
+         "allowBlank=\"" << (bool)fields->fAllowBlank << "\" " <<
+         "showInputMessage=\"" << (bool)fields->fShowInputMsg << "\" " <<
+         "showErrorMessage=\"" << (bool)fields->fShowErrorMsg << "\" " <<
+         "sqref=\"" << sqref << "\" >" <<
+         "<formula1>" << formula1 << "</formula1>" <<
+         "<formula2>" << formula2 << "</formula2>" <<
+         "</dataValidation>" << std::endl;
+
+        break;
+      }
+
+      case BrtDValList:
+      {
+        Rcpp::Rcout << "BrtDValList" << std::endl;
+
+        std::string strDvalList = XLWideString(bin, swapit);
+        Rcpp::Rcout << strDvalList << std::endl;
+
+        break;
+      }
+
+      case BrtEndDVals:
+      {
+        if (debug) Rcpp::Rcout << "BrtEndDVals" << std::endl;
+        out << "</dataValidations>" << std::endl;
         bin.seekg(size, bin.cur);
         break;
       }
 
+      case BrtBeginDVals14:
+      {
+        if (debug) Rcpp::Rcout << "BrtBeginDVals14" << std::endl;
+        // Rcpp::warning("Worksheet contains unhandled data validation.");
+
+        // FRT blank
+        uint32_t reserved = 0;
+        reserved = readbin(reserved, bin, swapit);
+
+        // Dvals
+        uint16_t flags = 0;
+        uint32_t xLeft = 0, yTop = 0, unused3 = 0, idvMac = 0;
+
+        // openxlsx2 does not handle this?
+        flags   = readbin(flags, bin, swapit);
+        xLeft   = readbin(xLeft, bin, swapit);
+        yTop    = readbin(yTop, bin, swapit);
+        unused3 = readbin(unused3, bin, swapit);
+        idvMac  = readbin(idvMac, bin, swapit);
+
+        if (idvMac > 65534) Rcpp::stop("idvMac to big");
+
+        out << "<x14:dataValidations count=\"" <<
+          std::to_string(idvMac) <<
+          "\" xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\""
+          ">" << std::endl;
+
+        break;
+      }
+
+      case BrtDVal14:
+      {
+        if (debug) Rcpp::Rcout << "BrtDVal14" << std::endl;
+
+        // Start FRTHeader
+        uint32_t flags_frt = 0;
+        std::vector<std::string> frt_sqrefs;
+        std::vector<std::string> frt_fmls;
+
+        flags_frt = readbin(flags_frt, bin, swapit);
+
+        FRTHeaderFields *fields_frt = (FRTHeaderFields *)&flags_frt;
+
+        if (fields_frt->fRef) { // but must be 0
+          // Rcpp::Rcout << "fRef" << std::endl;
+          uint32_t cref = 0;
+          cref = readbin(cref, bin, swapit);
+          // Rcpp::Rcout << "Refs: " << cref << std::endl;
+
+          for (uint32_t crf = 0; crf < cref; ++crf) {
+            uint32_t flags_cref = 0;
+            flags_cref = readbin(flags_cref, bin, swapit);
+            std::vector<int> rfx_cref = UncheckedRfX(bin, swapit);
+          }
+
+        }
+
+        if (fields_frt->fSqref) { // must be 1
+          // Rcpp::Rcout << "fSqref" << std::endl;
+          uint32_t csqref = 0;
+          csqref = readbin(csqref, bin, swapit);
+          // Rcpp::Rcout << "Sqrefs: " << csqref << std::endl;
+
+          for (uint32_t csqrf = 0; csqrf < csqref; ++csqrf) {
+            uint32_t flags_csqrf = 0;
+            flags_csqrf = readbin(flags_csqrf, bin, swapit);
+
+            /* beg move this to function -------------------------------------*/
+            std::vector<int> rfx_csqrfx = UncheckedSqRfX(bin, swapit);
+
+            std::string lref = int_to_col(rfx_csqrfx[3] + 1) + std::to_string(rfx_csqrfx[1] + 1);
+            std::string rref = int_to_col(rfx_csqrfx[4] + 1) + std::to_string(rfx_csqrfx[2] + 1);
+
+            std::string sqref;
+            if (lref.compare(rref) == 0) {
+              sqref = lref;
+            } else {
+              sqref =  lref + ":" + rref;
+            }
+            /* end move this to function -------------------------------------*/
+
+            frt_sqrefs.push_back(sqref);
+
+          }
+
+        }
+
+        if (fields_frt->fFormula) { // 0 or 1
+          // Rcpp::Rcout << "fFormula" << std::endl;
+          uint32_t cformula = 0;
+          cformula = readbin(cformula, bin, swapit);
+          // Rcpp::Rcout << "Formulas: " << cformula << std::endl;
+
+          for (uint32_t cfml = 0; cfml < cformula; ++cfml) {
+            uint32_t flags_cfml = 0;
+            flags_cfml = readbin(flags_cfml, bin, swapit);
+            int sharedFormula = false;
+            std::string frt_fml = FRTParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+            frt_fmls.push_back(frt_fml);
+            // Rcpp::Rcout << frt_fmls[cfml] << std::endl;
+          }
+
+        }
+
+        if (fields_frt->fRelID) { // 0
+          // Rcpp::Rcout << "fRelID" << std::endl;
+          std::string relId = LPWideString(bin, swapit);
+        }
+        // End FRTHeader
+
+        uint32_t flags = 0;
+        std::string strErrorTitle = "", strError = "", strPromptTitle = "", strPrompt = "";
+
+        flags = readbin(flags, bin, swapit);
+
+        BrtDValFields *fields = (BrtDValFields *)&flags;
+
+
+        // if (debug)
+        // Rprintf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+        //   (uint32_t)fields->valType,
+        //   (uint32_t)fields->errStyle,
+        //   (uint32_t)fields->unused,
+        //   (uint32_t)fields->fAllowBlank,
+        //   (uint32_t)fields->fSuppressCombo,
+        //   (uint32_t)fields->mdImeMode,
+        //   (uint32_t)fields->fShowInputMsg,
+        //   (uint32_t)fields->fShowErrorMsg,
+        //   (uint32_t)fields->typOperator,
+        //   (uint32_t)fields->fDVMinFmla,
+        //   (uint32_t)fields->fDVMaxFmla
+        // );
+
+        strErrorTitle  = XLNullableWideString(bin, swapit);
+        strError       = XLNullableWideString(bin, swapit);
+        strPromptTitle = XLNullableWideString(bin, swapit);
+        strPrompt      = XLNullableWideString(bin, swapit);
+
+        out << "<x14:dataValidation " <<
+         "type=\"" << valType(fields->valType) << "\" " <<
+         "operator=\"" << typOperator(fields->typOperator) << "\" " <<
+         "allowBlank=\"" << (bool)fields->fAllowBlank << "\" " <<
+         "showInputMessage=\"" << (bool)fields->fShowInputMsg << "\" " <<
+         "showErrorMessage=\"" << (bool)fields->fShowErrorMsg << "\" " <<
+         // "xr:uid=\"{00000000-0002-0000-0200-000000000000}\" " <<
+         ">";
+
+        for (size_t len = 0; len < frt_fmls.size(); ++len) {
+
+          out <<
+            "<x14:formula" << std::to_string(len + 1) << ">" <<
+            "<xm:f>" <<
+            frt_fmls[len] <<
+            "</xm:f>" <<
+            "</x14:formula" << std::to_string(len + 1) << ">";
+        }
+        for (size_t len = 0; len < frt_fmls.size(); ++len) {
+
+          out <<
+            "<xm:sqref>" <<
+            frt_sqrefs[len] <<
+            "</xm:sqref>";
+        }
+
+        out  << "</x14:dataValidation>" << std::endl;
+
+        break;
+      }
+
+      case BrtEndDVals14:
+      {
+        if (debug) Rcpp::Rcout << "BrtEndDVals14" << std::endl;
+        out << "</x14:dataValidations>" << std::endl;
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
+
+      case BrtBeginDCon:
+      case BrtEndDCon:
+      {
+        if (debug) Rcpp::Rcout << "BrtBegin/EndDCon" << std::endl;
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
+      case BrtBeginConditionalFormattings:
+      case BrtBeginConditionalFormatting14:
+      {
+        if (debug) Rcpp::Rcout << "BrtBegin/EndDCon" << std::endl;
+
+        Rcpp::warning("Worksheet contains unhandled conditional formatting.");
+        bin.seekg(size, bin.cur);
+        break;
+      }
 
       case BrtBeginConditionalFormatting:
       {
-
-        Rcpp::warning("Worksheet contains unhandled conditional formatting.");
 
         if (debug) Rcpp::Rcout << "<conditionalFormatting>" << std::endl;
 
@@ -3488,13 +3864,13 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         int sharedFormula = false;
         std::string rgce1, rgce2, rgce3;
         if (cbFmla1 != 0x00000000) {
-          rgce1 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula);
+          rgce1 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
         }
         if (cbFmla2 != 0x00000000) {
-          rgce2 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula);
+          rgce2 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
         }
         if (cbFmla3 != 0x00000000) {
-          rgce3 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula);
+          rgce3 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
         }
 
         BrtBeginCFRuleFields *fields = (BrtBeginCFRuleFields *)&flags;
@@ -3528,6 +3904,27 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
         break;
       }
 
+      case BrtEndConditionalFormatting14:
+      case BrtBeginCFRule14:
+      case BrtEndCFRule14:
+      {
+        if (debug) Rcpp::Rcout << "BrtBegin/EndDCon 14" << std::endl;
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
+      // dxf styles for conditional formatting can be (or is always?) embedded in the worksheet
+      // the xlsx conversion creates <x14:dxf/>
+      case BrtBeginDXFs:
+      case BrtDXF:
+      case BrtEndDXFs:
+      {
+        if (debug) Rcpp::Rcout << "BrtBegin/EndDXFs in worksheet (?)" << std::endl;
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
+
       case BrtEndCFRule:
       {
 
@@ -3539,10 +3936,17 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
 
       case BrtEndConditionalFormatting:
       {
-
         if (debug) Rcpp::Rcout << "</conditionalFormatting>" << std::endl;
         out << "</conditionalFormatting>" << std::endl;
+        bin.seekg(size, bin.cur);
+        break;
+      }
 
+      case BrtEndConditionalFormattings:
+      {
+        // UNHANDLED
+        if (debug) Rcpp::Rcout << "</conditionalFormattings>" << std::endl;
+        bin.seekg(size, bin.cur);
         break;
       }
 
@@ -3586,11 +3990,28 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
       }
       // end unhandled page breaks
 
-      // TODO it is not correct to stop here for future records, but we ignore
-      // this <ext/> segments currently. Otherwise the calendar_stress.xlsb
-      // file breaks. Somehow there are new blank cell and row header entries.
       case BrtFRTBegin:
+      {
+        if (debug) Rcpp::Rcout << "BrtFRTBegin" << std::endl;
+
+        // we only handle this for data validation lists.
+        out << "<extLst>" <<
+          "<ext uri=\"{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">" <<
+            std::endl;
+
+        ProductVersion(bin, swapit, debug);
+
+        break;
+      }
+
       case BrtFRTEnd:
+      {
+        if (debug) Rcpp::Rcout << "BrtFRTEnd" << std::endl;
+        out << "</ext></extLst>" << std::endl;
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
       case BrtEndSheet:
       {
 
@@ -3612,6 +4033,59 @@ int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bo
           out << "</worksheet>" << std::endl;
         end_of_worksheet = true;
         row = 0;
+        break;
+      }
+
+      // ignore error section
+      case BrtBeginCellIgnoreECs:
+      case BrtCellIgnoreEC:
+      case BrtEndCellIgnoreECs:
+      {
+        if (debug) Rcpp::Rcout << "BrtBeginCell" << std::endl;
+        // Rcpp::warning("Worksheet contains unhandled data validation.");
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
+      case BrtRRChgCell:
+      case BrtRRDefName:
+      {
+        has_revision_record = true;
+        // -- have not seen this yet. if it appears, treat it as if a revision record was found --
+        // rgce.rgce or rgceOld.rgce in BrtRRDefName
+        if (debug) Rcpp::Rcout << "BrtRRChgCell or BrtRRDefName" << std::endl;
+        Rcpp::warning("Assuming revision record.");
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
+      case BrtBeginSortState:
+      case BrtEndSortState:
+      case BrtBeginSortCond:
+      case BrtEndSortCond:
+      {
+        if (debug) Rcpp::warning("Worksheet contains unhandled sorting.");
+        bin.seekg(size, bin.cur);
+        break;
+      }
+
+      case BrtValueMeta:
+      {
+        if (debug) Rcpp::Rcout << "BrtValueMeta" << std::endl;
+        int32_t ivmb = 0;
+        ivmb = readbin(ivmb, bin, swapit);
+        break;
+      }
+
+      case BrtSheetProtectionIso:
+      case BrtCsProtection:
+      {
+        if (debug) Rcpp::Rcout << "protection" << std::endl;
+        // uint16_t protpwd = 0;
+        // uint32_t fLocked = 0, fObjects = 0;
+        // unhandled
+        if (debug) Rcpp::warning("Worksheet contains unhandled protection.");
+        bin.seekg(size, bin.cur);
         break;
       }
 

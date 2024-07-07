@@ -17,8 +17,8 @@ test_that("write_formula", {
   # write data add array formula later
   wb <- wb_workbook()
   wb <- wb_add_worksheet(wb, "df")
-  wb$add_data("df", df, startCol = "C")
-  write_formula(wb, "df", start_col = "E", start_row = 2,
+  wb$add_data(x = df, startCol = "C")
+  wb$add_formula(start_col = "E", start_row = 2,
                x = "SUM(C2:C11*D2:D11)",
                array = TRUE)
 
@@ -31,9 +31,9 @@ test_that("write_formula", {
   # write formula first add data later
   wb <- wb_workbook()
   wb <- wb_add_worksheet(wb, "df")
-  write_formula(wb, "df", start_col = "E", start_row = 2,
-               x = "SUM(C2:C11*D2:D11)",
-               array = TRUE)
+  wb$add_formula(start_col = "E", start_row = 2,
+                 x = "SUM(C2:C11*D2:D11)",
+                 array = TRUE)
   wb$add_data("df", df, start_col = "C")
 
   cc <- wb$worksheets[[1]]$sheet_data$cc
@@ -581,7 +581,7 @@ test_that("writing slicers works", {
   expect_equal("x15:timelineCacheRefs", xml_node_name(wb$workbook$extLst, "extLst", "ext"))
   expect_equal("timelines", xml_node_name(wb$timelines))
   expect_equal("timelineCacheDefinition", xml_node_name(wb$timelineCaches))
-  expect_true(grepl("x15:timelineRefs", wb$worksheets[[2]]$extLst))
+  expect_match(wb$worksheets[[2]]$extLst, "x15:timelineRefs")
 
   wb$add_slicer(df, slicer = "lttr", pivot_table = "pivot1")
 
@@ -1232,4 +1232,10 @@ test_that("non consecutive columns do not overlap", {
   got <- cc[cc$r == "B2", "c_s"]
   expect_equal(exp, got)
 
+})
+
+test_that("sheet is a valid argument in write_xlsx", {
+  wb1 <- write_xlsx(x = mtcars, sheet_name = "data")
+  wb2 <- write_xlsx(x = mtcars, sheet = "data")
+  expect_equal(wb1$get_sheet_names(), wb2$get_sheet_names())
 })

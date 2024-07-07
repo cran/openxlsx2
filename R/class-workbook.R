@@ -1358,7 +1358,7 @@ wbWorkbook <- R6::R6Class(
           )
       }
 
-      write_data(
+      do_write_data(
         wb                = self,
         sheet             = sheet,
         x                 = x,
@@ -1436,7 +1436,7 @@ wbWorkbook <- R6::R6Class(
         )
       }
 
-      write_datatable(
+      do_write_datatable(
         wb              = self,
         x               = x,
         sheet           = sheet,
@@ -1901,33 +1901,17 @@ wbWorkbook <- R6::R6Class(
 
       next_id <- get_next_id(self$worksheets_rels[[sheet]])
 
+
+
       # add the pivot table and the drawing to the worksheet
-      is_ext_x14 <- grepl("xmlns:x14", self$worksheets[[sheet]]$extLst)
       if (!any(grepl(sprintf("Target=\"../slicers/slicer%s.xml\"", self$worksheets[[sheet]]$relships$slicer), self$worksheets_rels[[sheet]]))) {
 
         slicer_list_xml <- sprintf(
-          '<x14:slicerList><x14:slicer r:id=\"%s\"/></x14:slicerList>',
+          '<x14:slicer r:id=\"%s\"/>',
           next_id
         )
 
-        # add the extension list to the worksheet
-        if (length(self$worksheets[[sheet]]$extLst) == 0 || !any(is_ext_x14)) {
-
-          ext_x14 <- "<ext uri=\"{A8765BA9-456A-4dab-B4F3-ACF838C121DE}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\"></ext>"
-
-          self$worksheets[[sheet]]$append(
-            "extLst",
-            ext_x14
-          )
-
-          is_ext_x14 <- grepl("xmlns:x14", self$worksheets[[sheet]]$extLst)
-
-        }
-
-        self$worksheets[[sheet]]$extLst[is_ext_x14] <- xml_add_child(
-          self$worksheets[[sheet]]$extLst[is_ext_x14],
-          xml_child = slicer_list_xml
-        )
+        self$worksheets[[sheet]]$.__enclos_env__$private$do_append_x14(slicer_list_xml, "x14:slicer", "x14:slicerList")
 
         self$worksheets_rels[[sheet]] <- append(
           self$worksheets_rels[[sheet]],
@@ -1992,7 +1976,7 @@ wbWorkbook <- R6::R6Class(
       # remove worksheet relationship
       self$worksheets_rels[[sheet]]            <- self$worksheets_rels[[sheet]][!grepl(slicer_xml, self$worksheets_rels[[sheet]])]
       # remove "x14:slicerList"
-      is_ext_x14 <- grepl("xmlns:x14", self$worksheets[[sheet]]$extLst)
+      is_ext_x14 <- grepl("x14:slicerList", self$worksheets[[sheet]]$extLst)
       extLst     <- xml_rm_child(self$worksheets[[sheet]]$extLst[is_ext_x14], xml_child = "x14:slicerList")
       self$worksheets[[sheet]]$extLst[is_ext_x14] <- extLst
 
@@ -2296,7 +2280,7 @@ wbWorkbook <- R6::R6Class(
         )
 
         # add the extension list to the worksheet
-        is_ext_x15 <- grepl("xmlns:x15", self$worksheets[[sheet]]$extLst)
+        is_ext_x15 <- grepl("x15:timelineRefs", self$worksheets[[sheet]]$extLst)
         if (length(self$worksheets[[sheet]]$extLst) == 0 || !any(is_ext_x15)) {
 
           ext_x15 <- "<ext uri=\"{7E03D99C-DC04-49d9-9315-930204A7B6E9}\" xmlns:x15=\"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main\"></ext>"
@@ -2306,7 +2290,7 @@ wbWorkbook <- R6::R6Class(
             ext_x15
           )
 
-          is_ext_x15 <- grepl("xmlns:x15", self$worksheets[[sheet]]$extLst)
+          is_ext_x15 <- length(self$worksheets[[sheet]]$extLst)
 
         }
 
@@ -2378,7 +2362,7 @@ wbWorkbook <- R6::R6Class(
       # remove worksheet relationship
       self$worksheets_rels[[sheet]]              <- self$worksheets_rels[[sheet]][!grepl(timeline_xml, self$worksheets_rels[[sheet]])]
       # remove "x15:timelineRefs"
-      is_ext_x15 <- grepl("xmlns:x15", self$worksheets[[sheet]]$extLst)
+      is_ext_x15 <- grepl("x15:timelineRefs", self$worksheets[[sheet]]$extLst)
       extLst     <- xml_rm_child(self$worksheets[[sheet]]$extLst[is_ext_x15], xml_child = "x15:timelineRefs")
       self$worksheets[[sheet]]$extLst[is_ext_x15] <- extLst
 
@@ -2416,7 +2400,7 @@ wbWorkbook <- R6::R6Class(
     ) {
 
       standardize_case_names(...)
-      write_formula(
+      do_write_formula(
         wb              = self,
         sheet           = sheet,
         x               = x,
@@ -2478,6 +2462,7 @@ wbWorkbook <- R6::R6Class(
     #' @param na.numbers A numeric vector of digits which are to be interpreted as NA. Blank cells will be returned as NA.
     #' @param fill_merged_cells If TRUE, the value in a merged cell is given to all cells within the merge.
     #' @param keep_attributes If TRUE additional attributes are returned. (These are used internally to define a cell type.)
+    #' @param check_names If TRUE then the names of the variables in the data frame are checked to ensure that they are syntactically valid variable names.
     #' @return a data frame
     to_df = function(
       sheet,
@@ -2501,6 +2486,7 @@ wbWorkbook <- R6::R6Class(
       types,
       named_region,
       keep_attributes   = FALSE,
+      check_names       = FALSE,
       ...
     ) {
 
@@ -2531,7 +2517,8 @@ wbWorkbook <- R6::R6Class(
         show_formula      = show_formula,
         convert           = convert,
         types             = types,
-        named_region      = named_region
+        named_region      = named_region,
+        check_names       = check_names
       )
     },
 
@@ -3309,19 +3296,22 @@ wbWorkbook <- R6::R6Class(
           }, FUN.VALUE = ""), collapse = "")
           if (WR != "") {
             WR <- rbindlist(xml_attr(WR, "Relationships", "Relationship"))
-            WR$tmpDirPartName <- paste0(tmpDir, "/xl/", folder, "/", WR$Target)
-            WR$fileExists <- file.exists(WR$tmpDirPartName)
 
-            # exclude hyperlinks
-            WR$type <- basename(WR$Type)
-            WR <- WR[WR$type != "hyperlink", ]
+            if (NROW(WR)) { # in xlsb files it can be that WR has no rows
+              WR$tmpDirPartName <- paste0(tmpDir, "/xl/", folder, "/", WR$Target)
+              WR$fileExists <- file.exists(WR$tmpDirPartName)
 
-            if (!all(WR$fileExists)) {
-              missing_in_tmp <- WR$Target[!WR$fileExists]
-              warning(
-                "[", folder, "] file expected to be in output is missing: ",
-                paste(missing_in_tmp, collapse = " ")
-              )
+              # exclude hyperlinks
+              WR$type <- basename(WR$Type)
+              WR <- WR[WR$type != "hyperlink", ]
+
+              if (!all(WR$fileExists)) {
+                missing_in_tmp <- WR$Target[!WR$fileExists]
+                warning(
+                  "[", folder, "] file expected to be in output is missing: ",
+                  paste(missing_in_tmp, collapse = " ")
+                )
+              }
             }
           }
         }
@@ -4024,7 +4014,7 @@ wbWorkbook <- R6::R6Class(
       old <- old %||% seq_along(self$sheet_names)
 
       if (identical(old, new)) {
-        return(self)
+        return(invisible(self))
       }
 
       if (!length(self$worksheets)) {
@@ -4040,7 +4030,7 @@ wbWorkbook <- R6::R6Class(
       new_name <- replace_legal_chars(new_raw)
 
       if (identical(self$sheet_names[pos], new_name)) {
-        return(self)
+        return(invisible(self))
       }
 
       bad <- duplicated(tolower(new))
@@ -4336,7 +4326,7 @@ wbWorkbook <- R6::R6Class(
       # should do nothing if the cols' length is zero
       # TODO why would cols ever be 0?  Can we just signal this as an error?
       if (length(cols) == 0L) {
-        return(self)
+        return(invisible(self))
       }
 
       cols <- col2int(cols)
@@ -5050,7 +5040,7 @@ wbWorkbook <- R6::R6Class(
       if (!is.null(color) && !is_wbColour(color))
         stop("color needs to be a wb_color()")
 
-      write_comment(
+      do_write_comment(
         wb      = self,
         sheet   = sheet,
         comment = comment,
@@ -5116,7 +5106,7 @@ wbWorkbook <- R6::R6Class(
         gridExpand <- TRUE
       }
 
-      remove_comment(
+      do_remove_comment(
         wb         = self,
         sheet      = sheet,
         col        = col,
@@ -6444,7 +6434,7 @@ wbWorkbook <- R6::R6Class(
 
       if (!protect) {
         self$workbook$workbookProtection <- NULL
-        return(self)
+        return(invisible(self))
       }
 
       # match.arg() doesn't handle numbers too well
@@ -6500,7 +6490,7 @@ wbWorkbook <- R6::R6Class(
       if (!protect) {
         # initializes as character()
         self$worksheets[[sheet]]$sheetProtection <- character()
-        return(self)
+        return(invisible(self))
       }
 
       all_props <- worksheet_lock_properties()
@@ -7248,7 +7238,7 @@ wbWorkbook <- R6::R6Class(
     #' @description get tables
     #' @return The sheet tables.  `character()` if empty
     get_tables = function(sheet = current_sheet()) {
-      if (length(sheet) != 1) {
+      if (!is.null(sheet) && length(sheet) != 1) {
         stop("sheet argument must be length 1")
       }
 
@@ -7256,10 +7246,14 @@ wbWorkbook <- R6::R6Class(
         return(character())
       }
 
-      sheet <- private$get_sheet_index(sheet)
-      if (is.na(sheet)) stop("No such sheet in workbook")
+      if (!is.null(sheet)) {
+        sheet <- private$get_sheet_index(sheet)
+        if (is.na(sheet)) stop("No such sheet in workbook")
 
-      sel <- self$tables$tab_sheet == sheet & self$tables$tab_act == 1
+        sel <- self$tables$tab_sheet == sheet & self$tables$tab_act == 1
+      } else {
+        sel <- self$tables$tab_act == 1
+      }
       self$tables[sel, c("tab_name", "tab_ref")]
     },
 
@@ -8394,14 +8388,19 @@ wbWorkbook <- R6::R6Class(
     #' @return The `wbWorksheetObject`, invisibly
     set_cell_style = function(sheet = current_sheet(), dims, style) {
 
-      if (length(dims) == 1 && grepl(":|;", dims))
+      if (length(dims) == 1 && grepl(":|;|,", dims))
         dims <- dims_to_dataframe(dims, fill = TRUE)
       sheet <- private$get_sheet_index(sheet)
 
-      if (all(grepl("[A-Za-z]", style)))
-        styid <- self$get_cell_style(dims = style, sheet = sheet)
-      else
+      if (all(grepl("[A-Za-z]", style))) {
+        if (is_dims(style)) {
+          styid <- self$get_cell_style(dims = style, sheet = sheet)
+        } else {
+          styid <- self$styles_mgr$get_xf_id(style)
+        }
+      } else {
         styid <- style
+      }
 
       private$do_cell_init(sheet, dims)
 
@@ -8424,10 +8423,15 @@ wbWorkbook <- R6::R6Class(
     set_cell_style_across = function(sheet = current_sheet(), style, cols = NULL, rows = NULL) {
 
       sheet <- private$get_sheet_index(sheet)
-      if (all(grepl("[A-Za-z]", style)))
-        styid <- self$get_cell_style(dims = style, sheet = sheet)
-      else
+      if (all(grepl("[A-Za-z]", style))) {
+        if (is_dims(style)) {
+          styid <- self$get_cell_style(dims = style, sheet = sheet)
+        } else {
+          styid <- self$styles_mgr$get_xf_id(style)
+        }
+      } else {
         styid <- style
+      }
 
       if (!is.null(rows)) {
         if (is.character(rows)) # row2int
@@ -9517,7 +9521,7 @@ wbWorkbook <- R6::R6Class(
         uniqueValues = cf_unique_values(dxfId),
 
         ## iconSet ----
-        iconSet = cf_icon_set(values, params),
+        iconSet = cf_icon_set(self$worksheets[[sheet]]$extLst, sqref, values, params),
 
         ## containsErrors ----
         containsErrors = cf_iserror(dxfId, sqref),
@@ -9536,11 +9540,15 @@ wbWorkbook <- R6::R6Class(
       )
 
       # dataBar needs additional extLst
-      if (!is.null(attr(cfRule, "extLst")))
-        self$worksheets[[sheet]]$extLst <- read_xml(attr(cfRule, "extLst"), pointer = FALSE)
+      if (!is.null(attr(cfRule, "extLst"))) {
+        # self$worksheets[[sheet]]$extLst <- read_xml(attr(cfRule, "extLst"), pointer = FALSE)
+        self$worksheets[[sheet]]$.__enclos_env__$private$do_append_x14(attr(cfRule, "extLst"), "x14:conditionalFormatting", "x14:conditionalFormattings")
+      }
 
-      private$append_sheet_field(sheet, "conditionalFormatting", read_xml(cfRule, pointer = FALSE))
-      names(self$worksheets[[sheet]]$conditionalFormatting) <- nms
+      if (length(cfRule)) {
+        private$append_sheet_field(sheet, "conditionalFormatting", read_xml(cfRule, pointer = FALSE))
+        names(self$worksheets[[sheet]]$conditionalFormatting) <- nms
+      }
       invisible(self)
     },
 
@@ -9721,7 +9729,7 @@ wbWorkbook <- R6::R6Class(
         # there are some cells already available, we have to create the missing cells
 
         need_cells <- dims
-        if (length(need_cells) == 1 && grepl(":|;", need_cells))
+        if (length(need_cells) == 1 && grepl(":|;|,", need_cells))
           need_cells <- dims_to_dataframe(dims, fill = TRUE)
 
         exp_cells <- unname(unlist(need_cells[need_cells != ""]))

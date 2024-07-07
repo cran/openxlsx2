@@ -46,7 +46,7 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
 
   ## set scientific notation penalty
 
-  arguments <- c(ls(), "creator",  "sheet_name", "grid_lines",
+  arguments <- c(ls(), "creator", "sheet", "sheet_name", "grid_lines",
     "tab_color", "tab_colour",
     "zoom", "header", "footer", "even_header", "even_footer", "first_header",
     "first_footer", "start_col", "start_row", "total_row",
@@ -137,12 +137,13 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
 
 
   sheetName <- "Sheet 1"
-  if ("sheet_name" %in% names(params)) {
+  if (any(c("sheet_name", "sheet") %in% names(params))) {
+
+    sheetName <- as.character(params$sheet_name %||% params$sheet)
+
     if (any(nchar(params$sheet_name) > 31)) {
       stop("sheet_name too long! Max length is 31 characters.")
     }
-
-    sheetName <- as.character(params$sheet_name)
 
     if (inherits(x, "list") && (length(sheetName) == length(x))) {
       names(x) <- sheetName
@@ -352,7 +353,7 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
 
     if (as_table[i]) {
       # add data table??
-      write_datatable(
+      do_write_datatable(
         wb          = wb,
         sheet       = i,
         x           = x[[i]],
@@ -368,7 +369,7 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
       )
     } else {
       # TODO add_data()?
-      write_data(
+      do_write_data(
         wb = wb,
         sheet = i,
         x = x[[i]],

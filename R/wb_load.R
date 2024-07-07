@@ -1122,7 +1122,7 @@ wb_load <- function(
 
       # get extLst object. select the slicerCaches and replace it
       ext_nams <- xml_node_name(wb$workbook$extLst, "extLst", "ext")
-      is_slicer <- which(ext_nams == "x14:slicerCaches")
+      is_slicer <- which(ext_nams %in% c("x14:slicerCaches", "x15:slicerCaches"))
       ext <- xml_node(wb$workbook$extLst, "extLst", "ext")
       ext[is_slicer] <- genSlicerCachesExtLst(1E5 + seq_along(slicerCachesXML))
       wb$workbook$extLst <- xml_node_create("extLst", xml_children = ext)
@@ -1275,7 +1275,7 @@ wb_load <- function(
         # fix broken xml in vml buttons
         vml <- stringi::stri_read_lines(vml, encoding = "UTF-8")
         vml <- paste(vml, sep = "", collapse = "")
-        vml <- gsub("<br>", "<br/>", vml)
+        vml <- gsub("<br>(?!</br>)", "<br/>", vml, perl = TRUE)
         wb$vml[vml_file] <- read_xml(vml, pointer = FALSE)
       }
 
@@ -1302,6 +1302,36 @@ wb_load <- function(
         txt <- read_xml(commentsXML[comment_xml])
         authors <- xml_value(txt, "comments", "authors", "author")
         comments <- xml_node(txt, "comments", "commentList", "comment")
+
+
+      # create valid rich text strings in comments table
+      if (length(commentsBIN) && any(sel <- grepl("<FONT_\\d+/>", comments))) {
+
+        SST      <- c(comments)
+
+        matches <- stringi::stri_extract_all_regex(SST[sel], "<FONT_\\d+/>")
+        matches <- unique(unlist(matches))
+
+        values  <- as.integer(gsub("\\D+", "", matches))
+
+        xmls    <- stringi::stri_replace_all_fixed(
+          wb$styles_mgr$styles$fonts[values + 1],
+          c("<name", "font>"),
+          c("<rFont", "rPr>"),
+          vectorize_all = FALSE
+        )
+
+        sst <- stringi::stri_replace_all_fixed(
+          str           = SST[sel],
+          pattern       = matches,
+          replacement   = xmls,
+          vectorize_all = FALSE
+        )
+
+        SST[sel] <- sst
+
+        comments <- SST
+      }
 
         comments_attr <- rbindlist(xml_attr(comments, "comment"))
 
@@ -1498,7 +1528,7 @@ wb_load <- function(
 
       sheets <- wb$get_sheet_names(escape = TRUE)
 
-      xti$sheets <- NA_character_ #(otherwise in missing cases: all is <NA>)
+      xti$sheets <- "" # was NA_character_ but (in missing cases: all is <NA>)
       # all id == 0 are local references, otherwise external references
       # external references are written as "[0]sheetname!A1". Require
       # handling of externalReferences.bin
@@ -1531,6 +1561,27 @@ wb_load <- function(
           }
       }
 
+      for (i in seq_along(wb$tables$tab_xml)) {
+        wb$tables$tab_xml[i] <-
+          stringi::stri_replace_all_fixed(
+            wb$tables$tab_xml[i],
+            xti$name_id,
+            xti$sheets,
+            vectorize_all = FALSE
+          )
+      }
+
+      for (i in seq_along(wb$worksheets)) {
+        if (!wb$is_chartsheet[[i]])
+          wb$worksheets[[i]]$extLst <-
+            stringi::stri_replace_all_fixed(
+              wb$worksheets[[i]]$extLst,
+              xti$name_id,
+              xti$sheets,
+              vectorize_all = FALSE
+            )
+      }
+
       ### for external references we need to get the required sheet names first
       # For now this is all a little guess work
 
@@ -1556,7 +1607,7 @@ wb_load <- function(
           ref  <- xti$ext_id[sel][i]
 
           # want can be zero
-          if (want %in% seq_along(extSheets)) {
+          if (ref %in% seq_along(extSheets)) {
 
             sheetName <- extSheets[[ref]][[want]]
             if (xti$firstSheet[sel][i] < xti$lastSheet[sel][i]) {
@@ -1590,6 +1641,88 @@ wb_load <- function(
               xti$sheets,
               vectorize_all = FALSE
             )
+
+          # replace named region in formulas
+          nri         <- wb$get_named_regions()
+          nri$name_id <- paste0("openxlsx2defnam_", sprintf("%012d", as.integer(nri$id)))
+
+          if (debug)
+            print(nri)
+
+          for (j in seq_along(wb$worksheets)) {
+            if (any(sel <- grepl(paste0(nri$name_id, collapse = "|"), wb$worksheets[[j]]$sheet_data$cc$f))) {
+              wb$worksheets[[j]]$sheet_data$cc$f[sel] <-
+                stringi::stri_replace_all_fixed(
+                  wb$worksheets[[j]]$sheet_data$cc$f[sel],
+                  nri$name_id,
+                  nri$name,
+                  vectorize_all = FALSE
+                )
+            }
+
+
+            if (!wb$is_chartsheet[[i]])
+              wb$worksheets[[j]]$dataValidations <-
+                stringi::stri_replace_all_fixed(
+                  wb$worksheets[[j]]$dataValidations,
+                  nri$name_id,
+                  nri$name,
+                  vectorize_all = FALSE
+                )
+          }
+
+        }
+
+        if (length(wb$tables)) {
+          # replace named region in formulas
+          tri         <- wb$get_tables(sheet = NULL)
+          tri$id      <- as.integer(rbindlist(xml_attr(wb$tables$tab_xml, "table"))$id) # - 1L
+          tri$name_id <- paste0("openxlsx2tab_", sprintf("%012d", tri$id))
+          tri$vars    <- lapply(wb$tables$tab_xml, function(x) rbindlist(xml_attr(x, "table", "tableColumns", "tableColumn"))$name)
+
+          tri <- tri[order(tri$id), ]
+
+          if (debug)
+            print(tri)
+
+          for (j in seq_along(wb$worksheets)) {
+            if (any(sel <- grepl(paste0(tri$name_id, collapse = "|"), wb$worksheets[[j]]$sheet_data$cc$f))) {
+
+              for (i in seq_len(nrow(tri))) {
+
+                sel <- grepl(paste0(tri$name_id, collapse = "|"), wb$worksheets[[j]]$sheet_data$cc$f)
+
+                from_xlsb <- c(tri$name_id[i], paste0("[openxlsx2col_", tri$id[i], "_", seq_along(unlist(tri$vars[i])) - 1L, "]"))
+                to_xlsx   <- c(tri$tab_name[i], paste0("[", unlist(tri$vars[i]), "]"))
+
+                # always on all?
+                wb$tables$tab_xml <-
+                  stringi::stri_replace_all_fixed(
+                    wb$tables$tab_xml,
+                    from_xlsb,
+                    to_xlsx,
+                    vectorize_all = FALSE
+                  )
+
+                wb$worksheets[[j]]$sheet_data$cc$f[sel] <-
+                  stringi::stri_replace_all_fixed(
+                    wb$worksheets[[j]]$sheet_data$cc$f[sel],
+                    from_xlsb,
+                    to_xlsx,
+                    vectorize_all = FALSE
+                  )
+
+                wb$workbook$definedNames <-
+                  stringi::stri_replace_all_fixed(
+                    wb$workbook$definedNames,
+                    from_xlsb,
+                    to_xlsx,
+                    vectorize_all = FALSE
+                  )
+              }
+            }
+          }
+
         }
 
         # this might be terribly slow!
@@ -1605,6 +1738,37 @@ wb_load <- function(
           }
         }
       }
+    }
+
+    # create valid rich text strings in shared strings table
+    if (any(sel <- grepl("<FONT_\\d+/>", wb$sharedStrings))) {
+
+      attr_sst <- attributes(wb$sharedStrings)
+      SST      <- c(wb$sharedStrings)
+
+      matches <- stringi::stri_extract_all_regex(SST[sel], "<FONT_\\d+/>")
+      matches <- unique(unlist(matches))
+
+      values  <- as.integer(gsub("\\D+", "", matches))
+
+      xmls    <- stringi::stri_replace_all_fixed(
+        wb$styles_mgr$styles$fonts[values + 1],
+        c("<name", "font>"),
+        c("<rFont", "rPr>"),
+        vectorize_all = FALSE
+      )
+
+      sst <- stringi::stri_replace_all_fixed(
+        str           = SST[sel],
+        pattern       = matches,
+        replacement   = xmls,
+        vectorize_all = FALSE
+      )
+
+      SST[sel] <- sst
+      attributes(SST) <- attr_sst
+
+      wb$sharedStrings <- SST
     }
 
   }

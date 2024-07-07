@@ -179,6 +179,65 @@ typedef struct {
   uint16_t unused : 13;
 } BrtWbPropFields;
 
+typedef struct {
+  uint8_t valType : 4;
+  uint8_t errStyle : 3;
+  bool unused : 1;
+  bool fAllowBlank : 1;
+  bool fSuppressCombo : 1;
+  uint8_t mdImeMode : 8;
+  bool fShowInputMsg : 1;
+  bool fShowErrorMsg : 1;
+  uint8_t typOperator : 4;
+  bool fDVMinFmla : 1; // only in 14
+  bool fDVMaxFmla : 1; // only in 14
+  uint8_t reserved : 6;
+} BrtDValFields;
+
+typedef struct {
+  uint16_t product : 15;
+  bool reserved : 1;
+} FRTVersionFields;
+
+typedef struct {
+  bool fRef : 1;
+  bool fSqref : 1;
+  bool fFormula : 1;
+  bool fRelID : 1;
+  uint32_t reserved : 28;
+} FRTHeaderFields;
+
+typedef struct {
+  uint8_t columns : 2;
+  uint8_t rowType : 5;
+  bool squareBracketSpace : 1;
+  bool commaSpace : 1;
+  bool unused : 1;
+  uint8_t type : 2;
+  bool invalid : 1;
+  bool nonresident : 1;
+  uint8_t reserved2 : 2;
+} PtgListFields;
+
+enum PtgRowType
+{
+  data = 0x00,
+  all = 0x01,         // #All
+  headers = 0x02,     // #Headers
+  data2 = 0x04,       // #Data
+  dataheaders = 0x06,
+  totals = 0x08,      // #Totals
+  datatotals = 0x0C,
+  current = 0x10      // #This Row
+};
+
+enum PtgDataType
+{
+  reference = 0x1,
+  value = 0x2,
+  array = 0x3
+};
+
 enum RgbExtra
 {
   PtgExtraArray = 0,

@@ -5,8 +5,14 @@
 #include <fstream>
 #include <cstdint>
 
+
+/* We have no real way to test if the big endian stuff works. Some parts might,
+ * others not. */
+
+// #nocov start
 // for swap_endian
 #include <type_traits>
+
 
 // detect if we need to swap. assuming that there is no big endian xlsb format,
 // we only need to swap little endian xlsb files on big endian systems
@@ -84,6 +90,7 @@ swap_endian(T t) {
   return t;
 }
 // end swap_endian
+// #nocov end
 
 template <typename T>
 T readbin( T t , std::istream& sas, bool swapit)
@@ -147,11 +154,19 @@ std::string escape_xml(const std::string& input) {
       break;
     default:
       result += c;
-    break;
+      break;
     }
   }
 
   return result;
+}
+
+std::string wrap_xml(const std::string& str) {
+    if (!str.empty() && isspace(str[0])) {
+        return "<t xml:space=\"preserve\">" + str + "</t>";
+    } else {
+        return "<t>" + str + "</t>";
+    }
 }
 
 std::string to_utf8(const std::u16string& u16str) {
@@ -222,6 +237,13 @@ std::string read_xlwidestring(std::string &mystring, std::istream& sas) {
 }
 
 std::string PtrStr(std::istream& sas, bool swapit) {
+  uint16_t len = 0;
+  len = readbin(len, sas, swapit);
+  std::string str(len, '\0');
+  return read_xlwidestring(str, sas);
+}
+
+std::string LPWideString(std::istream& sas, bool swapit) {
   uint16_t len = 0;
   len = readbin(len, sas, swapit);
   std::string str(len, '\0');
@@ -399,27 +421,112 @@ std::string valign(int style) {
   return out;
 }
 
-void StrRun(std::istream& sas, uint32_t dwSizeStrRun, bool swapit) {
+std::vector<std::pair<int, int>> StrRun(std::istream& sas, uint32_t dwSizeStrRun, bool swapit) {
 
   uint16_t ich = 0, ifnt = 0;
 
   // something?
+  std::vector<std::pair<int, int>> str_run;
   for (uint8_t i = 0; i < dwSizeStrRun; ++i) {
     ich  = readbin(ich, sas, swapit);
     ifnt = readbin(ifnt, sas, swapit);
     // Rprintf("Styled string will be unstyled - strRun: %d %d\n", ich, ifnt);
+    str_run.push_back({ich, ifnt});
   }
+
+  return str_run;
+}
+
+// Function to get a safe substring from a UTF-8 string
+std::string utf8_substr(const std::string& str, size_t start, size_t length) {
+    size_t byte_pos = 0; // Byte position in the original string
+    size_t char_pos = 0; // Character position
+
+    // Find the byte position of the start character
+    while (char_pos < start && byte_pos < str.size()) {
+        if ((str[byte_pos] & 0x80) == 0) {
+            // Single-byte character (ASCII)
+            byte_pos += 1;
+        } else if ((str[byte_pos] & 0xE0) == 0xC0) {
+            // Two-byte character
+            byte_pos += 2;
+        } else if ((str[byte_pos] & 0xF0) == 0xE0) {
+            // Three-byte character
+            byte_pos += 3;
+        } else if ((str[byte_pos] & 0xF8) == 0xF0) {
+            // Four-byte character
+            byte_pos += 4;
+        } else {
+            Rcpp::stop("Invalid UTF-8 encoding detected.");
+        }
+        ++char_pos;
+    }
+
+    size_t start_byte_pos = byte_pos;
+
+    // Find the byte position of the end character
+    while (char_pos < start + length && byte_pos < str.size()) {
+        if ((str[byte_pos] & 0x80) == 0) {
+            // Single-byte character (ASCII)
+            byte_pos += 1;
+        } else if ((str[byte_pos] & 0xE0) == 0xC0) {
+            // Two-byte character
+            byte_pos += 2;
+        } else if ((str[byte_pos] & 0xF0) == 0xE0) {
+            // Three-byte character
+            byte_pos += 3;
+        } else if ((str[byte_pos] & 0xF8) == 0xF0) {
+            // Four-byte character
+            byte_pos += 4;
+        } else {
+            Rcpp::stop("Invalid UTF-8 encoding detected.");
+        }
+        ++char_pos;
+    }
+
+    return str.substr(start_byte_pos, byte_pos - start_byte_pos);
+}
+
+std::string to_rich_text(const std::string& str, const std::vector<std::pair<int, int>>& str_runs) {
+    std::string result;
+    int start = 0, len = 0;
+
+    for (size_t str_run = 0; str_run < str_runs.size(); ++str_run) {
+
+        if (str_run == 0 && str_runs[0].first > 0) {
+
+          start = 0;
+          len   = str_runs[str_run].first;
+
+          std::string part = utf8_substr(str, start, len);
+
+          result += "<r><FONT_" + std::to_string(str_runs[str_run].second) + "/>" + wrap_xml(escape_xml(part)) + "</r>";
+        }
+
+          start = str_runs[str_run].first;
+          if ((str_run + 1) < str_runs.size())
+            len = str_runs[str_run + 1].first - start;
+          else
+            len = str.size() - start;
+
+          std::string part = utf8_substr(str, start, len);
+
+          result += "<r><FONT_" + std::to_string(str_runs[str_run].second) + "/>" + wrap_xml(escape_xml(part)) + "</r>";
+    }
+
+    return result;
 }
 
 void PhRun(std::istream& sas, uint32_t dwPhoneticRun, bool swapit) {
 
-  uint16_t ichFirst = 0, ichMom = 0, cchMom = 0, ifnt = 0;
+  uint16_t ichFirst = 0, ichMom = 0, cchMom = 0, ifnt = 0, AB = 0;
   // uint32_t phrun = 0;
   for (uint8_t i = 0; i < dwPhoneticRun; ++i) {
     ichFirst = readbin(ichFirst, sas, swapit);
     ichMom   = readbin(ichMom, sas, swapit);
     cchMom   = readbin(cchMom, sas, swapit);
     ifnt     = readbin(ifnt, sas, swapit);
+    AB       = readbin(AB, sas, swapit);  // phType (2) alcH (2) unused (12)
   }
 }
 
@@ -435,6 +542,8 @@ std::string RichStr(std::istream& sas, bool swapit) {
   // unk = AB & 0x3F;
   // if (debug) if (unk) Rcpp::Rcout << std::to_string(unk) << std::endl;
 
+  std::vector<std::pair<int, int>> str_run;
+
   std::string str = XLWideString(sas, swapit);
 
   uint32_t dwSizeStrRun = 0, dwPhoneticRun = 0;
@@ -444,7 +553,11 @@ std::string RichStr(std::istream& sas, bool swapit) {
     // number of runs following
     dwSizeStrRun = readbin(dwSizeStrRun, sas, swapit);
     if (dwSizeStrRun > 0x7FFF) Rcpp::stop("dwSizeStrRun to large");
-    StrRun(sas, dwSizeStrRun, swapit);
+    str_run = StrRun(sas, dwSizeStrRun, swapit);
+
+    str = to_rich_text(str, str_run);
+  } else {
+    str = wrap_xml(escape_xml(str));
   }
 
   if (B) {
@@ -462,15 +575,16 @@ std::string RichStr(std::istream& sas, bool swapit) {
 }
 
 void ProductVersion(std::istream& sas, bool swapit, bool debug) {
-  uint16_t fileVersion = 0, fileProduct = 0;
-  int8_t fileExtension = 0;
 
-  fileVersion = readbin(fileVersion, sas, swapit);
-  fileProduct = readbin(fileProduct, sas, swapit);
+  uint16_t version = 0, flags = 0;
+  version = readbin(version, sas, swapit); // 3586 - x14?
+  flags = readbin(flags, sas, swapit);     // 0
 
-  fileExtension = fileProduct & 0x01;
-  fileProduct   = fileProduct & ~static_cast<uint16_t>(0x01);
-  if (debug) Rprintf("ProductVersion: %d: %d: %d\n", fileVersion, fileProduct, fileExtension);
+  FRTVersionFields *fields = (FRTVersionFields *)&flags;
+
+  // if (fields->reserved != 0) Rcpp::stop("product version reserved not 0");
+
+  if (debug) Rprintf("ProductVersion: %d: %d: %d\n", version, fields->product, fields->reserved);
 }
 
 std::vector<int> UncheckedRfX(std::istream& sas, bool swapit) {
@@ -598,10 +712,10 @@ std::string LocRel(std::istream& sas, bool swapit, int col, int row) {
       col_rel[0] -= 0x4000;
   }
 
-  // if (!fColRel) out += "$";
+  if (!fColRel) out += "$";
   out += int_to_col(col_rel[0] + 1);
 
-  // if (!fRwRel) out += "$";
+  if (!fRwRel) out += "$";
   out += std::to_string(row_rel + 1);
 
   return out;
@@ -692,18 +806,18 @@ std::string AreaRel(std::istream& sas, bool swapit, int col, int row) {
       col_rel1[0] -= 0x4000;
   }
 
-  // if (!fColRel0) out += "$";
+  if (!fColRel0) out += "$";
   out += int_to_col(col_rel0[0] + 1);
 
-  // if (!fRwRel0) out += "$";
+  if (!fRwRel0) out += "$";
   out += std::to_string(row_rel0 + 1);
 
   out += ":";
 
-  // if (!fColRel1) out += "$";
+  if (!fColRel1) out += "$";
   out += int_to_col(col_rel1[0] + 1);
 
-  // if (!fRwRel1) out += "$";
+  if (!fRwRel1) out += "$";
   out += std::to_string(row_rel1 + 1);
 
   return out;
@@ -894,6 +1008,34 @@ std::string BErr(std::istream& sas, bool swapit) {
   return "unknown_ERROR";
 }
 
+std::string valType(uint8_t type) {
+
+  if (type == 0x0) return "none";
+  if (type == 0x1) return "whole";
+  if (type == 0x2) return "decimal";
+  if (type == 0x3) return "list";
+  if (type == 0x4) return "date";
+  if (type == 0x5) return "time";
+  if (type == 0x6) return "textLength";
+  if (type == 0x7) return "custom";
+
+  return "unknown_type";
+}
+
+std::string typOperator(uint8_t oprtr) {
+
+  if (oprtr == 0x0) return "between";
+  if (oprtr == 0x1) return "notBetween";
+  if (oprtr == 0x2) return "equal";
+  if (oprtr == 0x3) return "notEqual";
+  if (oprtr == 0x4) return "greaterThan";
+  if (oprtr == 0x5) return "lessThan";
+  if (oprtr == 0x6) return "greaterThanOrEqual";
+  if (oprtr == 0x7) return "lessThanOrEqual";
+
+  return "unknown_operator";
+}
+
 std::vector<int> Xti(std::istream& sas, bool swapit) {
   int32_t firstSheet = 0, lastSheet = 0;
   uint32_t externalLink = 0;
@@ -921,6 +1063,27 @@ std::vector<int> Xti(std::istream& sas, bool swapit) {
 //     token == " " || token == "&amp;" || token == ":" || token == "," ||
 //     token == "#" || token == "@";
 // }
+
+
+std::string array_elements(const std::vector<std::string>& elements, int n, int k) {
+    std::stringstream ss;
+    ss << "{";
+    for (int i = 0; i < n; ++i) {
+        if (i > 0) ss << ";";
+        for (int j = 0; j < k; ++j) {
+            if (j > 0) ss << ",";
+            size_t index = i * k + j;
+            if (index < elements.size()) {
+              // check if it needs escaping
+                ss << "\"";
+                ss << escape_quote(elements[index]);
+                ss << "\"";
+            }
+        }
+    }
+    ss << "}";
+    return ss.str();
+}
 
 #include <stack>
 
@@ -989,27 +1152,11 @@ std::string parseRPN(const std::string& expression) {
   return parsedFormula;
 }
 
+std::string rgce(std::string fml_out, std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml, bool has_revision_record, size_t pos, std::vector<int32_t> &ptgextra) {
 
-std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml) {
-  // bool ptg_extra_array = false;
-  uint32_t  cce= 0, cb= 0;
-
-  if (debug) Rcpp::Rcout << "CellParsedFormula: " << sas.tellg() << std::endl;
-
-  cce = readbin(cce, sas, swapit);
-  if (cce >= 16385) Rcpp::stop("wrong cce size");
-  if (debug) Rcpp::Rcout << "cce: " << cce << std::endl;
-  size_t pos = sas.tellg();
-  // sas.seekg(cce, sas.cur);
-  pos += cce;
   int8_t val1 = 0;
-
-  // row = 0;
-
-  std::vector<int32_t> ptgextra;
-
-  std::string fml_out;
-  while((size_t)sas.tellg() < pos) {
+  // std::vector<int32_t> ptgextra;
+    while((size_t)sas.tellg() < pos) {
 
     if (debug) Rcpp::Rcout << ".";
 
@@ -1039,33 +1186,119 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
       case PtgList:
       {
         RgbExtra typ = PtgExtraList;
-        ptgextra.push_back(typ);
+
         if (debug) Rcpp::Rcout << "PtgList " << sas.tellg() << std::endl;
         uint16_t ixti = 0, flags = 0;
         uint32_t listIndex = 0;
         int16_t colFirst = 0, colLast = 0;
 
-        // this is a reference to a table column something like "tab[col]"
+        // ixti = location of table
         ixti = readbin(ixti, sas, swapit);
-        flags = readbin(flags, sas, swapit);
+
+        // B:
+        // 0x00 columns consist of all columns in table
+        // 0x01 one column wide, only colFirst required
+        // 0x02 columns from colFirst to colLast
+        // rowType = PtgRowType()
+        // squareBracketSpace: spacing?
+        // commaSpace: comma space?
+        // unused
+        // type: PtgDataType()
+        // invalid: bool
+        // nonresident: bool
+        flags     = readbin(flags, sas, swapit);
+
+        // table identifier: unused if invalid=1 || nonresident=1
         listIndex = readbin(listIndex, sas, swapit);
-        colFirst = ColShort(sas, swapit);
-        colLast = ColShort(sas, swapit);
+
+        // cols: unused if invalid = 1 || nonresident = 1 || columns = 0
+        colFirst  = ColShort(sas, swapit);
+        colLast   = ColShort(sas, swapit);
+
+
+        PtgListFields *fields = (PtgListFields *)&flags;
+
+        // if (debug)
+        // Rprintf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+        //   (uint32_t)fields->columns,
+        //   (uint32_t)fields->commaSpace,
+        //   (uint32_t)fields->invalid,
+        //   (uint32_t)fields->nonresident,
+        //   (uint32_t)fields->reserved2,
+        //   (uint32_t)fields->rowType,
+        //   (uint32_t)fields->squareBracketSpace,
+        //   (uint32_t)fields->type,
+        //   (uint32_t)fields->unused
+        // );
+
+        if (fields->nonresident) // different workbook and invalid == 0
+          ptgextra.push_back(typ);
 
         std::stringstream paddedStr;
-        paddedStr << std::setw(12) << std::setfill('0') << ixti;
+        paddedStr << std::setw(12) << std::setfill('0') << listIndex; // << ixti;
 
         // A1 notation cell
-        fml_out += "openxlsx2xlsb_" + paddedStr.str();
-        // maybe [ ]
-        // fml_out += "#REF!";
+        // something like this: Table1[[#This Row],[a]]
+        fml_out += "openxlsx2tab_" + paddedStr.str();
+
+        bool no_row_type = fields->invalid == 1 || fields->nonresident == 1;
+
+        fml_out += "[";
+
+        bool need_bracket = fields->columns > 0 ||
+            (fields->columns == 0 &&
+              (fields->rowType == dataheaders ||
+                fields->rowType == datatotals)
+            );
+
+
+        // if rowType == 0 no #Data etc is added
+        if (!no_row_type && fields->rowType) {
+          if (need_bracket) fml_out += "[";
+          if (fields->rowType == data)        fml_out += "";
+          if (fields->rowType == all)         fml_out += "#All";
+          if (fields->rowType == headers)     fml_out += "#Headers";
+          if (fields->rowType == data2)       fml_out += "#Data";
+          if (fields->rowType == dataheaders) fml_out += "#Headers],[#Data";
+          if (fields->rowType == totals)      fml_out += "#Totals";
+          if (fields->rowType == datatotals)  fml_out += "#Data],[#Totals";
+          if (fields->rowType == current)     fml_out += "#This Row";
+          if (need_bracket) fml_out += "]";
+          if (fields->columns > 0) fml_out += ",";
+        }
+
+        // not sure what is supposed to happen in this case?
+        // have to replace colFirst with a variable name
+        if (!(fields->invalid == 1 || fields->nonresident == 1 || fields->columns == 0)) {
+          // Rcpp::Rcout << "colFirst" << std::endl;
+          if (fields->columns > 1 || fields->rowType > data) fml_out += "[";
+          fml_out += "openxlsx2col_";
+          fml_out += std::to_string(listIndex);
+          fml_out += "_";
+          fml_out += std::to_string(colFirst);
+          if (fields->columns > 1 || fields->rowType > data) fml_out  += "]";
+        }
+
+        // have to replace colLast with a variable name
+        if ((colFirst < colLast) && !(fields->invalid == 1 || fields->nonresident == 1 || fields->columns == 0)) {
+          // Rcpp::Rcout << "colLast" << std::endl;
+          fml_out += ":[openxlsx2col_";
+          fml_out += std::to_string(listIndex);
+          fml_out += "_";
+          fml_out += std::to_string(colLast);
+          if (fields->columns > 1 || fields->rowType > data) fml_out  += "]";
+        }
+
+        fml_out += "]";
         fml_out += "\n";
 
         // Do something with this, just ... what?
-        if (debug) Rprintf("PtgList: %d, %d, %d, %d\n",
+        if (debug)
+        Rprintf("PtgList: %d, %d, %d, %d\n",
             ixti, listIndex, colFirst, colLast);
 
-        Rcpp::warning("formulas with table references are not implemented.");
+        // if (debug)
+        // Rcpp::warning("formulas with table references are not implemented.");
 
         break;
       }
@@ -1103,12 +1336,15 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
       {
         if (debug) Rcpp::Rcout << "PtgAttrChoose" <<std::endl;
 
-        uint16_t cOffset = 0;
-        uint32_t rgOffset0 = 0, rgOffset1 = 0;
+        uint16_t cOffset = 0, rgOffset = 0;
 
         cOffset = readbin(cOffset, sas, swapit);
-        rgOffset0 = readbin(rgOffset0, sas, swapit);
-        rgOffset1 = readbin(rgOffset1, sas, swapit);
+
+        // some offsets, currently unused
+        for (int16_t off = 0; off < (cOffset + 1); ++off) {
+          rgOffset = readbin(rgOffset, sas, swapit);
+          if (debug) Rcpp::Rcout << rgOffset << std::endl;
+        }
 
         break;
       }
@@ -1120,6 +1356,7 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
 
         if (((val2 >> 6) & 1) != 1) Rcpp::stop("wrong value");
 
+        // PtgAttrSpaceType
         type = readbin(type, sas, swapit);
         // 0-6 various different types where to add the whitespace
         cch = readbin(cch, sas, swapit);
@@ -1136,6 +1373,17 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
         break;
       }
 
+      case PtgAttrSpaceSemi:
+      {
+        // type: A PtgAttrSpaceType
+        uint8_t type = 0, cch = 0;
+        type = readbin(type, sas, swapit);
+        cch = readbin(cch, sas, swapit);
+
+        if (debug) Rprintf("PtgAttrSpaceSemi: %d %d\n", type, cch);
+        break;
+      }
+
       case PtgAttrSum:
       {
         if (debug) Rcpp::Rcout << "PtgAttrSum" << std::endl;
@@ -1147,6 +1395,20 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
         // Rcpp::Rcout << unused << std::endl;
         fml_out += "SUM(%s)"; // maybe attr because it is a single cell function?
         fml_out += "\n";
+        break;
+      }
+
+      case PtgAttrBaxcel:
+      case PtgAttrBaxcel2:
+      {
+        // val1[8]   == bitSemi if Rgce is volatile
+        // val2[1:4] == 0
+        // val2[5]   == 1
+        // val2[6:8] == 0
+
+        uint16_t unused = 0;
+        unused = readbin(unused, sas, swapit);
+        Rcpp::warning("PtgAttrBaxcel: unhandled formula thing");
         break;
       }
 
@@ -1314,7 +1576,8 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
     case PtgMissArg:
     {
       if (debug) Rcpp::Rcout << "MISSING()" <<std::endl;
-      fml_out += "";
+      fml_out += " ";
+      fml_out += "\n";
       break;
     }
 
@@ -1342,7 +1605,10 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
     {
       if (debug) Rcpp::Rcout << "PtgStr" <<std::endl;
 
-      fml_out += "\"" + escape_quote(PtrStr(sas, swapit)) + "\"";
+      std::string esc_quote = PtrStr(sas, swapit);
+      // Rcpp::Rcout << esc_quote << std::endl;
+      if (esc_quote == "\n") fml_out += '\"'; // + escape_quote(esc_quote) + "\"";
+      else fml_out += "\"" + escape_xml(escape_quote(esc_quote)) + "\"";
       fml_out += "\n";
 
       break;
@@ -1404,7 +1670,8 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
       if (debug) Rcpp::Rcout << "PtgRef3d" <<std::endl;
       // need_ptg_revextern = true;
       RgbExtra typ = RevExtern;
-      ptgextra.push_back(typ);
+      if (has_revision_record)
+        ptgextra.push_back(typ);
 
       uint16_t ixti = 0;
       ixti = readbin(ixti, sas, swapit); // XtiIndex
@@ -1458,7 +1725,8 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
 
       // need_ptg_revextern = true;
       RgbExtra typ = RevExtern;
-      ptgextra.push_back(typ);
+      if (has_revision_record)
+        ptgextra.push_back(typ);
 
       uint16_t ixti = 0;
 
@@ -1521,11 +1789,18 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
 
       // need_ptg_revnametabid = true;
       RgbExtra typ = RevNameTabid;
-      ptgextra.push_back(typ);
+      if (has_revision_record)
+        ptgextra.push_back(typ);
+
       uint32_t nameindex = 0;
       nameindex = readbin(nameindex, sas, swapit);
       // Rcpp::Rcout << nameindex << std::endl;
-      fml_out += std::to_string(nameindex);
+      // fml_out += std::to_string(nameindex);
+
+      std::stringstream paddedStr;
+      paddedStr << std::setw(12) << std::setfill('0') << nameindex;
+
+      fml_out += "openxlsx2defnam_" + paddedStr.str();
       fml_out += "\n";
 
       break;
@@ -1539,7 +1814,9 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
 
       // need_ptg_revname = true;
       RgbExtra typ = RevName;
-      ptgextra.push_back(typ);
+      if (has_revision_record)
+        ptgextra.push_back(typ);
+
       // not yet found
       uint16_t ixti = 0;
       uint32_t nameindex = 0;
@@ -1547,7 +1824,13 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
       nameindex = readbin(nameindex, sas, swapit);
       // Rcpp::Rcout << nameindex << std::endl;
       // fml_out += std::to_string(ixti);
-      fml_out += std::to_string(nameindex);
+      // fml_out += std::to_string(nameindex);
+
+      // copied from above, does this work?
+      std::stringstream paddedStr;
+      paddedStr << std::setw(12) << std::setfill('0') << nameindex;
+
+      fml_out += "openxlsx2defnam_" + paddedStr.str();
       fml_out += "\n";
 
       break;
@@ -1579,7 +1862,9 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
 
       // need_ptg_revextern = true;
       RgbExtra typ = RevExtern;
-      ptgextra.push_back(typ);
+      if (has_revision_record)
+        ptgextra.push_back(typ);
+
       uint16_t ixti = 0, unused2 = 0;
       uint32_t unused1 = 0;
 
@@ -1608,7 +1893,9 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
 
       // need_ptg_revextern = true;
       RgbExtra typ = RevExtern;
-      ptgextra.push_back(typ);
+      if (has_revision_record)
+        ptgextra.push_back(typ);
+
       uint16_t ixti = 0;
       uint32_t unused1 = 0, unused2 = 0, unused3 = 0;
 
@@ -1721,7 +2008,47 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
       if (debug) Rcpp::Rcout << "PtgMemFunc" <<std::endl;
 
       uint16_t cce = 0;
-      cce = readbin(cce, sas, swapit);
+      cce = readbin(cce, sas, swapit); // count of bytes in the binary reference expression
+      break;
+    }
+
+    case PtgMemErr:
+    case PtgMemErr2:
+    case PtgMemErr3:
+    {
+      if (debug) Rcpp::Rcout << "PtgMemErr" <<std::endl;
+
+      uint8_t unused1 = 0;
+      uint16_t unused2 = 0, cce = 0;
+
+      // Error txt is already in the value field
+      // fml_out += BErr(sas, swapit);
+      // fml_out += "\n";
+
+      std::string err_str = "";
+      err_str = BErr(sas, swapit);
+
+      if (debug) Rcpp::Rcout << "PtgMemErr: " << err_str << std::endl;
+
+      unused1 = readbin(unused1, sas, swapit);
+      unused2 = readbin(unused2, sas, swapit);
+      cce = readbin(cce, sas, swapit); // count of bytes in the binary reference expression
+
+      break;
+    }
+
+    case PtgMemNoMem:
+    case PtgMemNoMem2:
+    case PtgMemNoMem3:
+    {
+      if (debug) Rcpp::Rcout << "PtgMemNoMem" <<std::endl;
+
+      uint32_t unused = 0;
+      unused = readbin(unused, sas, swapit);
+
+      uint16_t cce = 0;
+      cce = readbin(cce, sas, swapit); // count of bytes in the binary reference expression
+
       break;
     }
 
@@ -1737,57 +2064,29 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
 
   if ((size_t)sas.tellg() != pos) {
     // somethings not correct
+    Rcpp::Rcout << "[fml] unexpected position when parsing head" << std::endl;
     sas.seekg(pos, sas.beg);
   }
 
-  if (debug) Rcpp::Rcout << "--- formula ---\n" << fml_out << std::endl;
+  return fml_out;
+}
 
-  cb = readbin(cb, sas, swapit);
+std::string rgcb(std::string fml_out, std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml, bool has_revision_record, size_t pos, std::vector<int32_t> &ptgextra) {
 
-  if (debug)
-    Rcpp::Rcout << "cb: " << cb << std::endl;
+  int8_t val1 = 0;
+  // std::vector<int32_t> ptgextra;
+  // RgbExtra
+  for (size_t cntr = 0; cntr < ptgextra.size(); ++cntr) {
 
-  pos = sas.tellg();
-  // sas.seekg(cce, sas.cur);
-
-  // Rcpp::Rcout << "pre " << pos << std::endl;
-  pos += cb;
-  // Rcpp::Rcout << "post " << pos << std::endl;
-
-  size_t cntr = 0;
-
-  while((size_t)sas.tellg() < pos) {
-
-    if (debug) Rcpp::Rcout << ".";
-    if (debug) {
-      Rprintf("Formula cb: %d\n", val1);
-      Rprintf("%d: %d\n", (int)sas.tellg(), (int)pos);
-    }
-    // this is a little risky. maybe its some kind of vector indicating the
-    // order in which extra elements are going to be selected?
-
-    if (ptgextra.size() > 0 && ptgextra.size() > cntr) {
-      if (ptgextra[cntr] == PtgExtraArray) {
-        if (debug) Rcpp::Rcout << "need PtgArray" << std::endl;
-        val1 = PtgArray;
-      } else if  (ptgextra[cntr] == PtgExtraCol) {
-        if (debug) Rcpp::Rcout << "need PtgExp" << std::endl;
-        val1 = PtgExp;
-      } else if (ptgextra[cntr] == RevExtern) {
-        if (debug) Rcpp::Rcout << "need RevExtern" << std::endl;
-        val1 = RevExtern;
-      } else{
-        Rcpp::Rcout << ptgextra[cntr] << std::endl;
-      }
-    } else if (ptgextra.size() < (cntr + 1)) {
-      if (debug) Rprintf("ptgextra %d and %d\n", (int)ptgextra.size(),  (int)cntr);
-    }
+    val1 = ptgextra[cntr];
 
 
-    ++cntr;
+    if (debug)
+      Rcpp::Rcout << cntr << ": " << (int32_t)val1 << std::endl;
 
     switch(val1) {
-    case PtgExp:
+
+    case PtgExtraCol:
     { // PtgExtraCol
 
       // need_ptg_extra_col = true;
@@ -1801,77 +2100,82 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
       break;
     }
 
-    // TODO: this does not handle {"foo", "bar"}
-    case PtgArray:
-    case PtgArray2:
-    case PtgArray3:
+    case PtgExtraArray:
     {
       if (debug) Rcpp::Rcout << "PtgExtraArray" << std::endl;
       // PtgExtraArray
 
-      uint32_t rows = 0, cols = 0;
-      rows = readbin(rows, sas, swapit);
-      cols = readbin(cols, sas, swapit);
-      // blob (it is actually called this way)
-      uint8_t reserved = 0;
-      reserved = readbin(reserved, sas, swapit);
+      int32_t rows = 0, cols = 0;
+      // actually its DRw() and DCol(), but it does not matter?
+      rows = UncheckedRw(sas, swapit);
+      cols = UncheckedCol(sas, swapit);
 
       std::string array = "";
+      std::vector<std::string> array_elems; // (cols*rows);
 
-      if (debug) Rcpp::Rcout << (int32_t)reserved << std::endl;
+      if (debug) Rcpp::Rcout << rows << ": " << cols << std::endl;
 
-      // SerBool
-      if (reserved == 0x02) {
-        if (debug) Rcpp::Rcout << "SerBool" << std::endl;
-        uint8_t f = 0;
-        f = readbin(f, sas, swapit);
-        if (debug) Rcpp::Rcout << (int32_t)f << std::endl;
+      // number of elements in row order: must be equal to rows * cols
+      for (int32_t row = 0; row < rows; ++row) {
+        for (int32_t col = 0; col < cols; ++col) {
 
-        array = "{" + std::to_string((int32_t)f) + "}";
-        // fml_out += "\n";
+          // blob (it is actually called this way)
+          uint8_t reserved = 0;
+          reserved = readbin(reserved, sas, swapit);
+
+          if (debug) Rcpp::Rcout << (int32_t)reserved << std::endl;
+
+          // SerBool
+          if (reserved == 0x02) {
+            if (debug) Rcpp::Rcout << "SerBool" << std::endl;
+            uint8_t f = 0;
+            f = readbin(f, sas, swapit);
+
+            if (debug) Rcpp::Rcout << (int32_t)f << std::endl;
+            array_elems.push_back(std::to_string((int32_t)f));
+          }
+
+          // SerErr
+          if (reserved == 0x04) {
+            if (debug) Rcpp::Rcout << "SerErr" << std::endl;
+            uint8_t reserved2 = 0;
+            uint16_t reserved3 = 0;
+            std::string strerr = BErr(sas, swapit);
+            reserved2 = readbin(reserved2, sas, swapit);
+            reserved3 = readbin(reserved3, sas, swapit);
+
+            if (debug) Rcpp::Rcout << strerr << std::endl;
+            array_elems.push_back(strerr);
+          }
+
+          // SerNum
+          if (reserved == 0x00) {
+            if (debug) Rcpp::Rcout << "SerNum" << std::endl;
+            double xnum = 0.0;
+            xnum = Xnum(sas, swapit);
+
+            std::stringstream stream;
+            stream << std::setprecision(16) << xnum;
+
+            if (debug) Rcpp::Rcout << xnum << std::endl;
+            array_elems.push_back(stream.str());
+          }
+
+          // SerStr
+          if (reserved == 0x01) {
+            if (debug) Rcpp::Rcout << "SerStr" << std::endl;
+            uint16_t cch = 0;
+            cch = readbin(cch, sas, swapit);
+            std::string rgch(cch, '\0');
+            rgch = read_xlwidestring(rgch, sas);
+
+            if (debug) Rcpp::Rcout << rgch << std::endl;
+            array_elems.push_back(rgch);
+          }
+        }
       }
 
-      // SerErr
-      if (reserved == 0x04) {
-        if (debug) Rcpp::Rcout << "SerErr" << std::endl;
-        uint8_t reserved2 = 0;
-        uint16_t reserved3 = 0;
-        std::string strerr = BErr(sas, swapit);
-        if (debug) Rcpp::Rcout << strerr << std::endl;
-        reserved2 = readbin(reserved2, sas, swapit);
-        reserved3 = readbin(reserved3, sas, swapit);
-
-        array = "{" + strerr + "}";
-        // fml_out += "\n";
-      }
-
-      // SerNum
-      if (reserved == 0x00) {
-        if (debug) Rcpp::Rcout << "SerNum" << std::endl;
-        double xnum = 0.0;
-        xnum = Xnum(sas, swapit);
-
-        std::stringstream stream;
-        stream << std::setprecision(16) << xnum;
-
-        if (debug) Rcpp::Rcout << xnum << std::endl;
-        array = "{" + stream.str() + "}";
-        // fml_out += "\n";
-      }
-
-      // SerStr
-      if (reserved == 0x01) {
-        if (debug) Rcpp::Rcout << "SerStr" << std::endl;
-        uint16_t cch = 0;
-        cch = readbin(cch, sas, swapit);
-        std::string rgch(cch, '\0');
-        rgch = read_xlwidestring(rgch, sas);
-        if (debug)
-          Rcpp::Rcout << rgch << std::endl;
-
-        array = "{\"" + rgch + "\"}";
-        // fml_out += "\n";
-      }
+      array += array_elements(array_elems, rows, cols);
 
       size_t fi = fml_out.find("@array@");
 
@@ -1886,6 +2190,45 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
 
       if (debug) Rcpp::Rcout << fml_out << std::endl;
 
+      break;
+    }
+
+    case PtgExtraMem:
+    {
+      // not sure what this is good for
+      if (debug) Rcpp::Rcout << "PtgExtraMem: " << (int32_t)val1 << std::endl;
+
+      int32_t count = 0;
+      count = readbin(count, sas, swapit);
+
+      for (int32_t cnt = 0; cnt < count; ++cnt) {
+        std::vector<int> ucrfx = UncheckedRfX(sas, swapit);
+      }
+
+      break;
+    }
+
+    case RevNameTabid:
+    {
+      // Rcpp::stop("Skip");
+      if (debug) Rcpp::Rcout << "RevNameTabid: " << (int32_t)val1 << std::endl;
+      sas.seekg(pos, sas.beg);
+      break;
+    }
+
+    case RevName:
+    {
+      // Rcpp::stop("Skip");
+      if (debug) Rcpp::Rcout << "RevName: " << (int32_t)val1 << std::endl;
+      sas.seekg(pos, sas.beg);
+      break;
+    }
+
+    case PtgExtraList:
+    {
+      // Rcpp::stop("Skip");
+      if (debug) Rcpp::Rcout << "PtgExtraList: " << (int32_t)val1 << std::endl;
+      sas.seekg(pos, sas.beg);
       break;
     }
 
@@ -1917,7 +2260,7 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
     default :
     {
       // Rcpp::stop("Skip");
-      Rcpp::Rcout << "undefined cb: " << cb << std::endl;
+      Rcpp::Rcout << "undefined cb: " << (int32_t)val1 << std::endl;
       sas.seekg(pos, sas.beg);
       break;
     }
@@ -1929,13 +2272,104 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
     sas.seekg(pos, sas.beg);
   }
 
+  return fml_out;
+}
+
+
+std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml, bool has_revision_record) {
+  // bool ptg_extra_array = false;
+  uint32_t  cce= 0, cb= 0;
+  std::vector<int32_t> ptgextra;
+
+  if (debug) Rcpp::Rcout << "CellParsedFormula: " << sas.tellg() << std::endl;
+
+  cce = readbin(cce, sas, swapit);
+  if (cce >= 16385) Rcpp::stop("wrong cce size");
+  if (debug) Rcpp::Rcout << "cce: " << cce << std::endl;
+
+  size_t pos = sas.tellg();
+  // sas.seekg(cce, sas.cur);
+  pos += cce;
+
+  std::string fml_out;
+
+  fml_out = rgce(fml_out, sas, swapit, debug, col, row, sharedFml, has_revision_record, pos, ptgextra);
+
+  cb = readbin(cb, sas, swapit); // is there a control bit, even if CB is empty?
+
+  if (debug)
+    Rcpp::Rcout << "cb: " << cb << std::endl;
+
+  pos = sas.tellg();
+  // sas.seekg(cce, sas.cur);
+
+  pos += cb;
+
+  if (debug) Rcpp::Rcout << ".";
+  if (debug) {
+    // Rprintf("Formula cb: %d\n", val1);
+    Rprintf("%d: %d\n", (int)sas.tellg(), (int)pos);
+  }
+
+  if (debug) Rcpp::Rcout << "--- formula ---\n" << fml_out << std::endl;
+
+  fml_out = rgcb(fml_out, sas, swapit, debug, col, row, sharedFml, has_revision_record, pos, ptgextra);
+
   if (debug) {
     Rcpp::Rcout << "...fml..." << std::endl;
     Rcpp::Rcout << fml_out << std::endl;
   }
+
   std::string inflix =  parseRPN(fml_out);
 
   return inflix;
 }
+
+std::string FRTParsedFormula(std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml, bool has_revision_record) {
+  // bool ptg_extra_array = false;
+  uint32_t  cce= 0, cb= 0;
+  std::vector<int32_t> ptgextra;
+
+  if (debug) Rcpp::Rcout << "CellParsedFormula: " << sas.tellg() << std::endl;
+
+  cce = readbin(cce, sas, swapit);
+  if (cce >= 16385) Rcpp::stop("wrong cce size");
+  if (debug) Rcpp::Rcout << "cce: " << cce << std::endl;
+
+  cb = readbin(cb, sas, swapit); // is there a control bit, even if CB is empty?
+
+  size_t pos = sas.tellg();
+  pos += cce;
+
+  std::string fml_out;
+
+  fml_out = rgce(fml_out, sas, swapit, debug, col, row, sharedFml, has_revision_record, pos, ptgextra);
+
+  if (debug)
+    Rcpp::Rcout << "cb: " << cb << std::endl;
+
+  pos = sas.tellg();
+  pos += cb;
+
+  if (debug) Rcpp::Rcout << ".";
+  if (debug) {
+    Rprintf("%d: %d\n", (int)sas.tellg(), (int)pos);
+  }
+
+  if (debug) Rcpp::Rcout << "--- formula ---\n" << fml_out << std::endl;
+
+  fml_out = rgcb(fml_out, sas, swapit, debug, col, row, sharedFml, has_revision_record, pos, ptgextra);
+
+  if (debug) {
+    Rcpp::Rcout << "...fml..." << std::endl;
+    Rcpp::Rcout << fml_out << std::endl;
+  }
+
+  std::string inflix =  parseRPN(fml_out);
+
+  return inflix;
+}
+
+
 
 #endif

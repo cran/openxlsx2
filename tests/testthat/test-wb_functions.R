@@ -34,7 +34,7 @@ test_that("wb_to_df", {
   expect_equal(convert_to_excel_date(df = exp["Var5"], date1904 = FALSE),
                got["Var5"])
 
-  expect_warning(convertToExcelDate(df = exp["Var5"], date1904 = FALSE), "deprecated")
+  expect_error(convertToExcelDate(df = exp["Var5"], date1904 = FALSE), "defunct")
 
   # return the underlying Excel formula instead of their values
   got <- wb_to_df(wb1, showFormula = TRUE)
@@ -448,10 +448,10 @@ test_that("improve non consecutive dims", {
   exp <- dims_to_dataframe(dims, fill = TRUE)
   exp <- unname(unlist(exp[exp != ""]))
   got <- wb1$worksheets[[1]]$sheet_data$cc$r[wb1$worksheets[[1]]$sheet_data$cc$c_s != ""]
-  expect_true(all(exp %in% got))
+  expect_contains(got, exp)
 
   got <- wb2$worksheets[[1]]$sheet_data$cc$r[wb2$worksheets[[1]]$sheet_data$cc$c_s != ""]
-  expect_true(all(exp %in% got))
+  expect_contains(got, exp)
 
   ### Test rowwise
   # dims <- "D5:E5,I5:J5,C6:F6,H6:K6,B7:L9,C10:K10,D11:J11,E12:I12,F13:H13,G14"
@@ -473,9 +473,8 @@ test_that("improve non consecutive dims", {
   exp <- dims_to_dataframe(dims, fill = TRUE)
   exp <- unname(unlist(exp[exp != ""]))
   got <- wb3$worksheets[[1]]$sheet_data$cc$r[wb3$worksheets[[1]]$sheet_data$cc$c_s != ""]
-  expect_true(all(exp %in% got))
+  expect_contains(got, exp)
 
   got <- wb4$worksheets[[1]]$sheet_data$cc$r[wb4$worksheets[[1]]$sheet_data$cc$c_s != ""]
-  expect_true(all(exp %in% got))
-
+  expect_contains(got, exp)
 })
