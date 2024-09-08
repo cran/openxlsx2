@@ -467,14 +467,14 @@ written:</p>
 <span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_add_data</span>(wb, <span class="st">&quot;USexp&quot;</span>, USPersonalExpenditure)</span>
 <span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a><span class="fu">wb_get_sheet_names</span>(wb)</span>
 <span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a><span class="co">#&gt;   USexp </span></span>
-<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a><span class="co">#&gt; &quot;USexp&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">wb_to_df</span>(wb)</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="co">#&gt;     1940   1945  1950 1955  1960</span></span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="co">#&gt; 2 22.200 44.500 59.60 73.2 86.80</span></span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co">#&gt; 3 10.500 15.500 29.00 36.5 46.20</span></span>
-<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="co">#&gt; 4  3.530  5.760  9.71 14.0 21.10</span></span>
-<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="co">#&gt; 5  1.040  1.980  2.45  3.4  5.40</span></span>
-<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="co">#&gt; 6  0.341  0.974  1.80  2.6  3.64</span></span></code></pre></div>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a><span class="co">#&gt; &quot;USexp&quot;</span></span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a><span class="fu">wb_to_df</span>(wb)</span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a><span class="co">#&gt;     1940   1945  1950 1955  1960</span></span>
+<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a><span class="co">#&gt; 2 22.200 44.500 59.60 73.2 86.80</span></span>
+<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a><span class="co">#&gt; 3 10.500 15.500 29.00 36.5 46.20</span></span>
+<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a><span class="co">#&gt; 4  3.530  5.760  9.71 14.0 21.10</span></span>
+<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a><span class="co">#&gt; 5  1.040  1.980  2.45  3.4  5.40</span></span>
+<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a><span class="co">#&gt; 6  0.341  0.974  1.80  2.6  3.64</span></span></code></pre></div>
 <p>Now you’re probably thinking, I don’t want to assign the workbook
 object all the time and all the <code>wb_</code> functions are a little
 tedious to type. There is an alternative for you and it is called
@@ -483,14 +483,14 @@ can make use of chains. Basically every function that starts with
 <code>wb_</code> should have a underlying function of the same name
 without the prefix. So our data writing example from above can be
 written as:</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&quot;USexp&quot;</span>)<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> USPersonalExpenditure)</span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">to_df</span>()</span>
-<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co">#&gt;     1940   1945  1950 1955  1960</span></span>
-<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a><span class="co">#&gt; 2 22.200 44.500 59.60 73.2 86.80</span></span>
-<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a><span class="co">#&gt; 3 10.500 15.500 29.00 36.5 46.20</span></span>
-<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a><span class="co">#&gt; 4  3.530  5.760  9.71 14.0 21.10</span></span>
-<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a><span class="co">#&gt; 5  1.040  1.980  2.45  3.4  5.40</span></span>
-<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a><span class="co">#&gt; 6  0.341  0.974  1.80  2.6  3.64</span></span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>(<span class="st">&quot;USexp&quot;</span>)<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> USPersonalExpenditure)</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">to_df</span>()</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="co">#&gt;     1940   1945  1950 1955  1960</span></span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co">#&gt; 2 22.200 44.500 59.60 73.2 86.80</span></span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="co">#&gt; 3 10.500 15.500 29.00 36.5 46.20</span></span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="co">#&gt; 4  3.530  5.760  9.71 14.0 21.10</span></span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="co">#&gt; 5  1.040  1.980  2.45  3.4  5.40</span></span>
+<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a><span class="co">#&gt; 6  0.341  0.974  1.80  2.6  3.64</span></span></code></pre></div>
 <p>Whether you use wrapper functions or chain functions is up to you and
 personal preference. There is just one thing to remember, the
 documentation is exclusively written for the wrapper function. So if you
@@ -507,10 +507,10 @@ This <code>workbook</code> class is the heart of <code>openxlsx2</code>
 and probably the reason why you are reading this manual in the first
 place.</p>
 <p>Importing a file into a workbook looks like this:</p>
-<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="co"># the file we are going to load</span></span>
-<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;openxlsx2_example.xlsx&quot;</span>, <span class="at">package =</span> <span class="st">&quot;openxlsx2&quot;</span>)</span>
-<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="co"># loading the file into the workbook</span></span>
-<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_load</span>(<span class="at">file =</span> file)</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="co"># the file we are going to load</span></span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;openxlsx2_example.xlsx&quot;</span>, <span class="at">package =</span> <span class="st">&quot;openxlsx2&quot;</span>)</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co"># loading the file into the workbook</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_load</span>(<span class="at">file =</span> file)</span></code></pre></div>
 <p>The additional options <code>wb_load()</code> provides are for
 internal use: <code>sheet</code> loads only a selected sheet from the
 workbook and <code>data_only</code> reads only the data parts from a
@@ -535,7 +535,7 @@ options explained in the man pages and the additional style vignette
 <code>write_xlsx()</code> which will create an xlsx file. This file can
 be tweaked further. See <code>?write_xlsx</code> to see all the options.
 (further explanation and examples will follow).</p>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="fu">write_xlsx</span>(<span class="at">x =</span> mtcars, <span class="at">file =</span> <span class="st">&quot;mtcars.xlsx&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="fu">write_xlsx</span>(<span class="at">x =</span> mtcars, <span class="at">file =</span> <span class="st">&quot;mtcars.xlsx&quot;</span>)</span></code></pre></div>
 </div>
 <div id="exporting-a-wbworkbook" class="section level3">
 <h3>Exporting a <code>wbWorkbook</code></h3>
@@ -547,11 +547,11 @@ the file you want to write already exists. But be careful, this is
 optional. The default is to save the file and replace an existing file.
 Of course, on Windows, files that are locked (for example, if they were
 opened by another process) will not be replaced.</p>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="co"># replace the existing file</span></span>
-<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">save</span>(<span class="st">&quot;mtcars.xlsx&quot;</span>)</span>
-<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a></span>
-<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a><span class="co"># do not overwrite the existing file</span></span>
-<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="fu">try</span>(wb<span class="sc">$</span><span class="fu">save</span>(<span class="st">&quot;mtcars.xlsx&quot;</span>, <span class="at">overwrite =</span> <span class="cn">FALSE</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="co"># replace the existing file</span></span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>wb<span class="sc">$</span><span class="fu">save</span>(<span class="st">&quot;mtcars.xlsx&quot;</span>)</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a></span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="co"># do not overwrite the existing file</span></span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="fu">try</span>(wb<span class="sc">$</span><span class="fu">save</span>(<span class="st">&quot;mtcars.xlsx&quot;</span>, <span class="at">overwrite =</span> <span class="cn">FALSE</span>))</span></code></pre></div>
 </div>
 </div>
 <div id="dims-wb_dims" class="section level2">
@@ -564,72 +564,72 @@ notation. The single argument <code>dims</code> hereby replaces
 and <code>xy</code>. Since A1 notation is rather simple in the first few
 columns it might get confusing after the 26. Therefore we provide a
 wrapper to construct it:</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="co"># various options</span></span>
-<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">from_row =</span> <span class="dv">4</span>)</span>
-<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A4&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a></span>
-<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">4</span>, <span class="at">cols =</span> <span class="dv">4</span>)</span>
-<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;D4&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">4</span>, <span class="at">cols =</span> <span class="st">&quot;D&quot;</span>)</span>
-<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;D4&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a></span>
-<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">4</span><span class="sc">:</span><span class="dv">10</span>, <span class="at">cols =</span> <span class="dv">5</span><span class="sc">:</span><span class="dv">9</span>)</span>
-<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;E4:I10&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a></span>
-<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">4</span><span class="sc">:</span><span class="dv">10</span>, <span class="at">cols =</span> <span class="st">&quot;A:D&quot;</span>) <span class="co"># same as below</span></span>
-<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A4:D10&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="fu">seq_len</span>(<span class="dv">7</span>), <span class="at">cols =</span> <span class="fu">seq_len</span>(<span class="dv">4</span>), <span class="at">from_row =</span> <span class="dv">4</span>)</span>
-<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A4:D10&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="co"># 10 rows and 15 columns from indice B2.</span></span>
-<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>, <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">15</span>, <span class="at">from_col =</span> <span class="st">&quot;B&quot;</span>, <span class="at">from_row =</span> <span class="dv">2</span>)</span>
-<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;B2:P11&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a></span>
-<span id="cb30-2"><a href="#cb30-2" tabindex="-1"></a><span class="co"># data + col names</span></span>
-<span id="cb30-3"><a href="#cb30-3" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars)</span>
-<span id="cb30-4"><a href="#cb30-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A1:K33&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="co"># only data</span></span>
-<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">select =</span> <span class="st">&quot;data&quot;</span>)</span>
-<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A2:K33&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" tabindex="-1"></a></span>
-<span id="cb32-2"><a href="#cb32-2" tabindex="-1"></a><span class="co"># The dims of the values of a column in `x`</span></span>
-<span id="cb32-3"><a href="#cb32-3" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">cols =</span> <span class="st">&quot;cyl&quot;</span>)</span>
-<span id="cb32-4"><a href="#cb32-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;B2:B33&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="co"># a column in `x` with the column name</span></span>
-<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">cols =</span> <span class="st">&quot;cyl&quot;</span>, <span class="at">select =</span> <span class="st">&quot;x&quot;</span>)</span>
-<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;B1:B33&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a><span class="co"># rows in `x`</span></span>
-<span id="cb34-2"><a href="#cb34-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars)</span>
-<span id="cb34-3"><a href="#cb34-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A1:K33&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a></span>
-<span id="cb35-2"><a href="#cb35-2" tabindex="-1"></a><span class="co"># in a wb chain</span></span>
-<span id="cb35-3"><a href="#cb35-3" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
-<span id="cb35-4"><a href="#cb35-4" tabindex="-1"></a>  <span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
-<span id="cb35-5"><a href="#cb35-5" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> mtcars)<span class="sc">$</span></span>
-<span id="cb35-6"><a href="#cb35-6" tabindex="-1"></a>  <span class="fu">add_fill</span>(</span>
-<span id="cb35-7"><a href="#cb35-7" tabindex="-1"></a>    <span class="at">dims =</span> <span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>), <span class="co"># only 1st 5 rows of x data</span></span>
-<span id="cb35-8"><a href="#cb35-8" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;yellow&quot;</span>)</span>
-<span id="cb35-9"><a href="#cb35-9" tabindex="-1"></a>  )<span class="sc">$</span></span>
-<span id="cb35-10"><a href="#cb35-10" tabindex="-1"></a>  <span class="fu">add_fill</span>(</span>
-<span id="cb35-11"><a href="#cb35-11" tabindex="-1"></a>    <span class="at">dims =</span> <span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">select =</span> <span class="st">&quot;col_names&quot;</span>), <span class="co"># only column names</span></span>
-<span id="cb35-12"><a href="#cb35-12" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;cyan2&quot;</span>)</span>
-<span id="cb35-13"><a href="#cb35-13" tabindex="-1"></a>  )</span>
-<span id="cb35-14"><a href="#cb35-14" tabindex="-1"></a></span>
-<span id="cb35-15"><a href="#cb35-15" tabindex="-1"></a><span class="co"># or if the data&#39;s first coord needs to be located in B2.</span></span>
-<span id="cb35-16"><a href="#cb35-16" tabindex="-1"></a></span>
-<span id="cb35-17"><a href="#cb35-17" tabindex="-1"></a>wb_dims_custom <span class="ot">&lt;-</span> <span class="cf">function</span>(...) {</span>
-<span id="cb35-18"><a href="#cb35-18" tabindex="-1"></a>  <span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">from_col =</span> <span class="st">&quot;B&quot;</span>, <span class="at">from_row =</span> <span class="dv">2</span>, ...)</span>
-<span id="cb35-19"><a href="#cb35-19" tabindex="-1"></a>}</span>
-<span id="cb35-20"><a href="#cb35-20" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
-<span id="cb35-21"><a href="#cb35-21" tabindex="-1"></a>  <span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
-<span id="cb35-22"><a href="#cb35-22" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> mtcars, <span class="at">dims =</span> <span class="fu">wb_dims_custom</span>())<span class="sc">$</span></span>
-<span id="cb35-23"><a href="#cb35-23" tabindex="-1"></a>  <span class="fu">add_fill</span>(</span>
-<span id="cb35-24"><a href="#cb35-24" tabindex="-1"></a>    <span class="at">dims =</span> <span class="fu">wb_dims_custom</span>(<span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>),</span>
-<span id="cb35-25"><a href="#cb35-25" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;yellow&quot;</span>)</span>
-<span id="cb35-26"><a href="#cb35-26" tabindex="-1"></a>  )<span class="sc">$</span></span>
-<span id="cb35-27"><a href="#cb35-27" tabindex="-1"></a>  <span class="fu">add_fill</span>(</span>
-<span id="cb35-28"><a href="#cb35-28" tabindex="-1"></a>    <span class="at">dims =</span> <span class="fu">wb_dims_custom</span>(<span class="at">select =</span> <span class="st">&quot;col_names&quot;</span>),</span>
-<span id="cb35-29"><a href="#cb35-29" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;cyan2&quot;</span>)</span>
-<span id="cb35-30"><a href="#cb35-30" tabindex="-1"></a>  )</span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="co"># various options</span></span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">from_row =</span> <span class="dv">4</span>)</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A4&quot;</span></span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a></span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">4</span>, <span class="at">cols =</span> <span class="dv">4</span>)</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a><span class="co">#&gt; [1] &quot;D4&quot;</span></span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">4</span>, <span class="at">cols =</span> <span class="st">&quot;D&quot;</span>)</span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a><span class="co">#&gt; [1] &quot;D4&quot;</span></span>
+<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a></span>
+<span id="cb22-10"><a href="#cb22-10" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">4</span><span class="sc">:</span><span class="dv">10</span>, <span class="at">cols =</span> <span class="dv">5</span><span class="sc">:</span><span class="dv">9</span>)</span>
+<span id="cb22-11"><a href="#cb22-11" tabindex="-1"></a><span class="co">#&gt; [1] &quot;E4:I10&quot;</span></span>
+<span id="cb22-12"><a href="#cb22-12" tabindex="-1"></a></span>
+<span id="cb22-13"><a href="#cb22-13" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">4</span><span class="sc">:</span><span class="dv">10</span>, <span class="at">cols =</span> <span class="st">&quot;A:D&quot;</span>) <span class="co"># same as below</span></span>
+<span id="cb22-14"><a href="#cb22-14" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A4:D10&quot;</span></span>
+<span id="cb22-15"><a href="#cb22-15" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="fu">seq_len</span>(<span class="dv">7</span>), <span class="at">cols =</span> <span class="fu">seq_len</span>(<span class="dv">4</span>), <span class="at">from_row =</span> <span class="dv">4</span>)</span>
+<span id="cb22-16"><a href="#cb22-16" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A4:D10&quot;</span></span>
+<span id="cb22-17"><a href="#cb22-17" tabindex="-1"></a><span class="co"># 10 rows and 15 columns from indice B2.</span></span>
+<span id="cb22-18"><a href="#cb22-18" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>, <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">15</span>, <span class="at">from_col =</span> <span class="st">&quot;B&quot;</span>, <span class="at">from_row =</span> <span class="dv">2</span>)</span>
+<span id="cb22-19"><a href="#cb22-19" tabindex="-1"></a><span class="co">#&gt; [1] &quot;B2:P11&quot;</span></span>
+<span id="cb22-20"><a href="#cb22-20" tabindex="-1"></a></span>
+<span id="cb22-21"><a href="#cb22-21" tabindex="-1"></a><span class="co"># data + col names</span></span>
+<span id="cb22-22"><a href="#cb22-22" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars)</span>
+<span id="cb22-23"><a href="#cb22-23" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A1:K33&quot;</span></span>
+<span id="cb22-24"><a href="#cb22-24" tabindex="-1"></a><span class="co"># only data</span></span>
+<span id="cb22-25"><a href="#cb22-25" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">select =</span> <span class="st">&quot;data&quot;</span>)</span>
+<span id="cb22-26"><a href="#cb22-26" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A2:K33&quot;</span></span>
+<span id="cb22-27"><a href="#cb22-27" tabindex="-1"></a></span>
+<span id="cb22-28"><a href="#cb22-28" tabindex="-1"></a><span class="co"># The dims of the values of a column in `x`</span></span>
+<span id="cb22-29"><a href="#cb22-29" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">cols =</span> <span class="st">&quot;cyl&quot;</span>)</span>
+<span id="cb22-30"><a href="#cb22-30" tabindex="-1"></a><span class="co">#&gt; [1] &quot;B2:B33&quot;</span></span>
+<span id="cb22-31"><a href="#cb22-31" tabindex="-1"></a><span class="co"># a column in `x` with the column name</span></span>
+<span id="cb22-32"><a href="#cb22-32" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">cols =</span> <span class="st">&quot;cyl&quot;</span>, <span class="at">select =</span> <span class="st">&quot;x&quot;</span>)</span>
+<span id="cb22-33"><a href="#cb22-33" tabindex="-1"></a><span class="co">#&gt; [1] &quot;B1:B33&quot;</span></span>
+<span id="cb22-34"><a href="#cb22-34" tabindex="-1"></a><span class="co"># rows in `x`</span></span>
+<span id="cb22-35"><a href="#cb22-35" tabindex="-1"></a><span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars)</span>
+<span id="cb22-36"><a href="#cb22-36" tabindex="-1"></a><span class="co">#&gt; [1] &quot;A1:K33&quot;</span></span>
+<span id="cb22-37"><a href="#cb22-37" tabindex="-1"></a></span>
+<span id="cb22-38"><a href="#cb22-38" tabindex="-1"></a><span class="co"># in a wb chain</span></span>
+<span id="cb22-39"><a href="#cb22-39" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
+<span id="cb22-40"><a href="#cb22-40" tabindex="-1"></a>  <span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
+<span id="cb22-41"><a href="#cb22-41" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> mtcars)<span class="sc">$</span></span>
+<span id="cb22-42"><a href="#cb22-42" tabindex="-1"></a>  <span class="fu">add_fill</span>(</span>
+<span id="cb22-43"><a href="#cb22-43" tabindex="-1"></a>    <span class="at">dims =</span> <span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>), <span class="co"># only 1st 5 rows of x data</span></span>
+<span id="cb22-44"><a href="#cb22-44" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;yellow&quot;</span>)</span>
+<span id="cb22-45"><a href="#cb22-45" tabindex="-1"></a>  )<span class="sc">$</span></span>
+<span id="cb22-46"><a href="#cb22-46" tabindex="-1"></a>  <span class="fu">add_fill</span>(</span>
+<span id="cb22-47"><a href="#cb22-47" tabindex="-1"></a>    <span class="at">dims =</span> <span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">select =</span> <span class="st">&quot;col_names&quot;</span>), <span class="co"># only column names</span></span>
+<span id="cb22-48"><a href="#cb22-48" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;cyan2&quot;</span>)</span>
+<span id="cb22-49"><a href="#cb22-49" tabindex="-1"></a>  )</span>
+<span id="cb22-50"><a href="#cb22-50" tabindex="-1"></a></span>
+<span id="cb22-51"><a href="#cb22-51" tabindex="-1"></a><span class="co"># or if the data&#39;s first coord needs to be located in B2.</span></span>
+<span id="cb22-52"><a href="#cb22-52" tabindex="-1"></a></span>
+<span id="cb22-53"><a href="#cb22-53" tabindex="-1"></a>wb_dims_custom <span class="ot">&lt;-</span> <span class="cf">function</span>(...) {</span>
+<span id="cb22-54"><a href="#cb22-54" tabindex="-1"></a>  <span class="fu">wb_dims</span>(<span class="at">x =</span> mtcars, <span class="at">from_col =</span> <span class="st">&quot;B&quot;</span>, <span class="at">from_row =</span> <span class="dv">2</span>, ...)</span>
+<span id="cb22-55"><a href="#cb22-55" tabindex="-1"></a>}</span>
+<span id="cb22-56"><a href="#cb22-56" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span></span>
+<span id="cb22-57"><a href="#cb22-57" tabindex="-1"></a>  <span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
+<span id="cb22-58"><a href="#cb22-58" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> mtcars, <span class="at">dims =</span> <span class="fu">wb_dims_custom</span>())<span class="sc">$</span></span>
+<span id="cb22-59"><a href="#cb22-59" tabindex="-1"></a>  <span class="fu">add_fill</span>(</span>
+<span id="cb22-60"><a href="#cb22-60" tabindex="-1"></a>    <span class="at">dims =</span> <span class="fu">wb_dims_custom</span>(<span class="at">rows =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>),</span>
+<span id="cb22-61"><a href="#cb22-61" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;yellow&quot;</span>)</span>
+<span id="cb22-62"><a href="#cb22-62" tabindex="-1"></a>  )<span class="sc">$</span></span>
+<span id="cb22-63"><a href="#cb22-63" tabindex="-1"></a>  <span class="fu">add_fill</span>(</span>
+<span id="cb22-64"><a href="#cb22-64" tabindex="-1"></a>    <span class="at">dims =</span> <span class="fu">wb_dims_custom</span>(<span class="at">select =</span> <span class="st">&quot;col_names&quot;</span>),</span>
+<span id="cb22-65"><a href="#cb22-65" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;cyan2&quot;</span>)</span>
+<span id="cb22-66"><a href="#cb22-66" tabindex="-1"></a>  )</span></code></pre></div>
 </div>
 <div id="a-note-on-speed-and-memory-usage" class="section level2">
 <h2>A note on speed and memory usage</h2>

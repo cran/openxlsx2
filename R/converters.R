@@ -10,8 +10,8 @@
 #' @examples
 #' int2col(1:10)
 int2col <- function(x) {
-  if (!is.numeric(x)) {
-    stop("x must be numeric.")
+  if (!is.numeric(x) || any(is.infinite(x))) {
+    stop("x must be finite and numeric.")
   }
 
   sapply(x, int_to_col)
@@ -93,6 +93,9 @@ calc_col_width <- function(base_font, col_width) {
   # TODO base font might not be the font used in this column
   font <- base_font$name$val
   size <- as.integer(base_font$size$val)
+
+  if (!any(font %in% font_width_tab$FontFamilyName))
+    font <- "Aptos Narrow"
 
   sel <- font_width_tab$FontFamilyName == font & font_width_tab$FontSize == size
   # maximum digit width of selected font

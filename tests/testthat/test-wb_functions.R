@@ -290,6 +290,40 @@ test_that("skip hidden columns and rows works", {
 
 })
 
+test_that("test that skip_hidden_cols works with data_only", {
+  tmp <- temp_xlsx()
+
+  mm <- matrix(1, 3, 3)
+  mm[2, ] <- 2
+  mm[, 2] <- 2
+
+  wb_workbook()$
+    add_worksheet()$
+    add_data(x = mm)$
+    set_row_heights(rows = 3, hidden = TRUE)$
+    set_col_widths(cols = "B", hidden = TRUE)$
+    save(tmp)
+
+  wb <- wb_load(tmp, data_only = TRUE)
+
+  df1 <- wb_to_df(wb, skip_hidden_rows = TRUE)
+  df2 <- wb_to_df(wb, skip_hidden_cols = TRUE)
+  df3 <- wb_to_df(wb, skip_hidden_rows = TRUE, skip_hidden_cols = TRUE)
+
+  df <- data.frame(mm)
+  names(df) <- paste0("V", seq_along(df))
+  row.names(df) <- as.integer(2:4)
+
+  sel <- c(1, 3)
+  edf1 <- df[sel, ]
+  edf2 <- df[, sel]
+  edf3 <- df[sel, sel]
+
+  expect_equal(edf1, df1)
+  expect_equal(edf2, df2)
+  expect_equal(edf3, df3)
+})
+
 test_that("cols return order is correct", {
 
   wb <- wb_workbook()$add_worksheet()$add_data(dims = "B2", x = head(iris))
@@ -477,4 +511,45 @@ test_that("improve non consecutive dims", {
 
   got <- wb4$worksheets[[1]]$sheet_data$cc$r[wb4$worksheets[[1]]$sheet_data$cc$c_s != ""]
   expect_contains(got, exp)
+})
+
+test_that("creating a formula matrix works", {
+
+  df <- matrix(
+    1:100, ncol = 10, nrow = 10
+  )
+
+  wb <-  wb_workbook()$add_worksheet()$add_data(x = df)
+
+  wb$add_formula(
+    x      = "=$A2/B$2",
+    dims   = wb_dims(x = df, from_row = 13, col_names = FALSE),
+    shared = TRUE
+  )
+
+  exp <- c(210, 16)
+  got <- dim(wb$worksheets[[1]]$sheet_data$cc)
+  expect_equal(exp, got)
+
+})
+
+test_that("writing formula dataframes works", {
+
+  df <- matrix(
+    1:100, ncol = 10, nrow = 10
+  )
+
+  fml_df <- dims_to_dataframe(wb_dims(x = df, col_names = FALSE, from_row = 2), fill = TRUE)
+
+  wb <-  wb_workbook()$add_worksheet()$add_data(x = df)
+
+  wb$add_formula(
+    x      = fml_df,
+    dims   = wb_dims(x = df, from_row = 13, col_names = FALSE)
+  )
+
+  exp <- c(210, 16)
+  got <- dim(wb$worksheets[[1]]$sheet_data$cc)
+  expect_equal(exp, got)
+
 })

@@ -685,6 +685,7 @@ wb_remove_timeline <- function(
 #' @param apply_cell_style Should we write cell styles to the workbook?
 #' @param remove_cell_style Should we keep the cell style?
 #' @param enforce enforce dims
+#' @param shared shared formula
 #' @param ... additional arguments
 #' @return The workbook, invisibly.
 #' @family workbook wrappers
@@ -705,6 +706,11 @@ wb_remove_timeline <- function(
 #'  add_data(x = mm, dims = "A4:B5", col_names = FALSE)$
 #'  add_formula(x = "MMULT(A1:B2, A4:B5)", dims = "A7:B8", array = TRUE)
 #'
+#' # add shared formula
+#' wb$add_worksheet()$
+#'  add_data(x = matrix(rnorm(5*5), ncol = 5, nrow = 5))$
+#'  add_formula(x = "SUM($A2:A2)", dims = "A8:E12", shared = TRUE)
+#'
 wb_add_formula <- function(
     wb,
     sheet             = current_sheet(),
@@ -717,6 +723,7 @@ wb_add_formula <- function(
     apply_cell_style  = TRUE,
     remove_cell_style = FALSE,
     enforce           = FALSE,
+    shared            = FALSE,
     ...
 ) {
   assert_workbook(wb)
@@ -731,6 +738,7 @@ wb_add_formula <- function(
     apply_cell_style  = apply_cell_style,
     remove_cell_style = remove_cell_style,
     enforce           = enforce,
+    shared            = shared,
     ...               = ...
   )
 }
@@ -1659,6 +1667,8 @@ wb_set_bookview <- function(
 #'   right.  `header` and `footer` are used to default additional arguments.
 #'   Setting `even`, `odd`, or `first`, overrides `header`/`footer`. Use `NA` to
 #'   skip a position.
+#' @param align_with_margins Align header/footer with margins
+#' @param scale_with_doc Scale header/footer with document
 # #' @inheritParams wb_add_worksheet
 #' @param ... additional arguments
 #' @export
@@ -1702,28 +1712,31 @@ wb_set_bookview <- function(
 #' )
 wb_set_header_footer <- function(
     wb,
-    sheet        = current_sheet(),
-    header       = NULL,
-    footer       = NULL,
-    even_header  = NULL,
-    even_footer  = NULL,
-    first_header = NULL,
-    first_footer = NULL,
+    sheet              = current_sheet(),
+    header             = NULL,
+    footer             = NULL,
+    even_header        = NULL,
+    even_footer        = NULL,
+    first_header       = NULL,
+    first_footer       = NULL,
+    align_with_margins = NULL,
+    scale_with_doc     = NULL,
     ...
 ) {
   assert_workbook(wb)
   wb$clone()$set_header_footer(
-    sheet        = sheet,
-    header       = header,
-    footer       = footer,
-    even_header  = even_header,
-    even_footer  = even_footer,
-    first_header = first_header,
-    first_footer = first_footer,
-    ...          = ...
+    sheet              = sheet,
+    header             = header,
+    footer             = footer,
+    even_header        = even_header,
+    even_footer        = even_footer,
+    first_header       = first_header,
+    first_footer       = first_footer,
+    align_with_margins = align_with_margins,
+    scale_with_doc     = scale_with_doc,
+    ...                = ...
   )
 }
-
 
 
 #' Set page margins, orientation and print scaling of a worksheet

@@ -1,3 +1,26 @@
+# openxlsx2 1.9
+
+## New features
+
+* Experimental support for shared formulas. Similar to spreadsheet software, when a cell is dragged to horizontally or vertically. This requires the formula to be written only for a single cell and it is filled by spreadsheet software for the remaining dimensions. `wb_add_formula()` gained a new argument `shared`. [1074](https://github.com/JanMarvin/openxlsx2/pull/1074)
+
+* Experimental support for reading shared formulas. If `show_formula` is used with `wb_to_df()`, we try to show the value that is shown in spreadsheet software. [1091](https://github.com/JanMarvin/openxlsx2/pull/1091)
+
+* It is possible to read cells containing formulas as formula. [1103](https://github.com/JanMarvin/openxlsx2/pull/1103)
+
+## Fixes
+
+* If a font unknown to `openxlsx2` is used `wb_set_col_widths()` defaults to using the workbooks default font. [1080](https://github.com/JanMarvin/openxlsx2/pull/1080)
+
+* Previously, if only `cols` and `rows` were passed to `wb_dims()` and row `1` was selected, incorrect results were returned. This has been fixed. [1094](https://github.com/JanMarvin/openxlsx2/pull/1094)
+
+* `wb_dims()` no longer ignores `above`, `below`, `left`, `right` if `from_dims` is not supplied. [1104](https://github.com/JanMarvin/openxlsx2/pull/1104)
+
+* `wb_to_df()` with `skip_hidden_rows = TRUE` works now if a file path is passed. [1122](https://github.com/JanMarvin/openxlsx2/pull/1122)
+
+
+***************************************************************************
+
 # openxlsx2 1.8
 
 ## Maintenance

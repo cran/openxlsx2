@@ -21,45 +21,6 @@ dev.off()
 # Add basic plots to the workbook
 wb$add_worksheet("add_image")$add_image(file = myplot)
 
-## ----ggplot-------------------------------------------------------------------
-if (requireNamespace("ggplot2")) {
-
-library(ggplot2)
-p <- ggplot(mtcars, aes(x = mpg, fill = as.factor(gear))) +
-  ggtitle("Distribution of Gas Mileage") +
-  geom_density(alpha = 0.5)
-print(p)
-
-# Add ggplot to the workbook
-wb$add_worksheet("add_plot")$
-  add_plot(width = 5, height = 3.5, file_type = "png", units = "in")
-
-}
-
-## ----rvg----------------------------------------------------------------------
-if (requireNamespace("ggplot2") && requireNamespace("rvg")) {
-
-library(rvg)
-
-## create rvg example
-
-p <- ggplot(iris, aes(x = Sepal.Length, y = Petal.Width)) +
-  geom_point() +
-  labs(title = "With font Bradley Hand") +
-  theme_minimal(base_family = "sans", base_size = 18)
-
-tmp <- tempfile(fileext = ".xml")
-rvg::dml_xlsx(file =  tmp, fonts = list(sans = "Bradley Hand"))
-print(p)
-dev.off()
-
-# Add rvg to the workbook
-wb$add_worksheet("add_drawing")$
-  add_drawing(xml = tmp)$
-  add_drawing(xml = tmp, dims = NULL)
-
-}
-
 ## ----mschart------------------------------------------------------------------
 if (requireNamespace("mschart")) {
 

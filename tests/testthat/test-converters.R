@@ -1,7 +1,7 @@
 test_that("int2col", {
-
   expect_equal(int2col(1:10), LETTERS[1:10])
-  expect_error(int2col("a"), "x must be numeric.")
+  expect_error(int2col("a"), "x must be finite and numeric.")
+  expect_error(int2col(Inf))
 })
 
 test_that("col2int", {
@@ -57,4 +57,11 @@ test_that("", {
   got <- calc_col_width(wb_workbook()$get_base_font(), 7)
   expect_equal(got, 8)
 
+})
+
+test_that("unknown font works", {
+  wb <- wb_workbook()
+  wb$add_worksheet("Sheet 1")
+  wb$set_base_font(font_name = "Roboto")
+  expect_silent(wb$set_col_widths(cols = c(1, 4, 6, 7, 9), widths = c(16, 15, 12, 18, 33)))
 })

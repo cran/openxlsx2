@@ -1,6 +1,6 @@
 test_that("reading xlsb works", {
 
-  skip_if_offline()
+  skip_online_checks()
 
   xlsxFile <- testfile_path("openxlsx2_example.xlsb")
 
@@ -21,7 +21,7 @@ test_that("reading xlsb works", {
 
 test_that("reading complex xlsb works", {
 
-  skip_if_offline()
+  skip_online_checks()
 
   xlsxFile <- testfile_path("hyperlink.xlsb")
 
@@ -65,7 +65,7 @@ test_that("reading complex xlsb works", {
 
 test_that("worksheets with real world formulas", {
 
-  skip_if_offline()
+  skip_online_checks()
 
   xlsxFile <- testfile_path("nhs-core-standards-for-eprr-v6.1.xlsb")
 
@@ -102,10 +102,10 @@ test_that("worksheets with real world formulas", {
   exp <- structure(
     list(
       A = c("1", "A1+1", NA, "SUM({\"1\",\"2\",\"3\"})", "SUMIFS(A1:A2,'[1]foo'!B2:B3,{\"A\"})"),
-      B = c("A1+1", "B1+1", NA, "{\"a\"}", NA),
-      C = c("B1+1", "C1+1", NA, NA, NA),
-      D = c("C1+1", "D1+1", NA, NA, NA),
-      E = c("D1+1", "E1+1", NA, NA, NA)
+      B = structure(c("A1+1", "B1+1", NA, "{\"a\"}", NA), class = c("character", "formula")),
+      C = structure(c("B1+1", "C1+1", NA, NA, NA), class = c("character", "formula")),
+      D = structure(c("C1+1", "D1+1", NA, NA, NA), class = c("character", "formula")),
+      E = structure(c("D1+1", "E1+1", NA, NA, NA), class = c("character", "formula"))
     ),
     row.names = c(NA, 5L),
     class = "data.frame"
@@ -118,7 +118,10 @@ test_that("worksheets with real world formulas", {
 
   wb <- wb_load(xlsxFile)
 
-  exp <- "IF(ISNA(MATCH(G681,{\"Annual\",\"\"\"5\"\"\",\"\"\"1+4\"\"\"},0)),1,MATCH(G681,{\"Annual\",\"\"\"5\"\"\",\"\"\"1+4\"\"\"},0))"
+  exp <- structure(
+    "IF(ISNA(MATCH(G681,{\"Annual\",\"\"\"5\"\"\",\"\"\"1+4\"\"\"},0)),1,MATCH(G681,{\"Annual\",\"\"\"5\"\"\",\"\"\"1+4\"\"\"},0))",
+    class = c("character", "formula")
+  )
   got <- wb_to_df(wb, col_names = FALSE, show_formula = TRUE)$A
   expect_equal(exp, got)
 

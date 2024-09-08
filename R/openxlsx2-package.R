@@ -12,11 +12,11 @@
 #' @import R6
 #' @importFrom grDevices bmp col2rgb colors dev.copy dev.list dev.off jpeg palette png rgb tiff
 #' @importFrom magrittr %>%
-#' @importFrom stringi stri_c stri_encode stri_isempty stri_join stri_match
-#'   stri_match_all_regex stri_order stri_opts_collator stri_pad_left
-#'   stri_rand_strings stri_read_lines stri_replace_all_fixed
-#'   stri_split_fixed stri_split_regex stri_sub stri_unescape_unicode
-#'   stri_unique
+#' @importFrom stringi stri_c stri_encode stri_extract_all_regex
+#'   stri_isempty stri_join stri_match stri_match_all_regex stri_match_first_regex
+#'   stri_order stri_opts_collator stri_pad_left stri_rand_strings stri_read_lines
+#'   stri_replace_all_fixed stri_replace_all_regex stri_split_fixed
+#'   stri_split_regex stri_sub stri_unescape_unicode stri_unique
 #' @importFrom utils download.file head menu read.csv unzip
 #' @importFrom zip zip
 #'
@@ -160,6 +160,7 @@
 #'    will be converted. `"1"` will be written as `1`
 #' * `options("openxlsx2.na.strings" = "#N/A")` consulted by `write_xlsx()`,
 #'   `wb_add_data()` and `wb_add_data_table()`.
+#' * `options("openxlsx2.compression_level" = 6)` compression level for the output file. Increasing compression and time consumed from 1-9.
 #' @name openxlsx2_options
 NULL
 # matches enum celltype

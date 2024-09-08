@@ -22,6 +22,11 @@
 #' * 3: posixt (datetime)
 #' * 4: logical
 #'
+#' If no type is specified, the column types are derived based on all cells
+#' in a column within the selected data range, excluding potential column
+#' names. If `keep_attr` is `TRUE`, the derived column types can be inspected
+#' as an attribute of the data frame.
+#'
 #' `wb_to_df()` will not pick up formulas added to a workbook object
 #' via [wb_add_formula()]. This is because only the formula is written and left
 #' to be evaluated when the file is opened in a spreadsheet software.
@@ -424,9 +429,45 @@ wb_to_df <- function(
   }
 
   if (show_formula) {
+
+    if (any(cc$f_t == "shared")) {
+
+      # depending on the sheet, this might require updates to many cells
+      # TODO reduce this to cells, that are part of `cc`. Currently we
+      # might waste time, updating cells that are not visible to the user
+      cc_shared <- wb$worksheets[[sheet]]$sheet_data$cc
+      cc_shared <- cc_shared[cc_shared$f_t == "shared", ]
+      cc_shared <- cc_shared[order(as.integer(cc_shared$f_si)), ]
+
+      # carry forward the shared formula
+      cc_shared$f    <- ave2(cc_shared$f, cc_shared$f_si, carry_forward)
+
+      # calculate differences from the formula cell, to the shared cells
+      cc_shared$cols <- ave2(col2int(cc_shared$c_r), cc_shared$f_si, calc_distance)
+      cc_shared$rows <- ave2(as.integer(cc_shared$row_r), cc_shared$f_si, calc_distance)
+
+      # begin updating the formulas. find a1 notion, get the next cell, update formula
+      cells <- find_a1_notation(cc_shared$f)
+      repls <- vector("list", length = length(cells))
+
+      for (i in seq_along(cells)) {
+        repls[[i]] <- next_cell(cells[[i]], cc_shared$cols[i], cc_shared$rows[i])
+      }
+
+      cc_shared$f    <- replace_a1_notation(cc_shared$f, repls)
+      cc_shared$cols <- NULL
+      cc_shared$rows <- NULL
+
+      # reduce and assign
+      cc_shared <- cc_shared[which(cc_shared$r %in% cc$r), ]
+      cc[match(cc_shared$r, cc$r), ] <- cc_shared
+
+    }
+
     sel <- cc$f != ""
     cc$val[sel] <- replaceXMLEntities(cc$f[sel])
-    cc$typ[sel] <- "s"
+    cc$typ[sel] <- "f"
+
   }
 
   # convert "na_string" to missing
@@ -585,6 +626,7 @@ wb_to_df <- function(
       poxs <- names(which(types[sel] == 3))
       logs <- names(which(types[sel] == 4))
       difs <- names(which(types[sel] == 5))
+      fmls <- names(which(types[sel] == 6))
       # convert "#NUM!" to "NaN" -- then converts to NaN
       # maybe consider this an option to instead return NA?
       if (length(nums)) z[nums] <- lapply(z[nums], function(i) as.numeric(replace(i, i == "#NUM!", "NaN")))
@@ -592,6 +634,11 @@ wb_to_df <- function(
       if (length(poxs)) z[poxs] <- lapply(z[poxs], datetime_conv, origin = origin)
       if (length(logs)) z[logs] <- lapply(z[logs], as.logical)
       if (isNamespaceLoaded("hms")) z[difs] <- lapply(z[difs], hms_conv)
+
+      for (i in seq_along(z)) { # convert df to class formula
+        if (names(z)[i] %in% fmls) class(z[[i]]) <- c(class(z[[i]]), "formula")
+      }
+
     } else {
       warning("could not convert. All missing in row used for variable names")
     }

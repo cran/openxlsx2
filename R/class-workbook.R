@@ -2384,6 +2384,7 @@ wbWorkbook <- R6::R6Class(
     #' @param apply_cell_style applyCellStyle
     #' @param remove_cell_style if writing into existing cells, should the cell style be removed?
     #' @param enforce enforce dims
+    #' @param shared shared formula
     #' @return The `wbWorkbook` object
     add_formula = function(
         sheet             = current_sheet(),
@@ -2396,6 +2397,7 @@ wbWorkbook <- R6::R6Class(
         apply_cell_style  = TRUE,
         remove_cell_style = FALSE,
         enforce           = FALSE,
+        shared            = FALSE,
         ...
     ) {
 
@@ -2411,7 +2413,8 @@ wbWorkbook <- R6::R6Class(
         cm              = cm,
         applyCellStyle  = apply_cell_style,
         removeCellStyle = remove_cell_style,
-        enforce         = enforce
+        enforce         = enforce,
+        shared          = shared
       )
       invisible(self)
     },
@@ -3322,12 +3325,17 @@ wbWorkbook <- R6::R6Class(
       # TODO make self$vbaProject be TRUE/FALSE
       tmpFile <- tempfile(tmpdir = tmpDir, fileext = if (isTRUE(self$vbaProject)) ".xlsm" else ".xlsx")
 
+      # typo until release 1.8
+      compr_level <- getOption("openxlsx2.compression_level") %||%
+        getOption("openxlsx2.compresssionevel") %||%
+        6L
+
       ## zip it
       zip::zip(
         zipfile = tmpFile,
         files = list.files(tmpDir, full.names = FALSE),
         recurse = TRUE,
-        compression_level = getOption("openxlsx2.compresssionevel", 6),
+        compression_level = compr_level,
         include_directories = FALSE,
         # change the working directory for this
         root = tmpDir,
@@ -7170,15 +7178,19 @@ wbWorkbook <- R6::R6Class(
     #' @param even_footer evenFooter
     #' @param first_header firstHeader
     #' @param first_footer firstFooter
+    #' @param align_with_margins align_with_margins
+    #' @param scale_with_doc scale_with_doc
     #' @return The `wbWorkbook` object, invisibly
     set_header_footer = function(
-      sheet = current_sheet(),
-      header       = NULL,
-      footer       = NULL,
-      even_header  = NULL,
-      even_footer  = NULL,
-      first_header = NULL,
-      first_footer = NULL,
+      sheet              = current_sheet(),
+      header             = NULL,
+      footer             = NULL,
+      even_header        = NULL,
+      even_footer        = NULL,
+      first_header       = NULL,
+      first_footer       = NULL,
+      align_with_margins = NULL,
+      scale_with_doc     = NULL,
       ...
     ) {
 
@@ -7229,6 +7241,16 @@ wbWorkbook <- R6::R6Class(
 
       if (all(lengths(hf) == 0)) {
         hf <- NULL
+      }
+
+      if (!is.null(scale_with_doc)) {
+        assert_class(scale_with_doc, "logical")
+        self$worksheets[[sheet]]$scale_with_doc     <- scale_with_doc
+      }
+
+      if (!is.null(align_with_margins)) {
+        assert_class(align_with_margins, "logical")
+        self$worksheets[[sheet]]$align_with_margins <- align_with_margins
       }
 
       self$worksheets[[sheet]]$headerFooter <- hf
@@ -9377,6 +9399,9 @@ wbWorkbook <- R6::R6Class(
       xml               = NULL
     ) {
       name <- replace_legal_chars(name)
+
+      if (!grepl("^[\\p{L}_][^\\s]*$", name, perl = TRUE))
+        stop("named region must begin with a letter or an underscore and not contain whitespace(s).")
 
       # special names
 

@@ -1,13 +1,27 @@
 ## ----setup, include = FALSE---------------------------------------------------
-library(openxlsx2)
 options(rmarkdown.html_vignette.check_title = FALSE)
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
 
+# Mechanism to avoid including all images in the package, but display them on
+# the pkgdown site
+in_pkgdown <- function() {
+  identical(Sys.getenv("IN_PKGDOWN"), "true")
+}
+
+incl_graph_in_pkgdown <- function(path) {
+  if (in_pkgdown()) {
+    knitr::include_graphics(path)
+  }
+}
+
+## -----------------------------------------------------------------------------
+library(openxlsx2)
+
 ## ----echo=FALSE, warning=FALSE, out.width="100%", fig.cap="The example below, with increased column width."----
-knitr::include_graphics("img/worksheet_styling.jpg")
+incl_graph_in_pkgdown("img/worksheet_styling.jpg")
 
 ## -----------------------------------------------------------------------------
 # add some dummy data

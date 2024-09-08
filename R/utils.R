@@ -322,7 +322,7 @@ check_wb_dims_args <- function(args, select = NULL) {
   cnam_null <- is.null(args$col_names)
   rnam_null <- is.null(args$row_names)
   if (is.character(args$rows) || is.character(args$from_row)) {
-    warning("`rows` and `from_rows` in `wb_dims()` should not be a character. Please supply an integer vector.", call. = FALSE)
+    warning("`rows` and `from_row` in `wb_dims()` should not be a character. Please supply an integer vector.", call. = FALSE)
   }
 
   if (is.null(args$x)) {
@@ -676,20 +676,29 @@ wb_dims <- function(..., select = NULL) {
     )
   }
 
+  rows_arg <- args$rows
+  cols_arg <- args$cols
+
   if (n_unnamed_args == 1 && len > 1 && !"rows" %in% nams) {
     message("Assuming the first unnamed argument to be `rows`.")
-    nams[which(nams == "")[1]] <- "rows"
+    rows_pos <- which(nams == "")[1]
+    nams[rows_pos] <- "rows"
     names(args) <- nams
     n_unnamed_args <- length(which(!nzchar(nams)))
     all_args_unnamed <- n_unnamed_args == len
+
+    rows_arg <- args[[rows_pos]]
   }
 
   if (n_unnamed_args == 1 && len > 1 && "rows" %in% nams) {
     message("Assuming the first unnamed argument to be `cols`.")
-    nams[which(nams == "")[1]] <- "cols"
+    cols_pos <- which(nams == "")[1]
+    nams[cols_pos] <- "cols"
     names(args) <- nams
     n_unnamed_args <- length(which(!nzchar(nams)))
     all_args_unnamed <- n_unnamed_args == len
+
+    cols_arg <- args[[cols_pos]]
   }
 
   # if 2 unnamed arguments, will be rows, cols.
@@ -701,12 +710,33 @@ wb_dims <- function(..., select = NULL) {
     names(args) <- nams
     n_unnamed_args <- length(which(!nzchar(nams)))
     all_args_unnamed <- n_unnamed_args == len
+
+    rows_arg <- args[[rows_pos]]
+    cols_arg <- args[[cols_pos]]
+  }
+
+  if (!is.null(cols_arg) && (min(col2int(cols_arg)) < 1L)) {
+    stop("You must supply positive values to `cols`")
+  }
+
+  # in case the user mixes up column and row
+  if (is.character(rows_arg) && !all(is_charnum(rows_arg))) {
+    stop("`rows` is character and contains nothing that can be interpreted as number.")
+  }
+
+  if (!is.null(rows_arg) && (min(as.integer(rows_arg)) < 1L)) {
+    stop("You must supply positive values to `rows`.")
   }
 
   # Just keeping this as a safeguard
   has_some_unnamed_args <- !all(nzchar(nams))
   if (has_some_unnamed_args) {
     stop("Internal error, all arguments should be named after this point.")
+  }
+
+  if (length(args$from_col) > 1 || length(args$from_row) > 1 ||
+    (!is.null(args$from_row) && is.character(args$from_row) && !is_charnum(args$from_row))) {
+    stop("from_col/from_row must be positive integers if supplied.")
   }
 
   # handle from_dims
@@ -716,64 +746,71 @@ wb_dims <- function(..., select = NULL) {
     }
     # transform to
     from_row_and_col <- dims_to_rowcol(args$from_dims, as_integer = TRUE)
+    fcol <- from_row_and_col[[1]]
+    frow <- from_row_and_col[[2]]
+  } else {
+    fcol <- args$from_col %||% 1L
+    frow <- args$from_row %||% 1L
+  }
 
-    left  <- args$left
-    right <- args$right
-    above <- args$above
-    below <- args$below
+  fcol <- col2int(fcol)
+  frow <- col2int(frow)
 
-    from_col <- col2int(from_row_and_col[[1]])
-    from_row <- as.integer(from_row_and_col[[2]])
+  left  <- args$left
+  right <- args$right
+  above <- args$above
+  below <- args$below
 
-    # there can be only one
-    if (length(c(left, right, above, below)) > 1)
-      stop("can only be one direction")
 
-    # default is column names and no row names
-    cnms <- args$col_names %||% 1
-    rnms <- args$row_names %||% 0
+  # there can be only one
+  if (length(c(left, right, above, below)) > 1) {
+    stop("can only be one direction")
+  }
 
-    # NCOL(NULL)/NROW(NULL) could work as well, but the behavior might have
-    # changed recently.
-    if (!is.null(args$x)) {
-      width_x  <- ncol(args$x) + rnms
-      height_x <- nrow(args$x) + cnms
-    } else {
-      width_x  <- 1
-      height_x <- 1
-    }
+  # default is column names and no row names
+  cnms <- args$col_names %||% 1
+  rnms <- args$row_names %||% 0
 
-    if (!is.null(left)) {
-      fcol <- min(from_col) - left - width_x + 1L
-      frow <- min(from_row)
-    } else if (!is.null(right)) {
-      fcol <- max(from_col) + right
-      frow <- min(from_row)
-    } else if (!is.null(above)) {
-      fcol <- min(from_col)
-      frow <- min(from_row) - above - height_x + 1L
-    } else if (!is.null(below)) {
-      fcol <- min(from_col)
-      frow <- max(from_row) + below
-    } else {
-      fcol <- max(from_col)
-      frow <- max(from_row)
-    }
+  # NCOL(NULL)/NROW(NULL) could work as well, but the behavior might have
+  # changed recently.
+  if (!is.null(args$x)) {
+    width_x  <- NCOL(args$x) + rnms
+    height_x <- NROW(args$x) + cnms
+  } else {
+    width_x  <- 1
+    height_x <- 1
+  }
 
-    # guard against negative values
-    if (fcol < 1) {
-      warning("columns cannot be left of column A (integer position 1). resetting")
-      fcol <- 1
-    }
-    if (frow < 1) {
-      warning("rows cannot be above of row 1 (integer position 1). resetting")
-      frow <- 1
-    }
-
-    args$from_col  <- int2col(fcol)
-    args$from_row  <- frow
-    args$from_dims <- NULL
-
+  if (!is.null(left)) {
+    fcol <- min(fcol) - left - width_x + 1L
+    frow <- min(frow)
+  } else if (!is.null(right)) {
+    fcol <- max(fcol) + right
+    frow <- min(frow)
+  } else if (!is.null(above)) {
+    fcol <- min(fcol)
+    frow <- min(frow) - above - height_x + 1L
+  } else if (!is.null(below)) {
+    fcol <- min(fcol)
+    frow <- max(frow) + below
+  } else {
+    fcol <- max(fcol)
+    frow <- max(frow)
+  }
+  if (length(fcol) == 0) {
+    fcol <- 1
+  }
+  if (length(frow) == 0) {
+    frow <- 1
+  }
+  # guard against negative values
+  if (fcol < 1) {
+    warning("columns cannot be left of column A (integer position 1). resetting")
+    fcol <- 1
+  }
+  if (frow < 1) {
+    warning("rows cannot be above of row 1 (integer position 1). resetting")
+    frow <- 1
   }
 
   # After this point, all unnamed problems are solved ;)
@@ -785,167 +822,89 @@ wb_dims <- function(..., select = NULL) {
   # little helper that streamlines which inputs cannot be
   select <- determine_select_valid(args = args, select = select)
 
+  # TODO: we warn, but fail not? Shouldn't we fail?
   check_wb_dims_args(args, select = select)
-  rows_arg <- args$rows
-  rows_arg <- if (is.character(rows_arg)) {
-    col2int(rows_arg)
-  } else if (!is.null(rows_arg)) {
-    as.integer(rows_arg)
-  } else if (!is.null(args$x)) {
-    # rows_arg <- seq_len(nrow(args$x))
-    rows_arg <- NULL
-  } else {
-    1L
-  }
+  if (!is.null(rows_arg)) rows_arg <- as.integer(rows_arg)
+  if (!is.null(frow))     frow     <- as.integer(frow)
 
   assert_class(rows_arg, class = "integer", arg_nm = "rows", or_null = TRUE)
   # Checking cols (if it is a column name)
   cols_arg <- args$cols
   x_has_named_dims <- inherits(x, "data.frame") || inherits(x, "matrix")
-  x_has_colnames <- !is.null(colnames(x))
+
   if (!is.null(x)) {
     x <- as.data.frame(x)
   }
 
-  cnam_null <- is.null(args$col_names)
-  col_names <- args$col_names %||% x_has_named_dims
+  cnam      <- isTRUE(args$col_names)
+  col_names <- if (!is.null(args$col_names)) args$col_names else x_has_named_dims
+  row_names <- if (!is.null(args$row_names)) args$row_names else FALSE
 
-  if (!cnam_null && !x_has_named_dims) {
+  if (cnam && !x_has_named_dims) {
     stop("Can't supply `col_names` when `x` is a vector.\n", "Transform `x` to a data.frame")
   }
 
-  row_names <- args$row_names %||% FALSE
   assert_class(col_names, "logical")
   assert_class(row_names, "logical")
 
-  # Find column location id if `cols` is a character and is a colname of x
-  if (x_has_colnames && !is.null(cols_arg)) {
-    is_cols_a_colname <- cols_arg %in% colnames(x)
-
-    if (any(is_cols_a_colname)) {
-      cols_arg <- which(colnames(x) %in% cols_arg)
-    }
-  }
-
-  if (!is.null(cols_arg)) {
+  # special condition, can be cell reference
+  if (is.null(x) && is.character(cols_arg)) {
     cols_arg <- col2int(cols_arg)
-    assert_class(cols_arg, class = "integer", arg_nm = "cols")
-  } else if (!is.null(args$x)) {
-    cols_arg <- NULL
-  } else {
-    cols_arg <- 1L # no more NULL for cols_arg and rows_arg if `x` is not supplied
   }
 
-  if (!is.null(cols_arg) && (min(cols_arg) < 1L)) {
-    stop("You must supply positive values to `cols`")
-  }
+  # get base dimensions
+  cols_all <- if (!is.null(x)) seq_len(NCOL(x)) else cols_arg
+  rows_all <- if (!is.null(x)) seq_len(NROW(x)) else rows_arg
 
-  if (!is.null(rows_arg) && (min(rows_arg) < 1L)) {
-    stop("You must supply positive values to `rows`.")
-  }
+  # get selections in this base
+  cols_sel <- if (is.null(cols_arg)) cols_all else cols_arg
+  rows_sel <- if (is.null(rows_arg)) rows_all else rows_arg
 
-  # assess from_row / from_col
-  if (is.character(args$from_row)) {
-    frow <- col2int(args$from_row)
-  } else {
-    frow <- args$from_row %||% 1L
-    frow <- as.integer(frow)
-  }
-
-  # from_row is a function of col_names, from_rows and cols.
-  # cols_seq should start at 1 after this
-  # if from_row = 4, rows = 4:7,
-  # then frow = 4 + 4 et rows = seq_len(length(rows))
-  fcol <- col2int(args$from_col) %||% 1L
-  # after this point, no assertion, assuming all elements to be acceptable
-
-  # from_row / from_col = 0 only acceptable in certain cases.
-  if (!all(length(fcol) == 1, length(frow) == 1, fcol >= 1, frow >= 1)) {
-    stop("`from_col` / `from_row` should have length 1, and be positive.")
-  }
-
-  if (select == "col_names") {
-    if (is.null(cols_arg) || length(cols_arg) %in% c(0, 1))
-      ncol_to_span <- ncol(x)
-    else
-      ncol_to_span <- cols_arg
-    nrow_to_span <- 1L
-  } else if (select == "row_names") {
-    ncol_to_span <- 1L
-    nrow_to_span <- nrow(x) %||% 1L
-  } else if (select %in% c("x", "data")) {
-    if (!is.null(cols_arg)) {
-      if (length(cols_arg) == 1)
-        ncol_to_span <- length(cols_arg)
-      else
-        ncol_to_span <- cols_arg
-    } else {
-      ncol_to_span <- ncol(x) %||% 1L
-    }
-    if (!is.null(rows_arg)) {
-      nrow_to_span <- length(rows_arg)
-    } else {
-      nrow_to_span <- nrow(x) %||% 1L
-    }
-
-    if (select == "x") {
-      nrow_to_span <- nrow_to_span + col_names
-      ncol_to_span <- ncol_to_span + row_names
+  # if cols is a column name from x
+  if (!is.null(x) && is.character(cols_sel) && any(cols_sel %in% names(x))) {
+    names(cols_all) <- names(x)
+    cols_sel <- match(cols_sel, names(cols_all))
+    if (length(cols_sel) == 0) {
+      warning("selected column not found in `x`.")
+      cols_sel <- cols_all
     }
   }
 
-  # Setting frow / fcol correctly.
-  if (select == "row_names") {
-    fcol <- fcol
-    frow <- frow + col_names
-  } else if (select == "col_names") {
-    fcol <- fcol + row_names
-    frow <- frow
-  } else if (select %in% c("x", "data")) {
-    if (!is.null(cols_arg) && length(cols_arg) == 1L && all(diff(cols_arg) == 1L)) {
-      if (min(cols_arg) > 1) {
-        fcol <- fcol + min(cols_arg) - 1L # does not work with multi select
-      }
-    } else {
-      fcol <- fcol #+ row_names
-    }
+  # reduce to required length
+  col_span <- cols_all[cols_all %in% cols_sel]
+  row_span <- rows_all[rows_all %in% rows_sel]
 
-    if (!is.null(rows_arg)) { # && length(rows_arg) == 1L && all(diff(rows_arg) == 1L)) {
-      if (min(rows_arg) > 1) {
-        if (all(diff(rows_arg) == 1L))
-          frow <- frow + min(rows_arg) - 1L
-        else
-          frow         <- vapply(rows_arg, function(x) frow + min(x) - 1L, NA_real_)
-      }
-    }
+  # if required add column name and row name
+  if (col_names) row_span <- c(max(min(row_span, 1), 1L), row_span + 1L)
+  if (row_names) col_span <- c(max(min(col_span, 1), 1L), col_span + 1L)
 
-    if (select == "data") {
-      fcol <- fcol + row_names
-      frow <- frow + col_names
-    }
+  # data has no column name
+  if (!is.null(x) && select == "data") {
+    if (col_names) row_span <- row_span[-1]
+    if (row_names) col_span <- col_span[-1]
   }
 
-  # Ensure we are spanning at least 1 row and 1 col
-  if (identical(nrow_to_span, 0L)) {
-    nrow_to_span <- 1L
+  # column name has only the column name
+  if (!is.null(x) && select == "col_names") {
+    if (col_names) row_span <- row_span[1] # else 0?
+    if (row_names) col_span <- col_span[-1]
   }
 
-  if (identical(ncol_to_span, 0L)) {
-    ncol_to_span <- 1L
+  if (!is.null(x) && select == "row_names") {
+    if (col_names) row_span <- row_span[-1]
+    if (row_names) col_span <- col_span[1] # else 0?
   }
 
-  if (all(diff(frow) == 1))
-    row_span <- frow + seq_len(nrow_to_span) - 1L
-  else
-    row_span <- frow
+  # This can happen if only from_col or from_row is supplied
+  if (length(row_span) == 0) row_span <- 1L
+  if (length(col_span) == 0) col_span <- 1L
 
-  if (length(ncol_to_span) == 1)
-    col_span <- fcol + seq_len(ncol_to_span) - 1L
-  else # what does this do?
-    col_span <- fcol + ncol_to_span - 1L
+  # frow & fcol start at 1
+  row_span <- row_span + (frow - 1L)
+  col_span <- col_span + (fcol - 1L)
 
   # return single cells (A1 or A1,B1)
-  if (length(row_span) == 1 && (length(col_span) == 1 || any(diff(col_span) != 1L))) {
+  if ((length(row_span) == 1 || any(diff(row_span) != 1L)) && (length(col_span) == 1 || any(diff(col_span) != 1L))) {
 
     # A1
     row_start <- row_span
@@ -953,13 +912,28 @@ wb_dims <- function(..., select = NULL) {
 
     dims <- NULL
 
-    if (any(diff(col_span) != 1L)) {
-      for (col_start in col_span) {
-        tmp  <- rowcol_to_dim(row_start, col_start)
-        dims <- c(dims, tmp)
+    if (any(diff(row_span) != 1L)) {
+      for (row_start in row_span) {
+        cdims <- NULL
+        if (any(diff(col_span) != 1L)) {
+          for (col_start in col_span) {
+            tmp  <- rowcol_to_dim(row_start, col_start)
+            cdims <- c(cdims, tmp)
+          }
+        } else {
+          cdims <- rowcol_to_dim(row_start, col_span)
+        }
+        dims <- c(dims, cdims)
       }
     } else {
-      dims <- rowcol_to_dim(row_start, col_start)
+      if (any(diff(col_span) != 1L)) {
+        for (col_start in col_span) {
+          tmp  <- rowcol_to_dim(row_span, col_start)
+          dims <- c(dims, tmp)
+        }
+      } else {
+        dims <- rowcol_to_dim(row_span, col_span)
+      }
     }
 
   } else { # return range "A1:A7" or "A1:A7,B1:B7"
@@ -1273,4 +1247,111 @@ get_dims <- function(dims, check = FALSE, cols = FALSE, rows = FALSE) {
 
   return(rows)
 
+}
+
+#' the function to find the cell
+#' this function is used with `show_formula` in [wb_to_df()]
+#' @param string the formula
+#' @family internal
+#' @noRd
+find_a1_notation <- function(string) {
+  pattern <- "\\$?[A-Z]\\$?[0-9]+(:\\$?[A-Z]\\$?[0-9]+)?"
+  stringi::stri_extract_all_regex(string, pattern)
+}
+
+#' the function to replace the next cell
+#' this function is used with `show_formula` in [wb_to_df()]
+#' @param cell the cell from a shared formula [find_a1_notation()]
+#' @param cols,rows an integer where to move the cell
+#' @family internal
+#' @noRd
+next_cell <- function(cell, cols = 0L, rows = 0L) {
+
+  z <- vector("character", length(cell))
+  for (i in seq_along(cell)) {
+    # Match individual cells and ranges
+    match <- stringi::stri_match_first_regex(cell[[i]], "^(\\$?)([A-Z]+)(\\$?)(\\d+)(:(\\$?)([A-Z]+)(\\$?)(\\d+))?$")
+
+    # if shared formula contains no A1 reference
+    if (is.na(match[1, 1])) return(NA_character_)
+
+    # Extract parts of the cell
+    fixed_col1 <- match[2]
+    col1 <- match[3]
+    fixed_row1 <- match[4]
+    row1 <- as.numeric(match[5])
+
+    fixed_col2 <- match[7]
+    col2 <- match[8]
+    fixed_row2 <- match[9]
+    row2 <- as.numeric(match[10])
+
+    if (is.na(col2)) {
+
+      # Handle individual cell
+      next_col <- if (fixed_col1 == "") int2col(col2int(col1) + cols) else col1
+      next_row <- if (fixed_row1 == "") row1 + rows else row1
+      z[i] <- paste0(fixed_col1, next_col, fixed_row1, next_row)
+
+    } else {
+
+      # Handle range
+      next_col1 <- if (fixed_col1 == "") int2col(col2int(col1) + cols) else col1
+      next_row1 <- if (fixed_row1 == "") row1 + rows else row1
+      next_col2 <- if (fixed_col2 == "") int2col(col2int(col2) + cols) else col2
+      next_row2 <- if (fixed_col2 == "") row2 + rows else row2
+      z[i] <- paste0(fixed_col1, next_col1, fixed_row1, next_row1, ":", fixed_col2, next_col2, fixed_row2, next_row2)
+
+    }
+  }
+
+  z
+}
+
+#' the replacement function for shared formulas
+#' this function is used with `show_formula` in [wb_to_df()]
+#' @param string the formula
+#' @param replacements the replacements, from [next_cell()]
+#' @family internal
+#' @noRd
+replace_a1_notation <- function(strings, replacements) {
+
+  # create sprintf-able strings
+  strings <- stringi::stri_replace_all_regex(
+    strings,
+    "\\$?[A-Z]\\$?[0-9]+(:\\$?[A-Z]\\$?[0-9]+)?",
+    "%s"
+  )
+
+  # insert replacements into string
+  repl_fun <- function(str, y) {
+    if (!anyNA(y)) # else keep str as is
+      str <- do.call(sprintf, c(str, as.list(y)))
+    str
+  }
+
+  z <- vector("character", length(strings))
+  for (i in seq_along(strings)) {
+    z[i] <- repl_fun(strings[[i]], replacements[[i]])
+  }
+
+  z
+}
+
+# extend shared formula into all formula cells
+carry_forward <- function(x) {
+  rep(x[1], length(x))
+}
+
+# calculate difference for each shared formula to the origin
+calc_distance <- function(x) {
+  x - x[1]
+}
+
+# ave function to avoid a dependency on stats. if we ever rely on stats,
+# this can be replaced by stats::ave
+ave2 <- function(x, y, FUN) {
+  g <- as.factor(y)
+  split(x, g) <- lapply(split(x, g), FUN)
+  x
 }

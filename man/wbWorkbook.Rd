@@ -845,6 +845,7 @@ Add formula
   apply_cell_style = TRUE,
   remove_cell_style = FALSE,
   enforce = FALSE,
+  shared = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -871,6 +872,8 @@ Add formula
 \item{\code{remove_cell_style}}{if writing into existing cells, should the cell style be removed?}
 
 \item{\code{enforce}}{enforce dims}
+
+\item{\code{shared}}{shared formula}
 
 \item{\code{...}}{additional arguments}
 }
@@ -2713,6 +2716,8 @@ Sets headers and footers
   even_footer = NULL,
   first_header = NULL,
   first_footer = NULL,
+  align_with_margins = NULL,
+  scale_with_doc = NULL,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -2733,6 +2738,10 @@ Sets headers and footers
 \item{\code{first_header}}{firstHeader}
 
 \item{\code{first_footer}}{firstFooter}
+
+\item{\code{align_with_margins}}{align_with_margins}
+
+\item{\code{scale_with_doc}}{scale_with_doc}
 
 \item{\code{...}}{additional arguments}
 }
