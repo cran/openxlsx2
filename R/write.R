@@ -848,10 +848,16 @@ write_data_table <- function(
     na.strings <- getOption("openxlsx2.na.strings")
   }
 
-  if (data_table && nrow(x) < 1) {
-    warning("Found data table with zero rows, adding one.",
-            " Modify na with na.strings")
-    x[1, ] <- NA
+  if (data_table) {
+    if (nrow(x) < 1) {
+      warning("Found data table with zero rows, adding one.",
+             " Modify na with na.strings")
+      x[1, ] <- NA
+    }
+    if (any(duplicated(tolower(colnames(x))))) {
+      warning("tables cannot have duplicated column names")
+      colnames(x) <- fix_pt_names(colnames(x))
+    }
   }
 
   ## common part ---------------------------------------------------------------
@@ -1027,7 +1033,7 @@ write_data_table <- function(
 
     ## Table name validation
     if (is.null(tableName)) {
-      tableName <- paste0("Table", as.character(NROW(wb$tables) + 1L))
+      tableName <- paste0("Table", last_table_id(wb) + 1L)
     } else {
       tableName <- wb_validate_table_name(wb, tableName)
     }
@@ -1183,6 +1189,7 @@ do_write_formula <- function(
     remove_cell_style = FALSE,
     enforce           = FALSE,
     shared            = FALSE,
+    name              = NULL,
     ...
 ) {
   standardize_case_names(...)
@@ -1214,7 +1221,12 @@ do_write_formula <- function(
   if (array || enforce) {
     dfx <- data.frame("X" = x, stringsAsFactors = FALSE)
   } else {
-    dfx   <- dims_to_dataframe(dims)
+    # if dims a single cell and x > dfx, increase dfx
+    if (!grepl(":", dims) && (NROW(x) > 1 || NCOL(x) > 1)) {
+      dfx   <- dims_to_dataframe(wb_dims(x = x, from_dims = dims))
+    } else {
+      dfx   <- dims_to_dataframe(dims)
+    }
     dfx[] <- x
   }
 
@@ -1307,6 +1319,7 @@ do_write_formula <- function(
     array             = array,
     col_names         = FALSE,
     row_names         = FALSE,
+    name              = name,
     apply_cell_style  = apply_cell_style,
     remove_cell_style = remove_cell_style,
     enforce           = enforce,

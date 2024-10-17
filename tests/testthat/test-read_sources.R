@@ -372,7 +372,7 @@ test_that("hyperlinks work", {
   dir.create(temp_uzip)
   unzip(tmp, exdir = temp_uzip)
 
-  exp <- "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1h\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"https://www.github.com/JanMarvin/openxlsx2\" TargetMode=\"External\"/></Relationships>"
+  exp <- "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"https://www.github.com/JanMarvin/openxlsx2\" TargetMode=\"External\"/></Relationships>"
   got <- read_xml(paste0(temp_uzip, "/xl/worksheets/_rels/sheet1.xml.rels"), pointer = FALSE)
   expect_equal(exp, got)
 
@@ -410,4 +410,45 @@ test_that("reading timeline works", {
     "Cloning timelines is not yet supported. It will not appear on the sheet."
   )
 
+})
+
+test_that("show_hyperlink works", {
+
+  fl  <- testfile_path("hyperlinks.xlsx")
+
+  not_hl <- wb_to_df(fl, show_hyperlinks = FALSE)
+  has_hl <- wb_to_df(fl, show_hyperlinks = TRUE)
+
+  # everything identical in column A
+  expect_equal(not_hl$A, has_hl$A)
+
+  # column B: mail gets "mailto:":
+  exp <- "noreply@openxlsx2.com"
+  got <- not_hl$B[5]
+  expect_equal(exp, got)
+
+  exp <- "mailto:noreply@openxlsx2.com"
+  got <- has_hl$B[5]
+  expect_equal(exp, got)
+
+  # column B: hyperlink target url does not match hyperlink text
+  exp <- "https://github.com/JanMarvin/openxlsx2"
+  got <- not_hl$B[3]
+  expect_equal(exp, got)
+
+  exp <- "https://janmarvin.github.io/openxlsx2"
+  got <- has_hl$B[3]
+  expect_equal(exp, got)
+
+  # everything identical in column C
+  expect_equal(not_hl$C, has_hl$C)
+
+  # link to external file
+  exp <- "test"
+  got <- not_hl$D[1]
+  expect_equal(exp, got)
+
+  exp <- "hyperlink.xlsb"
+  got <- has_hl$D[1]
+  expect_equal(exp, got)
 })

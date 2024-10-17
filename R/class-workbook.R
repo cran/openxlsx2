@@ -1,5 +1,85 @@
 
 
+# helpers -----------------------------------------------------------------
+
+guard_ws <- function(x) {
+  if (grepl(" ", x)) x <- shQuote(x, type = "sh")
+  x
+}
+
+if_not_missing <- function(x) if (missing(x)) NULL else as.character(x)
+
+# TODO get table Id from table entry
+table_ids <- function(wb) {
+  z <- 0
+  if (!all(identical(unlist(wb$worksheets_rels), character()))) {
+    relship <- rbindlist(xml_attr(unlist(wb$worksheets_rels), "Relationship"))
+    relship$typ <- basename(relship$Type)
+    relship$tid <- as.numeric(gsub("\\D+", "", relship$Target))
+
+    z <- sort(relship$tid[relship$typ == "table"])
+  }
+  z
+}
+
+## id will start at 3 and drawing will always be 1, printer Settings at 2 (printer settings has been removed)
+last_table_id <- function(wb) {
+  max(as.integer(rbindlist(xml_attr(wb$tables$tab_xml, "table"))$id), 0)
+}
+
+fun_tab_cols <- function(tab_cols) {
+  tabCols <- NULL
+  for (i in seq_along(tab_cols)) {
+    tmp <- xml_node_create(
+      "tableColumn",
+      xml_attributes = c(id = as.character(i), name = tab_cols[i])
+    )
+    tabCols <- c(tabCols, tmp)
+  }
+
+  xml_node_create(
+    "tableColumns",
+    xml_attributes = c(count = as.character(length(tabCols))),
+    xml_children = tabCols
+  )
+}
+
+validRow <- function(summary_row) {
+  return(tolower(summary_row) %in% c("above", "below"))
+}
+
+validCol <- function(summary_col) {
+  return(tolower(summary_col) %in% c("left", "right"))
+}
+
+lcr <- function(var) {
+  # quick function for specifying error message
+  paste(var, "must have length 3 where elements correspond to positions: left, center, right.")
+}
+
+worksheet_lock_properties <- function() {
+  # provides a reference for the lock properties
+  c(
+    "selectLockedCells",
+    "selectUnlockedCells",
+    "formatCells",
+    "formatColumns",
+    "formatRows",
+    "insertColumns",
+    "insertRows",
+    "insertHyperlinks",
+    "deleteColumns",
+    "deleteRows",
+    "sort",
+    "autoFilter",
+    "pivotTables",
+    "objects",
+    "scenarios",
+    NULL
+  )
+}
+
+
 # R6 class ----------------------------------------------------------------
 # Lines 7 and 8 are needed until r-lib/roxygen2#1504 is fixed
 #' Workbook class
@@ -892,67 +972,62 @@ wbWorkbook <- R6::R6Class(
         drawing_id <- from$worksheets[[old]]$relships$drawing
 
         new_drawing_sheet <- length(self$drawings) + 1L
+        new_drawing_rels  <- length(self$drawings_rels) + 1L
 
-        self$append("drawings_rels", from$drawings_rels[[drawing_id]])
+        # if drawings_rels is list(), appending will create multiple lists
+        self$append("drawings_rels", list(from$drawings_rels[[drawing_id]]))
 
+        # select the latest addition to drawings_rels
+        drawings_rels <- self$drawings_rels[[new_drawing_rels]]
+
+        # For charts we have to modify the name of the chart in the xml code
         # give each chart its own filename (images can re-use the same file, but charts can't)
-        self$drawings_rels[[new_drawing_sheet]] <-
-          # TODO Can this be simplified?  There's a bit going on here
-          vapply(
-            self$drawings_rels[[new_drawing_sheet]],
-            function(rl) {
-              # is rl here a length of 1?
-              stopifnot(length(rl) == 1L) # lets find out...  if this fails, just remove it
-              chartfiles <- reg_match(rl, "(?<=charts/)chart[0-9]+\\.xml")
+        for (dl in seq_along(drawings_rels)) {
+          chartfiles <- reg_match(drawings_rels[dl], "(?<=charts/)chart[0-9]+\\.xml")
 
-              for (cf in chartfiles) {
-                chartid <- NROW(self$charts) + 1L
-                newname <- stri_join("chart", chartid, ".xml")
-                old_chart <- as.integer(gsub("\\D+", "", cf))
-                self$charts <- rbind(self$charts, from$charts[old_chart, ])
+          for (cf in chartfiles) {
+            chartid <- NROW(self$charts) + 1L
+            newname <- stri_join("chart", chartid, ".xml")
+            old_chart <- as.integer(gsub("\\D+", "", cf))
+            self$charts <- rbind(self$charts, from$charts[old_chart, ])
 
-                # Read the chartfile and adjust all formulas to point to the new
-                # sheet name instead of the clone source
+            # Read the chartfile and adjust all formulas to point to the new
+            # sheet name instead of the clone source
 
-                chart <- self$charts$chart[chartid]
-                self$charts$rels[chartid] <- gsub("?drawing[0-9]+.xml", paste0("drawing", chartid, ".xml"), self$charts$rels[chartid])
+            chart <- self$charts$chart[chartid]
+            self$charts$rels[chartid] <- gsub(
+              "?drawing[0-9]+.xml",
+              paste0("drawing", chartid, ".xml"),
+              self$charts$rels[chartid]
+            )
 
-                guard_ws <- function(x) {
-                  if (grepl(" ", x)) x <- shQuote(x, type = "sh")
-                  x
-                }
+            old_sheet_name <- guard_ws(from$sheet_names[[old]])
+            new_sheet_name <- guard_ws(new)
 
-                old_sheet_name <- guard_ws(from$sheet_names[[old]])
-                new_sheet_name <- guard_ws(new)
+            ## we need to replace "'oldname'" as well as "oldname"
+            chart <- gsub(
+              paste0(">", old_sheet_name, "!"),
+              paste0(">", new_sheet_name, "!"),
+              chart,
+              perl = TRUE
+            )
 
-                ## we need to replace "'oldname'" as well as "oldname"
-                chart <- gsub(
-                  paste0(">", old_sheet_name, "!"),
-                  paste0(">", new_sheet_name, "!"),
-                  chart,
-                  perl = TRUE
-                )
+            self$charts$chart[chartid] <- chart
 
-                self$charts$chart[chartid] <- chart
+            # two charts can not point to the same rels
+            if (self$charts$rels[chartid] != "") {
+              self$charts$rels[chartid] <- gsub(
+                stri_join(old_chart, ".xml"),
+                stri_join(chartid, ".xml"),
+                self$charts$rels[chartid]
+              )
+            }
 
-                # two charts can not point to the same rels
-                if (self$charts$rels[chartid] != "") {
-                  self$charts$rels[chartid] <- gsub(
-                    stri_join(old_chart, ".xml"),
-                    stri_join(chartid, ".xml"),
-                    self$charts$rels[chartid]
-                  )
-                }
+            drawings_rels[dl] <- gsub(stri_join("(?<=charts/)", cf), newname, drawings_rels[dl], perl = TRUE)
+          }
+        }
 
-                rl <- gsub(stri_join("(?<=charts/)", cf), newname, rl, perl = TRUE)
-              }
-
-              rl
-
-            },
-            NA_character_,
-            USE.NAMES = FALSE
-          )
+        self$drawings_rels[[new_drawing_rels]] <- drawings_rels
 
         self$append("drawings", from$drawings[[drawing_id]])
       }
@@ -1180,11 +1255,6 @@ wbWorkbook <- R6::R6Class(
 
         if (length(from$media)) {
 
-          # TODO there might be other content types like png, wav etc.
-          if (!any(grepl("Default Extension=\"jpg\"", self$Content_Types))) {
-            self$append("Content_Types", "<Default Extension=\"jpg\" ContentType=\"image/jpg\"/>")
-          }
-
           # get old drawing id, must not match new drawing id
           old_drawing_sheet <- from$worksheets[[old]]$relships$drawing
 
@@ -1198,34 +1268,47 @@ wbWorkbook <- R6::R6Class(
             # because we might end up with multiple files with similar names, we have to rename
             # the media file and update the drawing relationship
             # TODO has every drawing a drawing_rel of the same size?
-            drels <- rbindlist(xml_attr(self$drawings_rels[[new_drawing_sheet]], "Relationship"))
-            if (ncol(drels) && any(basename(drels$Type) == "image")) {
-              sel <- basename(drels$Type) == "image"
-              targets <- basename2(drels[sel]$Target)
-              media_names <- from$media[grepl(targets, names(from$media))]
+            if (all(nchar(self$drawings_rels[[new_drawing_rels]]))) {
 
-              onams    <- names(media_names)
-              mnams    <- vector("character", length(onams))
-              next_ids <- length(names(self$media)) + seq_along(mnams)
+              drels <- rbindlist(xml_attr(self$drawings_rels[[new_drawing_rels]], "Relationship"))
+              fe <- unique(tools::file_ext(drels$Target))
 
-              # we might have multiple media references on a sheet
-              for (i in seq_along(onams)) {
-                media_id   <- as.integer(gsub("\\D+", "", onams[i]))
-                # take filetype + number + file extension
-                # e.g. "image5.jpg" and return "image2.jpg"
-                mnams[i] <- gsub("(\\d+)\\.(\\w+)", paste0(next_ids[i], ".\\2"), onams[i])
+              cte <- sprintf("<Default Extension=\"%s\" ContentType=\"image/%s\"/>", fe, fe)
+              sel <- which(!cte %in% self$Content_Types)
+
+              if (length(sel)) {
+                self$append("Content_Types", sprintf("<Default Extension=\"%s\" ContentType=\"image/%s\"/>", fe, fe))
               }
-              names(media_names) <- mnams
 
-              # update relationship
-              self$drawings_rels[[new_drawing_sheet]] <- gsub(
-                pattern = onams,
-                replacement = mnams,
-                x = self$drawings_rels[[new_drawing_sheet]],
-              )
+              if (ncol(drels) && any(basename(drels$Type) == "image")) {
+                sel <- basename(drels$Type) == "image"
+                targets <- basename2(drels$Target)[sel]
+                media_names <- from$media[targets %in% names(from$media)]
 
-              # append media
-              self$append("media", media_names)
+                onams    <- names(media_names)
+                mnams    <- vector("character", length(onams))
+                next_ids <- length(names(self$media)) + seq_along(mnams)
+
+                # we might have multiple media references on a sheet
+                for (i in seq_along(onams)) {
+                  media_id   <- as.integer(gsub("\\D+", "", onams[i]))
+                  # take filetype + number + file extension
+                  # e.g. "image5.jpg" and return "image2.jpg"
+                  mnams[i] <- gsub("(\\d+)\\.(\\w+)", paste0(next_ids[i], ".\\2"), onams[i])
+                }
+                names(media_names) <- mnams
+
+                # update relationship
+                self$drawings_rels[[new_drawing_rels]] <- stringi::stri_replace_all_fixed(
+                  self$drawings_rels[[new_drawing_rels]],
+                  pattern = onams,
+                  replacement = mnams,
+                  vectorize_all = FALSE
+                )
+
+                # append media
+                self$append("media", media_names)
+              }
             }
           }
         }
@@ -1508,8 +1591,6 @@ wbWorkbook <- R6::R6Class(
       if (missing(fun))         fun    <- substitute()
       if (missing(pivot_table)) pivot_table <- NULL
       if (missing(params))      params <- NULL
-
-      if_not_missing <- function(x) if (missing(x)) NULL else as.character(x)
 
       if (any(duplicated(c(if_not_missing(filter), if_not_missing(rows), if_not_missing(cols))))) {
         stop("duplicated variable in filter, rows, and cols detected.")
@@ -2385,6 +2466,7 @@ wbWorkbook <- R6::R6Class(
     #' @param remove_cell_style if writing into existing cells, should the cell style be removed?
     #' @param enforce enforce dims
     #' @param shared shared formula
+    #' @param name name
     #' @return The `wbWorkbook` object
     add_formula = function(
         sheet             = current_sheet(),
@@ -2398,10 +2480,34 @@ wbWorkbook <- R6::R6Class(
         remove_cell_style = FALSE,
         enforce           = FALSE,
         shared            = FALSE,
+        name              = NULL,
         ...
     ) {
 
       standardize_case_names(...)
+
+      if (is.character(x) && !is.null(names(x)) && is.null(name)) {
+        assert_class(x, "character")
+        assert_named_region(names(x))
+
+        if (NROW(nr <- self$get_named_regions())) {
+          nr_name <- nr$name[nr$local == 0]
+
+          if (any(tolower(names(x)) %in% tolower(nr_name)))
+            stop("named regions cannot be duplicates")
+        }
+
+        xml <- xml_node_create(
+          "definedName",
+          xml_children = x,
+          xml_attributes = c(name = names(x))
+        )
+        private$append_workbook_field("definedNames", xml)
+
+        message("formula registered to the workbook")
+        return(invisible(self))
+      }
+
       do_write_formula(
         wb              = self,
         sheet           = sheet,
@@ -2414,8 +2520,216 @@ wbWorkbook <- R6::R6Class(
         applyCellStyle  = apply_cell_style,
         removeCellStyle = remove_cell_style,
         enforce         = enforce,
-        shared          = shared
+        shared          = shared,
+        name            = name
       )
+      invisible(self)
+    },
+
+    #' @description Add hyperlink
+    #' @param sheet sheet
+    #' @param dims dims
+    #' @param target target
+    #' @param tooltip tooltip
+    #' @param is_external is_external
+    #' @param col_names col_names
+    #' @return The `wbWorkbook` object
+    add_hyperlink = function(
+      sheet       = current_sheet(),
+      dims        = "A1",
+      target      = NULL,
+      tooltip     = NULL,
+      is_external = TRUE,
+      col_names   = FALSE
+    ) {
+
+      sheet <- self$validate_sheet(sheet)
+
+      if (!grepl(":", dims)) col_names <- FALSE
+
+      x <- wb_to_df(self, sheet = sheet, dims = dims, col_names = col_names)
+      nams <- names(x)
+
+      if (!is.null(target) && is.null(names(target))) {
+        if (nrow(x) > ncol(x)) {
+          target <- as.data.frame(as.matrix(target, nrow = nrow(x), ncol = ncol(x)))
+        }
+        names(target) <- nams
+      }
+
+      if (!is.null(tooltip) && is.null(names(tooltip))) {
+        if (nrow(x) > ncol(x)) {
+          tooltip <- as.data.frame(as.matrix(tooltip, nrow = nrow(x), ncol = ncol(x)))
+        }
+        names(tooltip) <- nams
+      }
+
+      rel_ids <- NULL
+      if (length(self$worksheets_rels[[sheet]])) {
+        relships <- rbindlist(xml_attr(self$worksheets_rels[[sheet]], "Relationship"))
+        rel_ids  <- as.integer(gsub("\\D+", "", relships$Id))
+      }
+
+      max_id <- max(rel_ids, 0)
+      if (!is.null(nams) && any(!nams %in% names(x)))
+        stop("some selected columns are not part of `dims`")
+
+      if (!is.null(target) && !any(names(target) %in% nams)) {
+        warning("target not found in selected `dims`")
+        return(invisible(self))
+      }
+
+      if (!is.null(tooltip) && !any(names(tooltip) %in% nams)) {
+        warning("tooltip not found in selected `dims`")
+        return(invisible(self))
+      }
+
+      for (nam in nams) {
+
+        ddims <- dims_to_dataframe(dims, fill = TRUE)
+        names(ddims) <- nams
+        # the first row is removed, because it is used only
+        # to identify the column, if a target/tooltip is named
+        if (col_names) ddims <- ddims[-1, , drop = FALSE]
+
+        if (!is.null(tooltip) && nam %in% names(tooltip)) {
+          tooltip_i <- tooltip[[nam]]
+        } else {
+          tooltip_i <- NULL
+        }
+
+        if (is_external) {
+
+          Target     <- x[[nam]]
+          if (!is.null(target) && nam %in% names(target)) {
+            Target <- target[[nam]]
+          }
+          max_id_seq <- seq.int(from = max_id + 1L, length.out = length(Target))
+          Id         <- paste0("rId", max_id_seq)
+          TargetMode <- "External"
+
+          # display <- target
+          df <- data.frame(
+            Id = Id,
+            Type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            Target = Target,
+            TargetMode = TargetMode,
+            stringsAsFactors = FALSE
+          )
+
+          new_relship <- df_to_xml("Relationship", df)
+
+          self$worksheets_rels[[sheet]] <- append(
+            self$worksheets_rels[[sheet]],
+            new_relship
+          )
+
+          df <- data.frame(
+            ref = unlist(unname(ddims[[nam]])),
+            `r:id` = Id,
+            tooltip = as_xml_attr(tooltip_i),
+            stringsAsFactors = FALSE,
+            check.names = FALSE
+          )
+
+          max_id <- max(max_id_seq, 0) + 1L
+
+        } else { # a cell reference within the workbook
+
+          if (!is.null(target)) {
+            Location <- unname(target[[nam]])
+            Display  <- unname(x[[nam]])
+          } else {
+            Location <- unname(x[[nam]])
+            Display  <- as_xml_attr(NULL)
+          }
+
+          df <- data.frame(
+            ref = unlist(unname(ddims[[nam]])),
+            location = Location,
+            display = Display,
+            tooltip = as_xml_attr(tooltip_i),
+            stringsAsFactors = FALSE,
+            check.names = FALSE
+          )
+
+        }
+
+        new_hyperlink <- df_to_xml("hyperlink", df)
+
+        self$worksheets[[sheet]]$hyperlinks <- append(
+          unlist(self$worksheets[[sheet]]$hyperlinks),
+          new_hyperlink
+        )
+
+        # get hyperlink color from template
+        if (is.null(self$theme)) {
+          has_hlink <- 11
+        } else {
+          clrs <- xml_node(self$theme, "a:theme", "a:themeElements", "a:clrScheme")
+          has_hlink <- which(xml_node_name(clrs, "a:clrScheme") == "a:hlink")
+        }
+
+        if (has_hlink) {
+          hyperlink_col <- wb_color(theme = has_hlink - 1L)
+        } else {
+          hyperlink_col <- wb_color(hex = "FF0000FF")
+        }
+
+        self$add_font(
+          sheet     = sheet,
+          dims      = ddims[[nam]],
+          color     = hyperlink_col,
+          name      = self$get_base_font()$name$val,
+          size      = self$get_base_font()$size$val,
+          underline = "single"
+        )
+
+      } # end nam loop
+
+      if (length(self$worksheets_rels[[sheet]])) {
+        relships <- rbindlist(xml_attr(self$worksheets_rels[[sheet]], "Relationship"))
+        rel_ids  <- as.integer(gsub("\\D+", "", relships$Id[basename(relships$Type) == "hyperlink"]))
+        self$worksheets[[sheet]]$relships$hyperlink <- rel_ids
+      }
+
+      invisible(self)
+    },
+
+    #' @description remove hyperlink
+    #' @param sheet sheet
+    #' @param dims dims
+    #' @return The `wbWorkbook` object
+    remove_hyperlink = function(sheet = current_sheet(), dims = NULL) {
+
+      sheet <- self$validate_sheet(sheet)
+
+      # get all hyperlinks
+      hls    <- self$worksheets[[sheet]]$hyperlinks
+
+      if (length(hls)) {
+        hls_df <- rbindlist(xml_attr(hls, "hyperlink"))
+
+        if (is.null(dims)) {
+          # remove all hyperlinks
+          self$worksheets[[sheet]]$hyperlinks <- character()
+          refs <- hls_df$ref
+        } else {
+          # get cells in dims, get required cells, replace these and reduce refs
+          ddims <- dims_to_dataframe(dims = dims, fill = TRUE)
+          sel <- which(hls_df$ref %in% unname(unlist(ddims)))
+          self$worksheets[[sheet]]$hyperlinks <- hls_df$ref[-sel]
+          refs <- hls_df$ref[sel]
+        }
+
+        # TODO remove "r:id" reference from worksheets_rels
+
+        # reset font style
+        for (ref in refs) {
+          self$add_cell_style(font_id = 0)
+        }
+      }
+
       invisible(self)
     },
 
@@ -2466,6 +2780,7 @@ wbWorkbook <- R6::R6Class(
     #' @param fill_merged_cells If TRUE, the value in a merged cell is given to all cells within the merge.
     #' @param keep_attributes If TRUE additional attributes are returned. (These are used internally to define a cell type.)
     #' @param check_names If TRUE then the names of the variables in the data frame are checked to ensure that they are syntactically valid variable names.
+    #' @param show_hyperlinks If `TRUE` instead of the displayed text, hyperlink targets are shown.
     #' @return a data frame
     to_df = function(
       sheet,
@@ -2490,6 +2805,7 @@ wbWorkbook <- R6::R6Class(
       named_region,
       keep_attributes   = FALSE,
       check_names       = FALSE,
+      show_hyperlinks   = FALSE,
       ...
     ) {
 
@@ -2521,7 +2837,9 @@ wbWorkbook <- R6::R6Class(
         convert           = convert,
         types             = types,
         named_region      = named_region,
-        check_names       = check_names
+        check_names       = check_names,
+        show_hyperlinks   = show_hyperlinks,
+        ...               = ...
       )
     },
 
@@ -2871,20 +3189,7 @@ wbWorkbook <- R6::R6Class(
       # TODO remove length() check since we have seq_along()
       if (any(self$tables$tab_act == 1)) {
 
-        # TODO get table Id from table entry
-        table_ids <- function() {
-          z <- 0
-          if (!all(identical(unlist(self$worksheets_rels), character()))) {
-            relship <- rbindlist(xml_attr(unlist(self$worksheets_rels), "Relationship"))
-            relship$typ <- basename(relship$Type)
-            relship$tid <- as.numeric(gsub("\\D+", "", relship$Target))
-
-            z <- sort(relship$tid[relship$typ == "table"])
-          }
-          z
-        }
-
-        tab_ids <- table_ids()
+        tab_ids <- table_ids(self)
 
         for (i in seq_along(tab_ids)) {
 
@@ -3395,23 +3700,7 @@ wbWorkbook <- R6::R6Class(
       showColumnStripes = 0
     ) {
 
-      ## id will start at 3 and drawing will always be 1, printer Settings at 2 (printer settings has been removed)
-      last_table_id <- function() {
-        z <- 0
-
-        if (!all(unlist(self$worksheets_rels) == "")) {
-          relship <- rbindlist(xml_attr(unlist(self$worksheets_rels), "Relationship"))
-          # assign("relship", relship, globalenv())
-          relship$typ <- basename(relship$Type)
-          relship$tid <- as.numeric(gsub("\\D+", "", relship$Target))
-          if (any(relship$typ == "table"))
-            z <- max(relship$tid[relship$typ == "table"])
-        }
-
-        z
-      }
-
-      id <- as.character(last_table_id() + 1) # otherwise will start at 0 for table 1 length indicates the last known
+      id <- as.character(last_table_id(self) + 1) # otherwise will start at 0 for table 1 length indicates the last known
       sheet <- wb_validate_sheet(self, sheet)
       # get the next highest rid
       rid <- 1
@@ -3584,23 +3873,7 @@ wbWorkbook <- R6::R6Class(
       tab_tabColumns <- xml_node(xml, "table", "tableColumns")
       tab_cols <- names(self$to_df(sheet = sheet, dims = dims))
 
-      fun <- function(tab_cols) {
-        tabCols <- NULL
-        for (i in seq_along(tab_cols)) {
-          tmp <- xml_node_create(
-            "tableColumn",
-            xml_attributes = c(id = as.character(i), name = tab_cols[i])
-          )
-          tabCols <- c(tabCols, tmp)
-        }
-
-        xml_node_create(
-          "tableColumns",
-          xml_attributes = c(count = as.character(length(tabCols))),
-          xml_children = tabCols
-        )
-      }
-      tab_tabColumns <- fun(tab_cols)
+      tab_tabColumns <- fun_tab_cols(tab_cols)
 
       tab_tabStyleIn <- xml_node(xml, "table", "tableStyleInfo")
 
@@ -3712,30 +3985,47 @@ wbWorkbook <- R6::R6Class(
       self$worksheets[[sheet]]$sheet_data$cc <- cc
 
       ### add hyperlinks ---
-      hyperlink_in_wb <- vapply(
-        self$worksheets[[from_sheet]]$hyperlinks,
-        function(x) x$ref,
-        NA_character_
-      )
+      if (length(self$worksheets[[from_sheet]]$relships$hyperlink)) {
 
-      if (any(sel <- hyperlink_in_wb %in% from_dims)) {
+        ws_hyls <- self$worksheets[[from_sheet]]$hyperlinks
+        ws_rels <- self$worksheets_rels[[self$worksheets[[from_sheet]]$relships$hyperlink]]
 
-        has_hl <- apply(from_dims_df, 2, function(x) x %in% hyperlink_in_wb)
+        relships <- rbindlist(xml_attr(ws_rels, "Relationship"))
+        relships <- relships[basename(relships$Type) == "hyperlink", ]
 
-        old <- from_dims_df[has_hl]
-        new <- to_dims_df_f[has_hl]
+        # prepare hyperlinks data frame
+        hlinks <- rbindlist(xml_attr(ws_hyls, "hyperlink"))
 
-        for (hls in match(hyperlink_in_wb, old)) {
+        # merge both
+        hl_df <- merge(hlinks, relships, by.x = "r:id", by.y = "Id", all.x = TRUE, all.y = FALSE)
 
-          # prepare the updated link
-          hl <- self$worksheets[[from_sheet]]$hyperlinks[[hls]]$clone()
-          hl$ref <- new[which(old == hl$ref)]
+        hyperlink_in_wb <- hlinks$ref
 
-          # assign it
-          self$worksheets[[sheet]]$hyperlinks <- append(
-            self$worksheets[[sheet]]$hyperlinks,
-            hl
-          )
+        if (any(sel <- hyperlink_in_wb %in% from_dims)) {
+
+          has_hl <- apply(from_dims_df, 2, function(x) x %in% hyperlink_in_wb)
+
+          # are these always the same size?
+          old <- from_dims_df[has_hl]
+          new <- to_dims_df_f[has_hl]
+
+          for (hls in match(hyperlink_in_wb, old)) {
+
+            # prepare the updated link
+            need_clone <- hyperlink_in_wb[hls]
+
+            hl_df <- hlinks[hlinks$ref == need_clone, ]
+            # this assumes that old and new are the same size
+            hl_df$ref <- new[hls]
+            hl <- df_to_xml("hyperlink", hl_df)
+
+            # assign it
+            self$worksheets[[sheet]]$hyperlinks <- append(
+              self$worksheets[[sheet]]$hyperlinks,
+              hl
+            )
+          }
+
         }
 
       }
@@ -5665,17 +5955,19 @@ wbWorkbook <- R6::R6Class(
     #' @param row_offset,col_offset offsets
     #' @param units units
     #' @param dpi dpi
+    #' @param address address
     #' @return The `wbWorkbook` object, invisibly
     add_image = function(
-      sheet = current_sheet(),
-      dims      = "A1",
+      sheet      = current_sheet(),
+      dims       = "A1",
       file,
-      width     = 6,
-      height    = 3,
+      width      = 6,
+      height     = 3,
       row_offset = 0,
       col_offset = 0,
-      units     = "in",
-      dpi       = 300,
+      units      = "in",
+      dpi        = 300,
+      address    = NULL,
       ...
     ) {
 
@@ -5739,10 +6031,15 @@ wbWorkbook <- R6::R6Class(
         imageNo <- 1L
       }
 
+      # TODO might want to clean this a bit more
+      if (is.null(address)) address_id <- ""
+
       if (length(self$drawings_rels) >= sheet_drawing && !all(self$drawings_rels[[sheet_drawing]] == "")) {
         next_id <- get_next_id(self$drawings_rels[[sheet_drawing]])
+        if (!is.null(address)) address_id <- get_next_id(self$drawings_rels[[sheet_drawing]], 2L)
       } else {
         next_id <- "rId1"
+        if (!is.null(address)) address_id <- "rId2"
       }
 
       pos <- '<xdr:pos x="0" y="0" />'
@@ -5751,7 +6048,7 @@ wbWorkbook <- R6::R6Class(
         "<xdr:absoluteAnchor>",
         pos,
         sprintf('<xdr:ext cx="%s" cy="%s"/>', width, height),
-        genBasePic(imageNo, next_id),
+        genBasePic(imageNo, next_id, address_id),
         "<xdr:clientData/>",
         "</xdr:absoluteAnchor>"
       )
@@ -5790,6 +6087,18 @@ wbWorkbook <- R6::R6Class(
           file
         )
       )
+
+      if (!is.null(address)) {
+        relship <- sprintf(
+          '<Relationship Id="%s" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="%s" TargetMode="External"/>',
+          address_id,
+          address
+        )
+        self$drawings_rels[[sheet_drawing]] <- append(
+          self$drawings_rels[[sheet_drawing]],
+          relship
+        )
+      }
 
       invisible(self)
     },
@@ -6979,12 +7288,6 @@ wbWorkbook <- R6::R6Class(
 
       ## summary row and col ----
       outlinepr <- character()
-      validRow <- function(summary_row) {
-        return(tolower(summary_row) %in% c("above", "below"))
-      }
-      validCol <- function(summary_col) {
-        return(tolower(summary_col) %in% c("left", "right"))
-      }
 
       if (!is.null(summary_row)) {
 
@@ -7465,13 +7768,13 @@ wbWorkbook <- R6::R6Class(
       }
       match_dn <- which(sel)
 
+      assert_named_region(name)
+
       if (any(match_dn)) {
         if (overwrite)
           self$workbook$definedNames <- self$workbook$definedNames[-match_dn]
         else
           stop(sprintf("Named region with name '%s' already exists! Use overwrite  = TRUE if you want to replace it", name))
-      } else if (grepl("^[A-Z]{1,3}[0-9]+$", name)) {
-        stop("name cannot look like a cell reference.")
       }
 
       rowcols <- dims_to_rowcol(dims, as_integer = TRUE)
@@ -7662,6 +7965,7 @@ wbWorkbook <- R6::R6Class(
     #' @param characters remove all characters
     #' @param styles remove all styles
     #' @param merged_cells remove all merged_cells
+    #' @param hyperlinks remove all hyperlinks
     #' @return The `wbWorksheetObject`, invisibly
     clean_sheet = function(
         sheet        = current_sheet(),
@@ -7669,7 +7973,8 @@ wbWorkbook <- R6::R6Class(
         numbers      = TRUE,
         characters   = TRUE,
         styles       = TRUE,
-        merged_cells = TRUE
+        merged_cells = TRUE,
+        hyperlinks   = TRUE
     ) {
       sheet <- private$get_sheet_index(sheet)
       self$worksheets[[sheet]]$clean_sheet(
@@ -7679,6 +7984,13 @@ wbWorkbook <- R6::R6Class(
         styles       = styles,
         merged_cells = merged_cells
       )
+
+      if (hyperlinks)
+        self$remove_hyperlink(
+          sheet = sheet,
+          dims  = dims
+        )
+
       invisible(self)
     },
 
@@ -7911,7 +8223,6 @@ wbWorkbook <- R6::R6Class(
       # we might create duplicates, but if a single style changes, the rest of
       # the workbook remains valid.
       smp <- random_string()
-      s <- function(x) paste0(smp, "s", deparse(substitute(x)), seq_along(x))
       sfull_single <- paste0(smp, "full_single")
       stop_single <- paste0(smp, "full_single")
       sbottom_single <- paste0(smp, "bottom_single")
@@ -8394,14 +8705,18 @@ wbWorkbook <- R6::R6Class(
         dims <- dims_to_dataframe(dims, fill = TRUE)
       sheet <- private$get_sheet_index(sheet)
 
-      # This alters the workbook
-      temp <- self$clone()$.__enclos_env__$private$do_cell_init(sheet, dims)
+      # We need to return a cell style, even if the cell is not part of the
+      # workbook. Since we need to return the values in the corret order, we
+      # initiate a cell, if needed. Because the initiation of a cell alters the
+      # workbook, we do it on a clone.
+      wanted_dims <- unname(unlist(dims))
+      need_dims   <- wanted_dims[!wanted_dims %in% self$worksheets[[sheet]]$sheet_data$cc$r]
+      if (length(need_dims)) # could be enough to pass wanted_dims
+        temp <- self$clone()$.__enclos_env__$private$do_cell_init(sheet, dims)
+      else
+        temp <- self
 
-      # if a range is passed (e.g. "A1:B2") we need to get every cell
-      dims <- unname(unlist(dims))
-
-      # TODO check that cc$r is alway valid. not sure atm
-      sel <- temp$worksheets[[sheet]]$sheet_data$cc$r %in% dims
+      sel <- temp$worksheets[[sheet]]$sheet_data$cc$r %in% wanted_dims
       temp$worksheets[[sheet]]$sheet_data$cc$c_s[sel]
     },
 
@@ -9333,17 +9648,8 @@ wbWorkbook <- R6::R6Class(
           write_xmlPtr(doc = sheet_xml, fl = ws_file)
 
           ## write worksheet rels
-          if (length(self$worksheets_rels[[i]]) || hasHL) {
+          if (length(self$worksheets_rels[[i]])) {
             ws_rels <- self$worksheets_rels[[i]]
-            if (hasHL) {
-              h_inds <- stri_join(seq_along(self$worksheets[[i]]$hyperlinks), "h")
-              ws_rels <-
-                c(ws_rels, unlist(
-                  lapply(seq_along(h_inds), function(j) {
-                    self$worksheets[[i]]$hyperlinks[[j]]$to_target_xml(h_inds[j])
-                  })
-                ))
-            }
 
             ## Check if any tables were deleted - remove these from rels
             # TODO a relship manager should take care of this
@@ -9420,7 +9726,7 @@ wbWorkbook <- R6::R6Class(
       # _xlnm .Sheet_Title
 
       named_region <- c(
-        comment          = comment,
+        comment           = comment,
         customMenu        = customMenu,
         description       = description,
         `function`        = is_function,
@@ -9772,65 +10078,3 @@ wbWorkbook <- R6::R6Class(
     }
   )
 )
-
-
-# helpers -----------------------------------------------------------------
-
-is_wbWorkbook <- function(x) inherits(x, c("wbWorkbook",   "R6"))
-
-lcr <- function(var) {
-  # quick function for specifying error message
-  paste(var, "must have length 3 where elements correspond to positions: left, center, right.")
-}
-
-
-# TODO Does this need to be checked?  No sheet name can be NA right?
-# res <- self$sheet_names[ind]; stopifnot(!anyNA(ind))
-
-#' Get sheet name
-#'
-#' @param wb a [wbWorkbook] object
-#' @param index Sheet name index
-#' @return The sheet index
-#' @keywords internal
-#' @noRd
-wb_get_sheet_name <- function(wb, index = NULL) {
-  index <- index %||% seq_along(wb$sheet_names)
-
-  # index should be integer like
-  stopifnot(is_integer_ish(index))
-
-  n <- length(wb$sheet_names)
-
-  if (any(index > n)) {
-    stop("Invalid sheet index. Workbook ", n, " sheet(s)", call. = FALSE)
-  }
-
-  # keep index 0 as ""
-  z <- vector("character", length(index))
-  names(z) <- index
-  z[index > 0] <- wb$sheet_names[index]
-  z
-}
-
-worksheet_lock_properties <- function() {
-  # provides a reference for the lock properties
-  c(
-    "selectLockedCells",
-    "selectUnlockedCells",
-    "formatCells",
-    "formatColumns",
-    "formatRows",
-    "insertColumns",
-    "insertRows",
-    "insertHyperlinks",
-    "deleteColumns",
-    "deleteRows",
-    "sort",
-    "autoFilter",
-    "pivotTables",
-    "objects",
-    "scenarios",
-    NULL
-  )
-}

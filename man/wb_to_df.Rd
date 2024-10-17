@@ -30,6 +30,7 @@ wb_to_df(
   named_region,
   keep_attributes = FALSE,
   check_names = FALSE,
+  show_hyperlinks = FALSE,
   ...
 )
 
@@ -50,6 +51,7 @@ read_xlsx(
   na.numbers = NA,
   fill_merged_cells = FALSE,
   check_names = FALSE,
+  show_hyperlinks = FALSE,
   ...
 )
 
@@ -69,6 +71,7 @@ wb_read(
   na.strings = "NA",
   na.numbers = NA,
   check_names = FALSE,
+  show_hyperlinks = FALSE,
   ...
 )
 }
@@ -126,6 +129,8 @@ If no sheet is selected, the first appearance will be selected. See \code{\link[
 
 \item{check_names}{If \code{TRUE} then the names of the variables in the data frame are checked to ensure that they are syntactically valid variable names.}
 
+\item{show_hyperlinks}{If \code{TRUE} instead of the displayed text, hyperlink targets are shown.}
+
 \item{...}{additional arguments}
 }
 \description{
@@ -143,12 +148,13 @@ row is selected as column name.
 Depending if the R package \code{hms} is loaded, \code{wb_to_df()} returns
 \code{hms} variables or string variables in the \code{hh:mm:ss} format.
 
-The \code{types} argument must be a named numeric.
+The \code{types} argument can be a named numeric or a character string of the
+matching R variable type. Either \code{c(foo = 1)} or \code{c(foo = "numeric")}.
 \itemize{
 \item 0: character
 \item 1: numeric
-\item 2: date
-\item 3: posixt (datetime)
+\item 2: Date
+\item 3: POSIXct (datetime)
 \item 4: logical
 }
 

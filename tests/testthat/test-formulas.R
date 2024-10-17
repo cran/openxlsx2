@@ -184,3 +184,36 @@ test_that("writing shared formulas works", {
   expect_equal(exp, got)
 
 })
+
+test_that("increase formula dims if required", {
+
+  fml <- c("SUM(A2:B2)", "SUM(A3:B3)")
+
+  # This only handles single cells, if C2 is passed and length(x) > 1
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = matrix(1:4, 2, 2))
+
+  wb1 <- wb_add_formula(wb, dims = "C2", x = fml)
+  wb2 <- wb_add_formula(wb, dims = "C2:D2", x = fml)
+
+  expect_equal(
+    wb1$worksheets[[1]]$sheet_data$cc,
+    wb2$worksheets[[1]]$sheet_data$cc
+  )
+
+})
+
+test_that("registering formulas works", {
+
+  fml <- "_xlfn.LAMBDA(TODAY() - 1)"
+  wb <- wb_workbook()$add_worksheet()
+
+  expect_message(wb$add_formula(x = c(YESTERDAY = fml)), "formula registered to the workbook")
+  expect_error(wb$add_formula(x = c(YESTERDAY = fml)), "named regions cannot be duplicates")
+  expect_equal(wb$get_named_regions()$value, fml)
+
+  wb <- wb_add_formula(wb, x = "YESTERDAY()", name = "YSTRDY", array = TRUE)
+  expect_equal(wb$get_named_regions()$name, c("YESTERDAY", "YSTRDY"))
+
+})

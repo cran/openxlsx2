@@ -15,11 +15,12 @@
 #' Depending if the R package `hms` is loaded, `wb_to_df()` returns
 #' `hms` variables or string variables in the `hh:mm:ss` format.
 #'
-#' The `types` argument must be a named numeric.
+#' The `types` argument can be a named numeric or a character string of the
+#' matching R variable type. Either `c(foo = 1)` or `c(foo = "numeric")`.
 #' * 0: character
 #' * 1: numeric
-#' * 2: date
-#' * 3: posixt (datetime)
+#' * 2: Date
+#' * 3: POSIXct (datetime)
 #' * 4: logical
 #'
 #' If no type is specified, the column types are derived based on all cells
@@ -65,6 +66,7 @@
 #' @param keep_attributes If `TRUE` additional attributes are returned.
 #'   (These are used internally to define a cell type.)
 #' @param check_names If `TRUE` then the names of the variables in the data frame are checked to ensure that they are syntactically valid variable names.
+#' @param show_hyperlinks If `TRUE` instead of the displayed text, hyperlink targets are shown.
 #' @param ... additional arguments
 #'
 #' @examples
@@ -156,6 +158,7 @@ wb_to_df <- function(
     named_region,
     keep_attributes   = FALSE,
     check_names       = FALSE,
+    show_hyperlinks = FALSE,
     ...
 ) {
 
@@ -177,13 +180,17 @@ wb_to_df <- function(
     if (missing(sheet))
       sheet <- substitute()
 
+    data_only <- TRUE
+    # TODO tables and hyperlinks are deeper embedded into the wb_load code
+    if (!missing(named_region) || show_hyperlinks) data_only <- FALSE
+
     # possible false positive on current lintr runs
-    wb <- wb_load(file, sheet = sheet, data_only = TRUE) # nolint
+    wb <- wb_load(file, sheet = sheet, data_only = data_only) # nolint
   }
 
   if (!missing(named_region)) {
 
-    nr <- wb_get_named_regions(wb, tables = TRUE)
+    nr <- wb$get_named_regions(tables = TRUE)
 
     if ((named_region %in% nr$name) && missing(sheet)) {
       sel   <- nr[nr$name == named_region, ][1, ]
@@ -470,6 +477,23 @@ wb_to_df <- function(
 
   }
 
+  if (show_hyperlinks) {
+
+    if (length(wb$worksheets[[sheet]]$hyperlinks)) {
+
+      hls <- wb_to_hyperlink(wb, sheet)
+      hyprlnks <- as.data.frame(
+        do.call("rbind",
+                lapply(hls, function(hl) {
+                  c(hl$ref, ifelse(is.null(hl$target), hl$location, hl$target))
+                })
+        )
+      )
+      cc$val[match(hyprlnks$V1, cc$r)] <- hyprlnks$V2
+    }
+
+  }
+
   # convert "na_string" to missing
   if (has_na_string) cc$typ[cc$typ == "na_string"] <- NA
   if (has_na_number) cc$typ[cc$typ == "na_number"] <- NA
@@ -610,8 +634,35 @@ wb_to_df <- function(
     date_conv     <- as.Date
     datetime_conv <- as.POSIXct
   } else {
-    # assign types the correct column name "A", "B" etc.
-    names(types) <- names(xlsx_cols_names[names(types) %in% xlsx_cols_names])
+    # TODO check if guessing only if !all() is possible
+    if (any(xlsx_cols_names %in% names(types))) {
+
+      if (is.character(types)) {
+        types[types == "character"] <- 0
+        types[types == "numeric"]   <- 1
+        types[types == "Date"]      <- 2
+        types[types == "POSIXct"]   <- 3
+        types[types == "logical"]   <- 4
+        types[types == "hms"]       <- 5
+        types[types == "formula"]   <- 6
+      }
+
+      if (any(!names(types) %in% xlsx_cols_names)) {
+        warning("variable from `types` not found in data")
+        types <- types[names(types) %in% xlsx_cols_names]
+      }
+
+      # assign types the correct column name "A", "B" etc.
+      names(types) <- names(xlsx_cols_names[match(names(types), xlsx_cols_names)])
+
+      # replace predefined types in guessed column types
+      guess <- guess_col_type(tt)
+      guess[names(types)] <- types
+      types <- guess
+    } else {
+      stop("no variable from `types` found in data")
+    }
+
     date_conv     <- convert_date
     datetime_conv <- convert_datetime
   }
@@ -684,6 +735,7 @@ read_xlsx <- function(
   na.numbers        = NA,
   fill_merged_cells = FALSE,
   check_names       = FALSE,
+  show_hyperlinks   = FALSE,
   ...
 ) {
 
@@ -712,7 +764,8 @@ read_xlsx <- function(
     na.numbers        = na.numbers,
     fill_merged_cells = fill_merged_cells,
     check_names       = check_names,
-    ...
+    show_hyperlinks   = show_hyperlinks,
+    ...               = ...
   )
 }
 
@@ -735,6 +788,7 @@ wb_read <- function(
   na.strings      = "NA",
   na.numbers      = NA,
   check_names     = FALSE,
+  show_hyperlinks = FALSE,
   ...
 ) {
 
@@ -762,7 +816,8 @@ wb_read <- function(
     na.strings      = na.strings,
     na.numbers      = na.numbers,
     check_names     = check_names,
-    ...
+    show_hyperlinks = show_hyperlinks,
+    ...             = ...
   )
 
 }

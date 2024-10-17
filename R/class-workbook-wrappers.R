@@ -673,6 +673,16 @@ wb_remove_timeline <- function(
 #' extends over several cells, is only possible with single strings. If a vector
 #' is passed, it is only possible to return individual cells.
 #'
+#' Custom functions can be registered as lambda functions in the workbook. For
+#' this you take the function you want to add `"LAMBDA(x, y, x + y)"` and escape
+#' it as follows. `LAMBDA()` is a future function and needs a prefix `_xlfn`. The
+#' arguments need a prefix `_xlpm.`. So the full function looks like this:
+#' `"_xlfn.LAMBDA(_xlpm.x, _xlpm.y, _xlpm.x + _xlpm.y)"`. These custom formulas
+#' are accessible via the named region manager and can be removed with
+#' [wb_remove_named_region()]. Contrary to other formulas, custom formulas must
+#' be registered with the workbook before they can be used (see the example
+#' below).
+#'
 #' @param wb A Workbook object containing a worksheet.
 #' @param sheet The worksheet to write to. (either as index or name)
 #' @param x A formula as character vector.
@@ -686,6 +696,7 @@ wb_remove_timeline <- function(
 #' @param remove_cell_style Should we keep the cell style?
 #' @param enforce enforce dims
 #' @param shared shared formula
+#' @param name The name of a named region if specified.
 #' @param ... additional arguments
 #' @return The workbook, invisibly.
 #' @family workbook wrappers
@@ -711,6 +722,10 @@ wb_remove_timeline <- function(
 #'  add_data(x = matrix(rnorm(5*5), ncol = 5, nrow = 5))$
 #'  add_formula(x = "SUM($A2:A2)", dims = "A8:E12", shared = TRUE)
 #'
+#' # add a custom formula, first define it, then use it
+#' wb$add_formula(x = c(YESTERDAY = "_xlfn.LAMBDA(TODAY() - 1)"))
+#' wb$add_formula(x = "=YESTERDAY()", dims = "A1", cm = TRUE)
+#'
 wb_add_formula <- function(
     wb,
     sheet             = current_sheet(),
@@ -724,6 +739,7 @@ wb_add_formula <- function(
     remove_cell_style = FALSE,
     enforce           = FALSE,
     shared            = FALSE,
+    name              = NULL,
     ...
 ) {
   assert_workbook(wb)
@@ -739,8 +755,64 @@ wb_add_formula <- function(
     remove_cell_style = remove_cell_style,
     enforce           = enforce,
     shared            = shared,
+    name              = name,
     ...               = ...
   )
+}
+
+#' wb_add_hyperlink
+#'
+#' Helper to add shared hyperlinks into a worksheet or remove shared hyperlinks from a worksheet
+#'
+#' @details
+#' There are multiple ways to add hyperlinks into a worksheet. One way is to construct a formula with [create_hyperlink()] another is to assign a class `hyperlink` to a column of a data frame.
+#' Contrary to the previous method, shared hyperlinks are not cell formulas in the worksheet, but references in the worksheet relationship and hyperlinks in the worksheet xml structure.
+#' These shared hyperlinks can be reused and they are not visible to spreadsheet users as `HYPERLINK()` formulas.
+#'
+#' @param wb A Workbook object containing a worksheet.
+#' @param sheet The worksheet to write to. (either as index or name)
+#' @param dims Spreadsheet dimensions that will determine where the hyperlink reference spans: "A1", "A1:B2", "A:B"
+#' @param target An optional target, if no target is specified, it is assumed that the cell already contains a reference (the cell could be a url or a filename)
+#' @param tooltip An optional description for a variable that will be visible when hovering over the link text in the spreadsheet
+#' @param is_external A logical indicating if the hyperlink is external (a url, a mail address, a file) or internal (a reference to worksheet cells)
+#' @param col_names Whether or not the object contains column names. If yes the first column of the dimension will be ignored
+#' @export
+#' @family workbook wrappers
+#' @family worksheet content functions
+#' @examples
+#' wb <- wb_workbook()$add_worksheet()$
+#'   add_data(x = "openxlsx2 on CRAN")$
+#'   add_hyperlink(target = "https://cran.r-project.org/package=openxlsx2",
+#'                 tooltip = "The canonical form to link to our CRAN page.")
+#'
+#' wb$remove_hyperlink()
+wb_add_hyperlink <- function(
+    wb,
+    sheet       = current_sheet(),
+    dims        = "A1",
+    target      = NULL,
+    tooltip     = NULL,
+    is_external = TRUE,
+    col_names   = FALSE
+  ) {
+
+  assert_workbook(wb)
+
+  wb$clone()$add_hyperlink(
+    sheet       = sheet,
+    dims        = dims,
+    target      = target,
+    tooltip     = tooltip,
+    is_external = is_external,
+    col_names   = col_names
+  )
+}
+
+#' @rdname wb_add_hyperlink
+#' @export
+wb_remove_hyperlink <- function(wb, sheet = current_sheet(), dims = NULL) {
+  assert_workbook(wb)
+  wb$clone()$remove_hyperlink(sheet = sheet, dims = dims)
 }
 
 #' Update a data table position in a worksheet
@@ -2874,6 +2946,7 @@ wb_set_last_modified_by <- function(wb, name, ...) {
 #' @param col_offset offset vector for one or two cell anchor within cell (column)
 #' @param units Units of width and height. Can be `"in"`, `"cm"` or `"px"`
 #' @param dpi Image resolution used for conversion between units.
+#' @param address An optional character string specifying an external URL, relative or absolute path to a file, or "mailto:" string (e.g. "mailto:example@@example.com") that will be opened when the image is clicked.
 #' @param ... additional arguments
 #' @seealso [wb_add_chart_xml()] [wb_add_drawing()] [wb_add_mschart()] [wb_add_plot()]
 #' @export
@@ -2898,6 +2971,7 @@ wb_add_image <- function(
   col_offset = 0,
   units      = "in",
   dpi        = 300,
+  address    = NULL,
   ...
 ) {
   assert_workbook(wb)
@@ -2911,6 +2985,7 @@ wb_add_image <- function(
     col_offset = col_offset,
     units      = units,
     dpi        = dpi,
+    address    = address,
     ...
   )
 }
@@ -2958,6 +3033,7 @@ wb_add_chart_xml <- function(
 #' @param characters remove all characters
 #' @param styles remove all styles
 #' @param merged_cells remove all merged_cells
+#' @param hyperlinks remove all hyperlinks
 #' @return A Workbook object
 #' @export
 wb_clean_sheet <- function(
@@ -2967,7 +3043,8 @@ wb_clean_sheet <- function(
     numbers      = TRUE,
     characters   = TRUE,
     styles       = TRUE,
-    merged_cells = TRUE
+    merged_cells = TRUE,
+    hyperlinks   = TRUE
 ) {
   assert_workbook(wb)
   wb$clone(deep = TRUE)$clean_sheet(
@@ -2976,7 +3053,8 @@ wb_clean_sheet <- function(
     numbers      = numbers,
     characters   = characters,
     styles       = styles,
-    merged_cells = merged_cells
+    merged_cells = merged_cells,
+    hyperlinks   = hyperlinks
   )
 }
 

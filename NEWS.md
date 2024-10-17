@@ -1,3 +1,38 @@
+# openxlsx2 1.10
+
+## New features
+
+* When writing a file with `na.strings = NULL`, the file will not contain any reference to the blank cell. Depending on the number of missings in a data set, this can reduce the file size significantly. [1111](https://github.com/JanMarvin/openxlsx2/pull/1111)
+
+* `wb_to_df()` gained a new argument `show_hyperlinks` which returns the target or location of a hyperlink, instead of the links description. [1136](https://github.com/JanMarvin/openxlsx2/pull/1136)
+
+* A new wrapper function `wb_add_hyperlink()` extends the capabilities of writing hyperlinks to shared hyperlinks. Shared hyperlinks bring along internal changes that are noted below. [1137](https://github.com/JanMarvin/openxlsx2/pull/1137)
+
+* Add `address` field to `wb_add_image()`. This can be used to add a url or mailto address to an image ([1138](https://github.com/JanMarvin/openxlsx2/pull/1138), conversion from a PR by @jistria for `openxlsx`)
+
+* It is now possible to remove hyperlinks with either `wb_remove_hyperlinks()` or `wb_clean_sheet()`. [1139](https://github.com/JanMarvin/openxlsx2/pull/1139)
+
+* `wb_add_data_table()` will throw a warning if non distinct column names are found and will fix this for the user. Non distinct can be duplicated or even upper and lower case `x` and `X`. [1150](https://github.com/JanMarvin/openxlsx2/pull/1150)
+
+## Fixes
+
+* The integration of the shared formula feature in the previous release broke the silent extension of dims, if a single cell `dims` was provided for an `x` that was larger than a single cell in `wb_add_formula()`. [1131](https://github.com/JanMarvin/openxlsx2/pull/1131)
+
+* Fixed a regression in the previous release, where `wb_dims()` would pass column names passed via `cols` to `col2int()` which could cause overflow errors resulting in a failing check. [1133](https://github.com/JanMarvin/openxlsx2/pull/1133)
+
+* Fix cloning from worksheets with multiple images.
+
+* Improved `wb_to_df(types = ...)`. Previously if used on unordered data this could cause unintended class order. `types` no longer requires knowledge of the order of the variables. Not all variables must be specified and it accepts character classes as well. [1147](https://github.com/JanMarvin/openxlsx2/pull/1147)
+
+* Improve creation of table ids. Previously, on a dirty workbook, unique table ids were not enforced. This caused duplicated table ids, which lead to errors in spreadsheet software. [1152](https://github.com/JanMarvin/openxlsx2/pull/1152)
+
+## Internal changes
+
+* The handling of shared hyperlinks has been updated. Previously, when loading a file with shared hyperlinks, they were converted into `wbHyperlink` objects (a legacy from `openxlsx`). With recent internal changes, hyperlinks are no longer automatically transformed into `wbHyperlink` objects. If you still require these objects, you can use the internal function `wb_to_hyperlink(wb, sheet = 1)`. However, please note that this class is not essential for `openxlsx2` and may be further simplified or removed in the future without notice. [1137](https://github.com/JanMarvin/openxlsx2/pull/1137)
+
+
+***************************************************************************
+
 # openxlsx2 1.9
 
 ## New features
@@ -77,7 +112,7 @@
 
 ## New features
 
-* Helper to read sensitivity labels from files and apply them to workbooks. 
+* Helper to read sensitivity labels from files and apply them to workbooks.
 [983](https://github.com/JanMarvin/openxlsx2/pull/983)
 
 * It is now possible to pass non consecutive dims like `"A1:B1,C2:D2"` to various style helpers like `wb_add_fill()`. In addition it is now possible to write a data set into a predefined dims region using `enforce = TRUE`. This handles either `","` or `";"` as cell separator. [993](https://github.com/JanMarvin/openxlsx2/pull/993)

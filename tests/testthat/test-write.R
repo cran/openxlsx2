@@ -809,7 +809,7 @@ test_that("writing na.strings = NULL works", {
   write_xlsx(matrix(NA, 2, 2), tmp, na.strings = NULL)
   wb <- wb_load(tmp)
 
-  exp <- ""
+  exp <- NA_character_
   got <- unique(wb$worksheets[[1]]$sheet_data$cc$v[3:6])
   expect_equal(exp, got)
 
@@ -1238,4 +1238,98 @@ test_that("sheet is a valid argument in write_xlsx", {
   wb1 <- write_xlsx(x = mtcars, sheet_name = "data")
   wb2 <- write_xlsx(x = mtcars, sheet = "data")
   expect_equal(wb1$get_sheet_names(), wb2$get_sheet_names())
+})
+
+test_that("skipping entirely blank cells works", {
+
+  tp <- temp_xlsx()
+
+  mm <- matrix(1:9, 3, 3)
+  mm[diag(mm)] <- NA
+
+  wb1  <- write_xlsx(x = mm, file = tp, col_names = FALSE, na.strings = NULL)
+  cc1  <- wb1$worksheets[[1]]$sheet_data$cc
+  got1 <- cc1[cc1$r %in% c("A1", "B2", "C3"), ]
+
+  wb2  <- wb_load(tp)
+  cc2  <- wb2$worksheets[[1]]$sheet_data$cc
+  got2 <- cc2[cc2$r %in% c("A1", "B2", "C3"), ]
+
+  expect_equal(3, nrow(got1))
+  expect_equal(0, nrow(got2))
+
+})
+
+test_that("saving images with address works", {
+
+  tmp <- temp_xlsx()
+  img <- system.file("extdata", "einstein.jpg", package = "openxlsx2")
+  url <- "https://en.wikipedia.org/wiki/Albert_Einstein"
+
+  wb <- wb_workbook()$add_worksheet()$
+    add_image(dims = "A1:D4", file = img, address = url)
+
+  exp <- "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"https://en.wikipedia.org/wiki/Albert_Einstein\" TargetMode=\"External\"/>"
+  got <- wb$drawings_rels[[1]][2]
+  expect_equal(exp, got)
+
+  wb$save(tmp)
+  rm(wb)
+
+  wb <- wb_load(tmp)
+  wb$add_image(dims = "E1:H4", file = img, address = "https://de.wikipedia.org/wiki/Albert_Einstein")
+
+  exp <- "<Relationship Id=\"rId4\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"https://de.wikipedia.org/wiki/Albert_Einstein\" TargetMode=\"External\"/>"
+  got <- wb$drawings_rels[[1]][4]
+  expect_equal(exp, got)
+
+})
+
+test_that("incomplete types work and character types work as well", {
+
+  # create a labelled test
+  df <- structure(
+    list(Var1 = c("abc", "def"),
+         Var3 = c(123, 456),
+         Var2 = structure(c(99999, 987),
+                          labels = c(ghi = 99999),
+                          # "vctrs_vctr", breaks if labelled is not loaded
+                          class = c("haven_labelled", "double"))),
+    row.names = c(NA, -2L),
+    class = "data.frame"
+  )
+  wb1 <- wb_workbook()$add_worksheet()$add_data(x = df)
+
+  # with characters
+  x <- wb_to_df(wb1, types = c("Var1" = "character", "Var3" = "numeric"))
+
+  exp <- c("character", "numeric")
+  got <- c(class(x$Var1), class(x$Var3))
+  expect_equal(exp, got)
+
+  # with numbers
+  x <- wb_to_df(wb1, types = c("Var1" = 0, "Var3" = 1))
+
+  exp <- c("character", "numeric")
+  got <- c(class(x$Var1), class(x$Var3))
+  expect_equal(exp, got)
+
+  # partial match
+  expect_warning(x <- wb_to_df(wb1, types = c("Var1" = 0, "foo" = 1)),
+                 "variable from")
+
+  exp <- c("character", "numeric")
+  got <- c(class(x$Var1), class(x$Var3))
+  expect_equal(exp, got)
+
+  # nothing found
+  expect_error(x <- wb_to_df(wb1, types = c("bar" = 0, "foo" = 1)),
+               "no variable from")
+
+  # with cols
+  x <- wb_to_df(wb1, cols = c(2, 1), types = c("Var1" = 0, "Var3" = 1))
+  exp <- c("numeric", "character")
+  got <- vapply(x, class, NA_character_, USE.NAMES = FALSE)
+  expect_equal(exp, got)
+
 })

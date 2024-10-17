@@ -158,6 +158,7 @@ linters
 listDataValidation
 localName
 magrittr
+mailto
 manualMax
 manualMin
 maxAxisType
@@ -253,6 +254,7 @@ tablename
 textLength
 th
 timelineCaches
+tooltip
 totalLabel
 totalRow
 totalsRowCount

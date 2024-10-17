@@ -223,3 +223,78 @@ test_that("writing table headers with factor variables works", {
   got <- wb$worksheets[[1]]$sheet_data$cc$is[[2]]
   expect_equal(exp, got)
 })
+
+test_that("tables cannot have duplicated column names", {
+
+  df1 <- data.frame(
+    x = 1,
+    x = 2,
+    check.names = FALSE
+  )
+
+  df2 <- data.frame(
+    x = 1,
+    X = 2,
+    check.names = FALSE
+  )
+
+
+  wb <- wb_workbook()
+
+  expect_warning(wb$add_worksheet()$add_data_table(x = df1), "tables cannot have duplicated column names")
+  expect_warning(wb$add_worksheet()$add_data_table(x = df2), "tables cannot have duplicated column names")
+
+
+  exp <- c("<tableColumn id=\"1\" name=\"x\"/>", "<tableColumn id=\"2\" name=\"x2\"/>")
+  got <- xml_node(wb$tables$tab_xml[[1]], "table", "tableColumns", "tableColumn")
+  expect_equal(exp, got)
+
+  exp <- c("<tableColumn id=\"1\" name=\"x\"/>", "<tableColumn id=\"2\" name=\"X2\"/>")
+  got <- xml_node(wb$tables$tab_xml[[2]], "table", "tableColumns", "tableColumn")
+  expect_equal(exp, got)
+
+})
+
+test_that("make sure that table id is unique", {
+
+  tmp <- temp_xlsx()
+
+  wb <- write_xlsx(x = list(head(mtcars), head(iris)), as_table = TRUE)
+
+  wb$remove_tables(sheet = 1, table = "Table1", remove_data = FALSE)
+
+  wb$save(tmp)
+  wb <- wb_load(tmp)
+
+  wb$add_worksheet()$add_data_table(x = head(Orange))
+
+  exp <- data.frame(name = c("Table2", "Table3"), id = c("2", "3"))
+  got <- rbindlist(xml_attr(wb$tables$tab_xml, "table"))[c("name", "id")]
+  expect_equal(exp, got)
+
+})
+
+test_that("wb_get_named_regions, works with removed tables", {
+
+  wb <- wb_workbook()$
+    add_worksheet()$add_data_table(x = iris, table_name = "iris1")$
+    add_worksheet()$add_data_table(x = iris, table_name = "iris2")$
+    add_worksheet()$add_data_table(x = iris, table_name = "iris3")
+
+  wb$remove_tables(table = "iris3")
+
+  tabs <- wb$get_named_regions(tables = TRUE)
+
+  expect_equal(2, nrow(tabs))
+  expect_equal(paste0("iris", 1:2), tabs$name)
+
+})
+
+test_that("reading tables from file works", {
+  tmp <- temp_xlsx()
+  exp <- head(mtcars)
+  write_xlsx(x = exp, file = tmp, as_table = TRUE)
+
+  got <- wb_to_df(tmp, named_region = "Table1")
+  expect_equal(exp, got, ignore_attr = TRUE)
+})
