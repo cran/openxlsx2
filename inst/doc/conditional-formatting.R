@@ -182,24 +182,24 @@ wb$add_conditional_formatting(
 knitr::include_graphics("img/cf_color_scale.jpg")
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  df <- read_xlsx("https://github.com/JanMarvin/openxlsx-data/raw/main/readTest.xlsx", sheet = 5)
-#  wb$add_worksheet("colorScale", zoom = 30)
-#  wb$add_data(x = df, col_names = FALSE) ## write data.frame
+# df <- read_xlsx("https://github.com/JanMarvin/openxlsx-data/raw/main/readTest.xlsx", sheet = 5)
+# wb$add_worksheet("colorScale", zoom = 30)
+# wb$add_data(x = df, col_names = FALSE) ## write data.frame
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  wb$add_conditional_formatting(
-#    sheet = "colorScale",
-#    dims = wb_dims(
-#      rows = seq_len(nrow(df)),
-#      cols = seq_len(ncol(df))
-#      ),
-#    # dims = wb_dims(x = df, col_names = FALSE, select = "data")
-#    style = c("black", "white"),
-#    rule = c(0, 255),
-#    type = "colorScale"
-#  )
-#  wb$set_col_widths("colorScale", cols = seq_along(df), widths = 1.07)
-#  wb$set_row_heights("colorScale", rows = seq_len(nrow(df)), heights = 7.5)
+# wb$add_conditional_formatting(
+#   sheet = "colorScale",
+#   dims = wb_dims(
+#     rows = seq_len(nrow(df)),
+#     cols = seq_len(ncol(df))
+#     ),
+#   # dims = wb_dims(x = df, col_names = FALSE, select = "data")
+#   style = c("black", "white"),
+#   rule = c(0, 255),
+#   type = "colorScale"
+# )
+# wb$set_col_widths("colorScale", cols = seq_along(df), widths = 1.07)
+# wb$set_row_heights("colorScale", rows = seq_len(nrow(df)), heights = 7.5)
 
 ## ----echo=FALSE, warning=FALSE, out.width="100%"------------------------------
 knitr::include_graphics("img/cf_databar.jpg")

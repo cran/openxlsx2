@@ -1,3 +1,17 @@
+# openxlsx2 1.11
+
+## New features
+
+* Add `hide_no_data_items` option in `wb_add_slicer()`. [1169](https://github.com/JanMarvin/openxlsx2/pull/1169)
+
+## Fixes
+
+* Previously rows that trigger scientific notation (e.g. `1e+05`) would cause issues, when matched against a non scientific version.  [1170](https://github.com/JanMarvin/openxlsx2/pull/1170)
+* When using `wb_add_data_table(..., total_row = TRUE)` the last row of the data table in the workbook was mistakenly overwritten with the total row formula, which should have been placed below the last row of the table. This caused loss of data. [1179](https://github.com/JanMarvin/openxlsx2/issues/1179)
+
+
+***************************************************************************
+
 # openxlsx2 1.10
 
 ## New features

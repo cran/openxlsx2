@@ -1758,8 +1758,8 @@ wbWorkbook <- R6::R6Class(
       } else {
         arguments <- c(
           "caption", "choose", "column_count", "cross_filter", "edit_as",
-          "level", "locked_position", "row_height", "show_caption",
-          "show_missing", "sort_order", "start_item", "style"
+          "hide_no_data_items", "level", "locked_position", "row_height",
+          "show_caption", "show_missing", "sort_order", "start_item", "style"
         )
         params <- standardize_case_names(params, arguments = arguments, return = TRUE)
       }
@@ -1819,6 +1819,16 @@ wbWorkbook <- R6::R6Class(
         xml_children = get_items(x, which(names(x) == slicer), NULL, slicer = TRUE, choose = choo, has_default = TRUE)
       )
 
+
+      hide_items_with_no_data <- ""
+      if (isTRUE(params$hide_no_data_items)) {
+        hide_items_with_no_data <- '<extLst>
+          <x:ext xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" uri="{470722E0-AACD-4C17-9CDC-17EF765DBC7E}">
+            <x15:slicerCacheHideItemsWithNoData/>
+          </x:ext>
+        </extLst>'
+      }
+
       slicer_cache <- read_xml(sprintf(
         '<slicerCacheDefinition xmlns="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x xr10" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:xr10="http://schemas.microsoft.com/office/spreadsheetml/2016/revision10" name="Slicer_%s" xr10:uid="{72B411E0-23B7-7444-B533-EAC1856BE56A}" sourceName="%s">
           <pivotTables>
@@ -1827,12 +1837,14 @@ wbWorkbook <- R6::R6Class(
           <data>
             %s
           </data>
+          %s
         </slicerCacheDefinition>',
         uni_name,
         slicer,
         sheet,
         pivot_table,
-        tab_xml
+        tab_xml,
+        hide_items_with_no_data
       ), pointer = FALSE)
 
       # we need the slicer cache
@@ -3723,13 +3735,7 @@ wbWorkbook <- R6::R6Class(
 
       ### autofilter
       autofilter <- if (withFilter) {
-        if (!isFALSE(totalsRowCount)) {
-          # exclude total row from filter
-          rowcol         <- dims_to_rowcol(ref)
-          autofilter_ref <- rowcol_to_dims(as.integer(rowcol[[2]])[-length(rowcol[[2]])], rowcol[[1]])
-        } else {
-          autofilter_ref <- ref
-        }
+        autofilter_ref <- ref
         xml_node_create(xml_name = "autoFilter", xml_attributes = c(ref = autofilter_ref))
       }
 
@@ -3747,7 +3753,12 @@ wbWorkbook <- R6::R6Class(
           lbl <- rep(NA_character_, length(colNames))
           has_total_lbl <- FALSE
         }
+
+        rowcol   <- dims_to_rowcol(ref)
+        ref_rows <- as.integer(rowcol[[2]])
+        ref      <- rowcol_to_dims(c(ref_rows, max(ref_rows) + 1L), rowcol[[1]])
       }
+
 
       ### tableColumn
       tableColumn <- sapply(colNames, function(x) {
@@ -3823,6 +3834,7 @@ wbWorkbook <- R6::R6Class(
 
       ## create a table.xml.rels
       self$append("tables.xml.rels", "")
+
 
       ## update worksheets_rels
       self$worksheets_rels[[sheet]] <- c(
@@ -4397,7 +4409,7 @@ wbWorkbook <- R6::R6Class(
       private$do_cell_init(sheet, dims)
 
       row_attr <- self$worksheets[[sheet]]$sheet_data$row_attr
-      sel <- match(as.character(rows), row_attr$r)
+      sel <- match(as.character(as.integer(rows)), row_attr$r)
       sel <- sel[!is.na(sel)]
 
       if (!is.null(heights)) {
@@ -4441,7 +4453,7 @@ wbWorkbook <- R6::R6Class(
         return(invisible(self))
       }
 
-      sel <- match(as.character(rows), row_attr$r)
+      sel <- match(as.character(as.integer(rows)), row_attr$r)
       sel <- sel[!is.na(sel)]
       row_attr[sel, "ht"] <- ""
       row_attr[sel, "customHeight"] <- ""
@@ -4768,7 +4780,7 @@ wbWorkbook <- R6::R6Class(
       # get the selection based on the row_attr frame.
 
       # the first n -1 rows get outlineLevel
-      select <- row_attr$r %in% as.character(rows)
+      select <- row_attr$r %in% as.character(as.integer(rows))
       collapse_in <- ifelse(below, length(rows), 1)
       select_n1 <- row_attr$r %in% as.character(rows[-collapse_in])
       if (length(select)) {
@@ -4804,7 +4816,7 @@ wbWorkbook <- R6::R6Class(
       row_attr <- self$worksheets[[sheet]]$sheet_data$row_attr
 
       # get the selection based on the row_attr frame.
-      select <- row_attr$r %in% as.character(rows)
+      select <- row_attr$r %in% as.character(as.integer(rows))
       if (length(select)) {
         row_attr$outlineLevel[select] <- ""
         row_attr$collapsed[select] <- ""
@@ -8785,7 +8797,7 @@ wbWorkbook <- R6::R6Class(
         }
 
         rows_df <- self$worksheets[[sheet]]$sheet_data$row_attr
-        sel     <- rows_df$r %in% as.character(rows)
+        sel     <- rows_df$r %in% as.character(as.integer(rows))
 
         rows_df$customFormat[sel] <- "1"
         rows_df$s[sel]            <- styid

@@ -784,6 +784,32 @@ test_that("removing timelines works", {
 
 })
 
+test_that("slicer extension 'hide_no_data_items' works", {
+
+  dat <- data.frame(
+    var = c("x", "y", "y", "z", "z", "x"),
+    speed = c(4, 4, 7, 7, 8, 9),
+    dis = c(2, 10, 4, 22, 16, 10),
+    slicervar1 = c("option1", "option1", "option1", "option2", "option2", "option2"),
+    slicervar2 = c("choice1", "choice1", "choice2", "choice3", "choice3", "choice1")
+  )
+
+  wb <- wb_workbook()$
+    add_worksheet("pivot")$
+    add_worksheet("dat")$add_data(x = dat)
+
+  df <- wb_data(wb)
+
+  wb$
+    add_pivot_table(df, sheet = "pivot", dims = "A3", slicer = c("slicervar1", "slicervar2"), rows = c("var"), data = "speed", params = list(name = "pivot_1"))$
+    add_slicer(x = df, sheet = "pivot", dims = "D3:E9", slicer = "slicervar1", pivot_table = "pivot_1", param = list(hide_no_data_items = TRUE))$
+    add_slicer(x = df, sheet = "pivot", dims = "F3:G9", slicer = "slicervar2", pivot_table = "pivot_1")
+
+  expect_true(grepl("x15:slicerCacheHideItemsWithNoData", wb$slicerCaches[[1]]))
+  expect_true(!grepl("x15:slicerCacheHideItemsWithNoData", wb$slicerCaches[[2]]))
+
+})
+
 test_that("writing na.strings = NULL works", {
 
   # write na.strings = na_strings()
@@ -1039,7 +1065,7 @@ test_that("writing total row works", {
     I = "SUBTOTAL(109,Table1[am])", J = "SUBTOTAL(109,Table1[gear])",
     K = "SUBTOTAL(109,Table1[carb])"
   )
-  got <- wb_to_df(wb, dims = wb_dims(rows = 33, cols = "A:K"),
+  got <- wb_to_df(wb, dims = wb_dims(rows = 34, cols = "A:K"),
                   show_formula = TRUE, col_names = FALSE)
   expect_equal(exp, got, ignore_attr = TRUE)
 
@@ -1051,7 +1077,7 @@ test_that("writing total row works", {
     E = NA_real_, F = NA_real_, G = NA_real_, H = NA_real_, I = NA_real_,
     J = NA_real_, K = NA_real_
   )
-  got <- wb_to_df(wb, dims = wb_dims(rows = 33, cols = "A:K"),
+  got <- wb_to_df(wb, dims = wb_dims(rows = 34, cols = "A:K"),
                   show_formula = TRUE, col_names = FALSE)
   expect_equal(exp, got, ignore_attr = TRUE)
 
@@ -1059,7 +1085,7 @@ test_that("writing total row works", {
   wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c(text = "Result", text = "sum"))
 
   exp <- data.frame(A = "Result", B = "sum")
-  got <- wb_to_df(wb, dims = wb_dims(rows = 51, cols = "A:B"),
+  got <- wb_to_df(wb, dims = wb_dims(rows = 52, cols = "A:B"),
                   show_formula = TRUE, col_names = FALSE)
   expect_equal(exp, got, ignore_attr = TRUE)
 
@@ -1067,7 +1093,7 @@ test_that("writing total row works", {
   wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c(text = "Result", "sum"))
 
   exp <- data.frame(A = "Result", B = "SUBTOTAL(109,Table1[dist])")
-  got <- wb_to_df(wb, dims = wb_dims(rows = 51, cols = "A:B"),
+  got <- wb_to_df(wb, dims = wb_dims(rows = 52, cols = "A:B"),
                   show_formula = TRUE, col_names = FALSE)
   expect_equal(exp, got, ignore_attr = TRUE)
 
@@ -1075,7 +1101,7 @@ test_that("writing total row works", {
   wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c("none", "COUNTA"))
 
   exp <- data.frame(A = NA_real_, B = "COUNTA(Table1[dist])")
-  got <- wb_to_df(wb, dims = wb_dims(rows = 51, cols = "A:B"),
+  got <- wb_to_df(wb, dims = wb_dims(rows = 52, cols = "A:B"),
                   show_formula = TRUE, col_names = FALSE)
   expect_equal(exp, got, ignore_attr = TRUE)
 
@@ -1092,9 +1118,26 @@ test_that("writing total row works", {
     D = "SUBTOTAL(109,Table1[1950])", E = "SUBTOTAL(109,Table1[1955])",
     F = "SUM(Table1[1960])"
   )
-  got <- wb_to_df(wb, dims = wb_dims(rows = 6, cols = "A:F"), col_names = FALSE, show_formula = TRUE)
+  got <- wb_to_df(wb, dims = wb_dims(rows = 7, cols = "A:F"), col_names = FALSE, show_formula = TRUE)
   expect_equal(exp, got, ignore_attr = TRUE)
 
+})
+
+test_that("escaping special characters works", {
+  df <- data.frame(
+    foo = rep("#Ref!", 5),
+    `1#1`  = 1:5,
+    `@Two` = 1:5,
+    `A1-A3` = 1:5,
+    check.names = FALSE
+  )
+
+  wb <- wb_workbook()$add_worksheet()$add_data_table(x = df, total_row = TRUE)
+
+  exp <- c("SUBTOTAL(109,Table1[foo])", "SUBTOTAL(109,Table1[1'#1])",
+           "SUBTOTAL(109,Table1['@Two])", "SUBTOTAL(109,Table1[A1'-A3])")
+  got <- unname(unlist(wb_to_df(wb, dims = "A7:D7", col_names = FALSE, show_formula = TRUE)))
+  expect_equal(exp, got)
 })
 
 test_that("writing vectors direction with dims works", {

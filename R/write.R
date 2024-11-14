@@ -297,12 +297,17 @@ write_data2 <- function(
       # its quicker to convert data to character and append the colnames
       # then to create a data frame from colnames, construct the required
       # length and copy the converted to character data into it.
-      data <- rbind(data, colnames(data))
-      out <- c(nrow(data), seq_len(nrow(data))[-nrow(data)])
-      data <- data[out, , drop = FALSE]
+
+      # data <- rbind(data, colnames(data))
+      # out <- c(nrow(data), seq_len(nrow(data))[-nrow(data)])
+      # data <- data[out, , drop = FALSE]
+
+      # this is painfully slow, but still somehow the fastest way.
+      data[nrow(data) + 1L, ] <- colnames(data)
+      data <- data[c(nrow(data), seq_len(nrow(data) - 1L)), , drop = FALSE]
+
     }
   }
-
 
   sheetno <- wb_validate_sheet(wb, sheet)
   # message("sheet no: ", sheetno)
@@ -1061,7 +1066,7 @@ write_data_table <- function(
         name            = name,
         colNames        = FALSE,
         rowNames        = FALSE,
-        startRow        = startRow + nrow(x),
+        startRow        = startRow + nrow(x) + 1L,
         startCol        = startCol,
         applyCellStyle  = applyCellStyle,
         removeCellStyle = removeCellStyle,

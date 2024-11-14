@@ -7,19 +7,19 @@ knitr::opts_chunk$set(
 )
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  install.packages("openxlsx2")
+# install.packages("openxlsx2")
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  library(openxlsx2)
+# library(openxlsx2)
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  wb <- wb_load("your_file.xlsx")
+# wb <- wb_load("your_file.xlsx")
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = your_data)
+# wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = your_data)
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  wb <- wb_add_data(wb_add_worksheet(wb_workbook()), x = your_data)
+# wb <- wb_add_data(wb_add_worksheet(wb_workbook()), x = your_data)
 
 ## -----------------------------------------------------------------------------
 wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = mtcars)
@@ -40,15 +40,15 @@ wb %>% wb_to_df() %>% head()
 wb %>% wb_to_df(sheet = "Sheet 2") %>% head()
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  wb %>% wb_save(file = "my_first_worksheet.xlsx")
+# wb %>% wb_save(file = "my_first_worksheet.xlsx")
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  wb %>% wb_open()
+# wb %>% wb_open()
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  wb <- wb_workbook()
-#  wb_add_worksheet(wb, sheet = "USexp")
-#  wb_add_data(wb, "USexp", USPersonalExpenditure)
+# wb <- wb_workbook()
+# wb_add_worksheet(wb, sheet = "USexp")
+# wb_add_data(wb, "USexp", USPersonalExpenditure)
 
 ## ----echo = FALSE-------------------------------------------------------------
 wb <- wb_workbook()
@@ -76,14 +76,14 @@ file <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
 wb <- wb_load(file = file)
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  write_xlsx(x = mtcars, file = "mtcars.xlsx")
+# write_xlsx(x = mtcars, file = "mtcars.xlsx")
 
 ## ----eval = FALSE-------------------------------------------------------------
-#  # replace the existing file
-#  wb$save("mtcars.xlsx")
-#  
-#  # do not overwrite the existing file
-#  try(wb$save("mtcars.xlsx", overwrite = FALSE))
+# # replace the existing file
+# wb$save("mtcars.xlsx")
+# 
+# # do not overwrite the existing file
+# try(wb$save("mtcars.xlsx", overwrite = FALSE))
 
 ## -----------------------------------------------------------------------------
 # various options
