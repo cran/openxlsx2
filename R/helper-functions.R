@@ -67,7 +67,13 @@ create_hyperlink <- function(sheet, row = 1, col = 1, text = NULL, file = NULL) 
     if (!is.null(text) && !is.null(file))
       str <- sprintf("=HYPERLINK(\"%s\", \"%s\")", file, text)
   } else {
+
+    if (is_waiver(sheet)) {
+      sheet <- paste0('<<', toupper(sheet), '>>')
+    }
+
     cell <- paste0(int2col(col), row)
+
     if (!is.null(file)) {
       dest <- sprintf('"[%s]%s!%s"', file, sheet, cell)
     } else {
@@ -201,17 +207,28 @@ pxml <- function(x) {
 #' @noRd
 amp_split <- function(x) {
   if (length(x) == 0) return(NULL)
-  # create output string of width 3
-  res <- vector("character", 3)
-  # Identify the names found in the string: returns them as matrix: strip the &amp;
-  nam <- gsub(pattern = "&amp;", "", unlist(stri_match_all_regex(x, "&amp;[LCR]")))
-  # split the string and assign names to join
-  z <- unlist(stri_split_regex(x, "&amp;[LCR]", omit_empty = TRUE))
 
-  if (length(z) == 0) return(character(0))
+  # Initialize an empty vector of three elements
+  res <- c(L = "", C = "", R = "")
 
-  names(z) <- as.character(nam)
-  res[c("L", "C", "R") %in% names(z)] <- z
+  has <- c(0, 0, 0)
+  # Extract each component if present and remove &amp;[LCR]
+  if (grepl("&amp;L", x)) {
+    has[1] <- 1
+    res[1] <- stringi::stri_extract_first_regex(x, "&amp;L.*?(?=&amp;C|&amp;R|$)")
+  }
+  if (grepl("&amp;C", x)) {
+    has[2] <- 1
+    res[2] <- stringi::stri_extract_first_regex(x, "&amp;C.*?(?=&amp;R|$)")
+  }
+  if (grepl("&amp;R", x)) {
+    has[3] <- 1
+    res[3] <- stringi::stri_extract_first_regex(x, "&amp;R.*?$")
+  }
+
+  if (sum(has) == 0) return(character(0))
+
+  res <- stringi::stri_replace_all_regex(res, "&amp;[LCR]", "")
 
   # return the string vector
   unname(res)
@@ -365,6 +382,33 @@ hashPassword <- function(password) {
   format(as.hexmode(hash), upper.case = TRUE)
 }
 
+# Helper to split a cell range into rows or columns
+split_dims <- function(dims, direction = "row") {
+  df <- dims_to_dataframe(dims, fill = TRUE, empty_rm = TRUE)
+  if (is.numeric(direction)) {
+    if (direction == 1) direction <- "row"
+    if (direction == 2) direction <- "col"
+  }
+  direction <- match.arg(direction, choices = c("row", "col"))
+  if (direction == "row") df <- as.data.frame(t(df), stringsAsFactors = FALSE)
+  vapply(df, FUN = function(x) {
+    fst <- x[1]
+    snd <- x[length(x)]
+    sprintf("%s:%s", fst, snd)
+  }, FUN.VALUE = NA_character_)
+}
+
+split_dim <- function(dims) {
+  df <- dims_to_dataframe(dims, fill = TRUE, empty_rm = TRUE)
+  if (ncol(df) > 1 && nrow(df) > 1)
+    stop("`dims` should be a cell range of one row or one column.", call. = FALSE)
+  unlist(df)
+}
+
+is_single_cell <- function(dims) {
+  all(lengths(dims_to_rowcol(dims)) == 1)
+}
+
 #' Create sparklines object
 #'
 #' Create a sparkline to be added a workbook with [wb_add_sparklines()]
@@ -375,6 +419,10 @@ hashPassword <- function(password) {
 #' @param dims Cell range of cells used to create the sparklines
 #' @param sqref Cell range of the destination of the sparklines.
 #' @param type Either `NULL`, `stacked` or `column`
+#' @param direction Either `NULL`, `row` (or `1`) or `col` (or `2`). Should
+#' sparklines be created in the row or column direction? Defaults to `NULL`.
+#' When `NULL` the direction is inferred from `dims` in cases where `dims`
+#' spans a single row or column and defaults to `row` otherwise.
 #' @param negative negative
 #' @param display_empty_cells_as Either `gap`, `span` or `zero`
 #' @param markers markers add marker to line
@@ -402,11 +450,12 @@ hashPassword <- function(password) {
 #' @param ... additional arguments
 #' @return A string containing XML code
 #' @examples
-#' # create sparklineGroup
+#' # create multiple sparklines
 #' sparklines <- c(
 #'   create_sparklines("Sheet 1", "A3:L3", "M3", type = "column", first = "1"),
 #'   create_sparklines("Sheet 1", "A2:L2", "M2", markers = "1"),
-#'   create_sparklines("Sheet 1", "A4:L4", "M4", type = "stacked", negative = "1")
+#'   create_sparklines("Sheet 1", "A4:L4", "M4", type = "stacked", negative = "1"),
+#'   create_sparklines("Sheet 1", "A5:L5;A7:L7", "M5;M7", markers = "1")
 #' )
 #'
 #' t1 <- AirPassengers
@@ -415,6 +464,27 @@ hashPassword <- function(password) {
 #'
 #' wb <- wb_workbook()$
 #'   add_worksheet("Sheet 1")$
+#'   add_data(x = t2)$
+#'   add_sparklines(sparklines = sparklines)
+#'
+#' # create sparkline groups
+#' sparklines <- c(
+#'   create_sparklines("Sheet 2", "A2:L6;", "M2:M6", markers = "1"),
+#'   create_sparklines(
+#'     "Sheet 2", "A7:L7;A9:L9", "M7;M9", type = "stacked", negative = "1"
+#'   ),
+#'   create_sparklines(
+#'     "Sheet 2", "A8:L8;A10:L13", "M8;M10:M13",
+#'     type = "column", first = "1"
+#'    ),
+#'   create_sparklines(
+#'     "Sheet 2", "A2:L13", "A14:L14", type = "column", first = "1",
+#'     direction = "col"
+#'   )
+#' )
+#'
+#' wb <- wb$
+#'   add_worksheet("Sheet 2")$
 #'   add_data(x = t2)$
 #'   add_sparklines(sparklines = sparklines)
 #'
@@ -448,12 +518,19 @@ create_sparklines <- function(
     min_axis_type          = NULL,
     max_axis_type          = NULL,
     right_to_left          = NULL,
+    direction              = NULL,
     ...
 ) {
 
   standardize_case_names(...)
 
-  assert_class(dims, "character")
+  if (is_waiver(sheet)) {
+    sheet <- paste0('<<', toupper(sheet), '>>')
+  } else {
+    assert_class(sheet, "character")
+  }
+
+  assert_class(dims,  "character")
   assert_class(sqref, "character")
 
   if (!is.null(type) && !type %in% c("stacked", "column"))
@@ -461,6 +538,40 @@ create_sparklines <- function(
 
   if (!is.null(markers) && as_xml_attr(markers) == "" && !is.null(type) && type %in% c("stacked", "column"))
     stop("markers only affect lines `type = NULL`, not stacked or column")
+
+  if (!is.null(direction) || !is_single_cell(sqref)) {
+    dims <- split_dims(dims, direction = direction)
+    sqref <- split_dim(sqref)
+  }
+
+  if (length(dims) != 1 && length(dims) != length(sqref)) {
+    stop("dims and sqref must be equal length.")
+  }
+
+  sparklines <- vapply(
+    seq_along(dims),
+    function(i) {
+      xml_node_create(
+        "x14:sparkline",
+        xml_children = c(
+          xml_node_create(
+            "xm:f",
+            xml_children = c(
+              paste0(shQuote(sheet, type = "sh"), "!", dims[[i]])
+            )
+          ),
+          xml_node_create(
+            "xm:sqref",
+            xml_children = c(
+              sqref[[i]]
+            )
+          )
+        )
+      )
+    },
+    FUN.VALUE = NA_character_
+  )
+  sparklines <- paste(sparklines, collapse = "")
 
   sparklineGroup <- xml_node_create(
     "x14:sparklineGroup",
@@ -494,19 +605,8 @@ create_sparklines <- function(
       xml_node_create("x14:colorHigh",     xml_attributes = color_high),
       xml_node_create("x14:colorLow",      xml_attributes = color_low),
       xml_node_create(
-        "x14:sparklines", xml_children = c(
-          xml_node_create(
-            "x14:sparkline", xml_children = c(
-              xml_node_create(
-                "xm:f", xml_children = c(
-                  paste0(shQuote(sheet, type = "sh"), "!", dims)
-                )),
-              xml_node_create(
-                "xm:sqref", xml_children = c(
-                  sqref
-                ))
-            ))
-        )
+        "x14:sparklines",
+        xml_children = sparklines
       )
     )
   )
@@ -586,11 +686,11 @@ write_workbook.xml.rels <- function(x, rm_sheet = NULL) {
 #' @noRd
 to_string <- function(x) {
   lbls <- attr(x, "labels")
-  chr <- as.character(x)
-  if (!is.null(lbls)) {
-    lbls <- lbls[lbls %in% x]
-    sel_l <- match(lbls, x)
-    if (length(sel_l)) chr[sel_l] <- names(lbls)
+  chr  <- as.character(x)
+  if (!is.null(lbls) && !is.null(names(lbls))) {
+    lbls <- lbls[match(x, lbls)]
+    sel_l <- which(!is.na(lbls))
+    if (length(sel_l)) chr[sel_l] <- names(lbls[!is.na(lbls)])
   }
   chr
 }
@@ -1065,7 +1165,7 @@ known_subtotal_funs <- function(x, total, table, row_names = FALSE) {
   }
 
   # prepare output
-  fml <- as.data.frame(t(fml))
+  fml <- as.data.frame(t(fml), stringsAsFactors = FALSE)
   names(fml) <- nms_x
   names(atr) <- nms_x
   names(lbl) <- nms_x
@@ -1198,7 +1298,7 @@ fits_in_dims <- function(x, dims, startCol, startRow) {
 transpose_df <- function(x) {
   attribs <- attr(x, "c_cm")
   classes <- class(x[[1]])
-  x <- as.data.frame(t(x))
+  x <- as.data.frame(t(x), stringsAsFactors = FALSE)
   for (i in seq_along(x)) {
     class(x[[i]]) <- classes
   }
@@ -1238,4 +1338,40 @@ wb_upd_custom_pid <- function(wb) {
     ),
     xml_children = out
   )
+}
+
+#' replace shared formulas with single cell formulas
+#' @param cc the full frame
+#' @param cc_shared a subset of the full frame with shared formulas
+#' @noRd
+shared_as_fml <- function(cc, cc_shared) {
+    cc_shared <- cc_shared[order(as.integer(cc_shared$f_si)), ]
+
+    # carry forward the shared formula
+    cc_shared$f    <- ave2(cc_shared$f, cc_shared$f_si, carry_forward)
+
+    # calculate differences from the formula cell, to the shared cells
+    cc_shared$cols <- ave2(col2int(cc_shared$c_r), cc_shared$f_si, calc_distance)
+    cc_shared$rows <- ave2(as.integer(cc_shared$row_r), cc_shared$f_si, calc_distance)
+
+    # begin updating the formulas. find a1 notion, get the next cell, update formula
+    cells <- find_a1_notation(cc_shared$f)
+    repls <- vector("list", length = length(cells))
+
+    for (i in seq_along(cells)) {
+      repls[[i]] <- next_cell(cells[[i]], cc_shared$cols[i], cc_shared$rows[i])
+    }
+
+    cc_shared$f     <- replace_a1_notation(cc_shared$f, repls)
+    cc_shared$cols  <- NULL
+    cc_shared$rows  <- NULL
+    cc_shared$f_t   <- ""
+    cc_shared$f_si  <- ""
+    cc_shared$f_ref <- ""
+
+    # reduce and assign
+    cc_shared <- cc_shared[which(cc_shared$r %in% cc$r), ]
+
+    cc[match(cc_shared$r, cc$r), ] <- cc_shared
+    cc
 }

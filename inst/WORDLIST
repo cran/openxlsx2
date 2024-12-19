@@ -57,6 +57,7 @@ TotalCell
 TrafficLights
 VARP
 activeTab
+activeX
 allowBlank
 applyCellStyle
 autoFilterDateGrouping
@@ -64,10 +65,12 @@ autocompletion
 bandedCols
 bandedRows
 blankRow
+bookview
 bool
 calcChain
 calculatedColumn
 camelCase
+centerContinuous
 charset
 chartShapes
 chartsheet
@@ -123,6 +126,7 @@ externalLinks
 externalLinksRels
 externalptr
 fanfold
+featurePropertyBag
 fileType
 firstColumn
 firstFooter

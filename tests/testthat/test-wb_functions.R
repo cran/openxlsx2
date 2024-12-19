@@ -123,12 +123,12 @@ test_that("wb_to_df", {
 
   # read dataset with named_region (returns global first)
   got <- wb_to_df(wb3, named_region = "MyRange", col_names = FALSE)
-  exp <- data.frame(A = "S2A1", B = "S2B1")
+  exp <- data.frame(A = "S2A1", B = "S2B1", stringsAsFactors = FALSE)
   expect_equal(got, exp, ignore_attr = TRUE)
 
   # read named_region from sheet
   got <- wb_to_df(wb3, named_region = "MyRange", sheet = 4, col_names = FALSE)
-  exp <- data.frame(A = "S3A1", B = "S3B1")
+  exp <- data.frame(A = "S3A1", B = "S3B1", stringsAsFactors = FALSE)
   expect_equal(got, exp, ignore_attr = TRUE)
 
 })
@@ -400,7 +400,8 @@ test_that("dims with separator work", {
 
   exp <- data.frame(
     V1 = c("V1", 1, 2, 3, 4),
-    V2 = c("V2", 5, 6, 7, 8)
+    V2 = c("V2", 5, 6, 7, 8),
+    stringsAsFactors = FALSE
   )
 
   got <- do.call("rbind", ll)
@@ -511,6 +512,21 @@ test_that("improve non consecutive dims", {
 
   got <- wb4$worksheets[[1]]$sheet_data$cc$r[wb4$worksheets[[1]]$sheet_data$cc$c_s != ""]
   expect_contains(got, exp)
+})
+
+test_that("reading equal sized ranges works", {
+
+  df <- as.data.frame(matrix(rep(1:4, 4), 4, 4, byrow = TRUE))
+
+  wb <- wb_workbook()$add_worksheet()$add_data(x = df)
+
+  exp <- df[, -2]
+  got <- wb_to_df(wb, dims = "A1:A5,C1:D5")
+  expect_equal(exp, got, ignore_attr = TRUE)
+
+  got <- wb_to_df(wb, dims = "A1,C1:D1,A2:A5,C2:D5")
+  expect_equal(exp, got, ignore_attr = TRUE)
+
 })
 
 test_that("creating a formula matrix works", {

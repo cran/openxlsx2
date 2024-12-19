@@ -11,6 +11,7 @@ is_integer_ish <- function(x) {
 }
 
 naToNULLList <- function(x) {
+  if (length(x) == 1 && is.na(x)) x <- c(NA, NA, NA)
   lapply(x, function(i) if (is.na(i)) NULL else i)
 }
 
@@ -20,7 +21,7 @@ naToNULLList <- function(x) {
 paste_c <- function(..., sep = "", collapse = " ", unlist = FALSE) {
   x <- c(...)
   if (unlist) x <- unlist(x, use.names = FALSE)
-  stri_join(x[nzchar(x)], sep = sep, collapse = collapse)
+  stringi::stri_join(x[nzchar(x)], sep = sep, collapse = collapse)
 }
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
@@ -274,7 +275,7 @@ con_rng <- function(x) {
   ranges <- tapply(x, group, function(y) c(beg = y[1], end = y[length(y)]))
   ranges_df <- do.call(rbind, ranges)
 
-  as.data.frame(ranges_df)
+  as.data.frame(ranges_df, stringsAsFactors = FALSE)
 }
 
 #' create consecutive dims from column and row vector
@@ -840,7 +841,7 @@ wb_dims <- function(..., select = NULL) {
   x_has_named_dims <- inherits(x, "data.frame") || inherits(x, "matrix")
 
   if (!is.null(x)) {
-    x <- as.data.frame(x)
+    x <- as.data.frame(x, stringsAsFactors = FALSE)
   }
 
   cnam      <- isTRUE(args$col_names)
@@ -1361,4 +1362,10 @@ ave2 <- function(x, y, FUN) {
   g <- as.factor(y)
   split(x, g) <- lapply(split(x, g), FUN)
   x
+}
+
+if (getRversion() < "4.0.0") {
+  deparse1 <- function(expr, collapse = " ") {
+    paste(deparse(expr), collapse = collapse)
+  }
 }

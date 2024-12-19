@@ -127,8 +127,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // wide_to_long
-void wide_to_long(Rcpp::DataFrame z, std::vector<int32_t> vtyps, Rcpp::DataFrame zz, bool ColNames, int32_t start_col, int32_t start_row, std::vector<std::string> ref, int32_t string_nums, bool na_null, bool na_missing, std::string na_strings, bool inline_strings, std::string c_cm, std::vector<std::string> dims);
-RcppExport SEXP _openxlsx2_wide_to_long(SEXP zSEXP, SEXP vtypsSEXP, SEXP zzSEXP, SEXP ColNamesSEXP, SEXP start_colSEXP, SEXP start_rowSEXP, SEXP refSEXP, SEXP string_numsSEXP, SEXP na_nullSEXP, SEXP na_missingSEXP, SEXP na_stringsSEXP, SEXP inline_stringsSEXP, SEXP c_cmSEXP, SEXP dimsSEXP) {
+void wide_to_long(Rcpp::DataFrame z, std::vector<int32_t> vtyps, Rcpp::DataFrame zz, bool ColNames, int32_t start_col, int32_t start_row, Rcpp::Nullable<Rcpp::CharacterVector> refed, int32_t string_nums, bool na_null, bool na_missing, std::string na_strings, bool inline_strings, std::string c_cm, std::vector<std::string> dims);
+RcppExport SEXP _openxlsx2_wide_to_long(SEXP zSEXP, SEXP vtypsSEXP, SEXP zzSEXP, SEXP ColNamesSEXP, SEXP start_colSEXP, SEXP start_rowSEXP, SEXP refedSEXP, SEXP string_numsSEXP, SEXP na_nullSEXP, SEXP na_missingSEXP, SEXP na_stringsSEXP, SEXP inline_stringsSEXP, SEXP c_cmSEXP, SEXP dimsSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::DataFrame >::type z(zSEXP);
@@ -137,7 +137,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< bool >::type ColNames(ColNamesSEXP);
     Rcpp::traits::input_parameter< int32_t >::type start_col(start_colSEXP);
     Rcpp::traits::input_parameter< int32_t >::type start_row(start_rowSEXP);
-    Rcpp::traits::input_parameter< std::vector<std::string> >::type ref(refSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::CharacterVector> >::type refed(refedSEXP);
     Rcpp::traits::input_parameter< int32_t >::type string_nums(string_numsSEXP);
     Rcpp::traits::input_parameter< bool >::type na_null(na_nullSEXP);
     Rcpp::traits::input_parameter< bool >::type na_missing(na_missingSEXP);
@@ -145,7 +145,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< bool >::type inline_strings(inline_stringsSEXP);
     Rcpp::traits::input_parameter< std::string >::type c_cm(c_cmSEXP);
     Rcpp::traits::input_parameter< std::vector<std::string> >::type dims(dimsSEXP);
-    wide_to_long(z, vtyps, zz, ColNames, start_col, start_row, ref, string_nums, na_null, na_missing, na_strings, inline_strings, c_cm, dims);
+    wide_to_long(z, vtyps, zz, ColNames, start_col, start_row, refed, string_nums, na_null, na_missing, na_strings, inline_strings, c_cm, dims);
     return R_NilValue;
 END_RCPP
 }
@@ -555,21 +555,21 @@ BEGIN_RCPP
 END_RCPP
 }
 // xml_remove_child1
-SEXP xml_remove_child1(XPtrXML node, std::string child, int which, bool pointer);
+SEXP xml_remove_child1(XPtrXML node, std::string child, int32_t which, bool pointer);
 RcppExport SEXP _openxlsx2_xml_remove_child1(SEXP nodeSEXP, SEXP childSEXP, SEXP whichSEXP, SEXP pointerSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< XPtrXML >::type node(nodeSEXP);
     Rcpp::traits::input_parameter< std::string >::type child(childSEXP);
-    Rcpp::traits::input_parameter< int >::type which(whichSEXP);
+    Rcpp::traits::input_parameter< int32_t >::type which(whichSEXP);
     Rcpp::traits::input_parameter< bool >::type pointer(pointerSEXP);
     rcpp_result_gen = Rcpp::wrap(xml_remove_child1(node, child, which, pointer));
     return rcpp_result_gen;
 END_RCPP
 }
 // xml_remove_child2
-SEXP xml_remove_child2(XPtrXML node, std::string child, std::string level1, int which, bool pointer);
+SEXP xml_remove_child2(XPtrXML node, std::string child, std::string level1, int32_t which, bool pointer);
 RcppExport SEXP _openxlsx2_xml_remove_child2(SEXP nodeSEXP, SEXP childSEXP, SEXP level1SEXP, SEXP whichSEXP, SEXP pointerSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -577,14 +577,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< XPtrXML >::type node(nodeSEXP);
     Rcpp::traits::input_parameter< std::string >::type child(childSEXP);
     Rcpp::traits::input_parameter< std::string >::type level1(level1SEXP);
-    Rcpp::traits::input_parameter< int >::type which(whichSEXP);
+    Rcpp::traits::input_parameter< int32_t >::type which(whichSEXP);
     Rcpp::traits::input_parameter< bool >::type pointer(pointerSEXP);
     rcpp_result_gen = Rcpp::wrap(xml_remove_child2(node, child, level1, which, pointer));
     return rcpp_result_gen;
 END_RCPP
 }
 // xml_remove_child3
-SEXP xml_remove_child3(XPtrXML node, std::string child, std::string level1, std::string level2, int which, bool pointer);
+SEXP xml_remove_child3(XPtrXML node, std::string child, std::string level1, std::string level2, int32_t which, bool pointer);
 RcppExport SEXP _openxlsx2_xml_remove_child3(SEXP nodeSEXP, SEXP childSEXP, SEXP level1SEXP, SEXP level2SEXP, SEXP whichSEXP, SEXP pointerSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -593,7 +593,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< std::string >::type child(childSEXP);
     Rcpp::traits::input_parameter< std::string >::type level1(level1SEXP);
     Rcpp::traits::input_parameter< std::string >::type level2(level2SEXP);
-    Rcpp::traits::input_parameter< int >::type which(whichSEXP);
+    Rcpp::traits::input_parameter< int32_t >::type which(whichSEXP);
     Rcpp::traits::input_parameter< bool >::type pointer(pointerSEXP);
     rcpp_result_gen = Rcpp::wrap(xml_remove_child3(node, child, level1, level2, which, pointer));
     return rcpp_result_gen;
@@ -894,7 +894,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // styles_bin
-int styles_bin(std::string filePath, std::string outPath, bool debug);
+int32_t styles_bin(std::string filePath, std::string outPath, bool debug);
 RcppExport SEXP _openxlsx2_styles_bin(SEXP filePathSEXP, SEXP outPathSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -907,7 +907,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // table_bin
-int table_bin(std::string filePath, std::string outPath, bool debug);
+int32_t table_bin(std::string filePath, std::string outPath, bool debug);
 RcppExport SEXP _openxlsx2_table_bin(SEXP filePathSEXP, SEXP outPathSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -920,7 +920,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // comments_bin
-int comments_bin(std::string filePath, std::string outPath, bool debug);
+int32_t comments_bin(std::string filePath, std::string outPath, bool debug);
 RcppExport SEXP _openxlsx2_comments_bin(SEXP filePathSEXP, SEXP outPathSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -933,7 +933,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // externalreferences_bin
-int externalreferences_bin(std::string filePath, std::string outPath, bool debug);
+int32_t externalreferences_bin(std::string filePath, std::string outPath, bool debug);
 RcppExport SEXP _openxlsx2_externalreferences_bin(SEXP filePathSEXP, SEXP outPathSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -946,7 +946,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // sharedstrings_bin
-int sharedstrings_bin(std::string filePath, std::string outPath, bool debug);
+int32_t sharedstrings_bin(std::string filePath, std::string outPath, bool debug);
 RcppExport SEXP _openxlsx2_sharedstrings_bin(SEXP filePathSEXP, SEXP outPathSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -959,7 +959,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // workbook_bin
-int workbook_bin(std::string filePath, std::string outPath, bool debug);
+int32_t workbook_bin(std::string filePath, std::string outPath, bool debug);
 RcppExport SEXP _openxlsx2_workbook_bin(SEXP filePathSEXP, SEXP outPathSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -972,7 +972,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // worksheet_bin
-int worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bool debug);
+int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bool debug);
 RcppExport SEXP _openxlsx2_worksheet_bin(SEXP filePathSEXP, SEXP chartsheetSEXP, SEXP outPathSEXP, SEXP debugSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

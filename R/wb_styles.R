@@ -400,8 +400,8 @@ create_fill <- function(
 #' @param ext_lst dummy
 #' @param hidden dummy
 #' @param locked dummy
-#' @param horizontal alignment can be "", "center", "right"
-#' @param vertical alignment can be "", "center", "right"
+#' @param horizontal alignment can be '', 'general', 'left', 'center', 'right', 'fill', 'justify', 'centerContinuous', 'distributed'
+#' @param vertical alignment can be '', 'top', 'center', 'bottom', 'justify', 'distributed'
 #' @param ... reserved for additional arguments
 #' @seealso [wb_add_cell_style()]
 #' @family style creating functions
@@ -1286,6 +1286,7 @@ create_colors_xml <- function(
     ), pointer = FALSE
   )
 }
+
 #' @export
 #' @rdname create_colors_xml
 #' @usage NULL

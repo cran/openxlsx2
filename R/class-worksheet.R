@@ -488,7 +488,9 @@ wbWorksheet <- R6::R6Class(
         data.frame(
           string = values,
           min = cumsum(lengths) - lengths + 1,
-          max = cumsum(lengths))
+          max = cumsum(lengths),
+          stringsAsFactors = FALSE
+        )
       )
 
       # remove duplicates pre merge
@@ -514,14 +516,20 @@ wbWorksheet <- R6::R6Class(
     #' Set cell merging for a sheet
     #' @param rows,cols Row and column specifications.
     #' @param solve logical if intersects should be solved
+    #' @param direction direction in which to split
     #' @return The `wbWorkbook` object, invisibly
-    merge_cells = function(rows = NULL, cols = NULL, solve = FALSE) {
+    merge_cells = function(dims = NULL, solve = FALSE, direction = NULL) {
+
+      ddims <- dims_to_rowcol(dims)
+
+      rows <- ddims[[2]]
+      cols <- ddims[[1]]
 
       rows <- range(as.integer(rows))
       cols <- range(col2int(cols))
 
       sqref <- paste0(int2col(cols), rows)
-      sqref <- stri_join(sqref, collapse = ":", sep = " ")
+      sqref <- stringi::stri_join(sqref, collapse = ":", sep = " ")
 
       current <- rbindlist(xml_attr(xml = self$mergeCells, "mergeCell"))$ref
 
@@ -549,11 +557,17 @@ wbWorksheet <- R6::R6Class(
           } else {
             msg <- sprintf(
               "Merge intersects with existing merged cells: \n\t\t%s.\nRemove existing merge first.",
-              stri_join(current[intersects], collapse = "\n\t\t")
+              stringi::stri_join(current[intersects], collapse = "\n\t\t")
             )
             stop(msg, call. = FALSE)
           }
         }
+      }
+
+      if (!is.null(direction)) {
+        if (direction == "row") direction <- 1
+        if (direction == "col") direction <- 2
+        sqref <- split_dims(sqref, direction = direction)
       }
 
       self$append("mergeCells", sprintf('<mergeCell ref="%s"/>', sqref))
@@ -572,7 +586,7 @@ wbWorksheet <- R6::R6Class(
       cols <- range(col2int(cols))
 
       sqref <- paste0(int2col(cols), rows)
-      sqref <- stri_join(sqref, collapse = ":", sep = " ")
+      sqref <- stringi::stri_join(sqref, collapse = ":", sep = " ")
 
       current <- rbindlist(xml_attr(xml = self$mergeCells, "mergeCell"))$ref
 

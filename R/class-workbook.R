@@ -137,6 +137,8 @@ worksheet_lock_properties <- function() {
 #' @param datetime_created The datetime (as `POSIXt`) the workbook is
 #'   created.  Defaults to the current `Sys.time()` when the workbook object
 #'   is created, not when the Excel files are saved.
+#' @param datetime_modified The datetime (as `POSIXt`) that should be recorded
+#'   as last modification date. Defaults to the creation date.
 #' @param ... additional arguments
 #' @export
 wbWorkbook <- R6::R6Class(
@@ -192,6 +194,9 @@ wbWorkbook <- R6::R6Class(
     # #' @field drawings_vml drawings_vml
     # drawings_vml = NULL,
 
+    #' @field activeX activeX
+    activeX = NULL,
+
     #' @field embeddings embeddings
     embeddings = NULL,
 
@@ -200,6 +205,9 @@ wbWorkbook <- R6::R6Class(
 
     #' @field externalLinksRels externalLinksRels
     externalLinksRels = NULL,
+
+    #' @field featurePropertyBag featurePropertyBag
+    featurePropertyBag = NULL,
 
     #' @field headFoot The header and footer
     headFoot = NULL,
@@ -302,16 +310,17 @@ wbWorkbook <- R6::R6Class(
     #' @param ... additional arguments
     #' @return a `wbWorkbook` object
     initialize = function(
-      creator          = NULL,
-      title            = NULL,
-      subject          = NULL,
-      category         = NULL,
-      datetime_created = Sys.time(),
-      theme            = NULL,
-      keywords         = NULL,
-      comments         = NULL,
-      manager          = NULL,
-      company          = NULL,
+      creator           = NULL,
+      title             = NULL,
+      subject           = NULL,
+      category          = NULL,
+      datetime_created  = Sys.time(),
+      datetime_modified = NULL,
+      theme             = NULL,
+      keywords          = NULL,
+      comments          = NULL,
+      manager           = NULL,
+      company           = NULL,
       ...
     ) {
 
@@ -331,6 +340,7 @@ wbWorkbook <- R6::R6Class(
                   default = Sys.getenv("USERNAME", unset = Sys.getenv("USER")))
         # USERNAME is present for (Windows, Linux) "USER" is present for Mac
 
+      # Internal option to alleviate timing problems in CI and CRAN
       datetime_created <- getOption("openxlsx2.datetimeCreated", datetime_created)
 
 
@@ -344,6 +354,11 @@ wbWorkbook <- R6::R6Class(
       assert_class(company,          "character", or_null = TRUE)
 
       assert_class(datetime_created, "POSIXt")
+      assert_class(datetime_modified, "POSIXt", or_null = TRUE)
+
+      # Avoid modtime being slightly different from createtime by two distinct
+      # Sys.time() calls
+      if (is.null(datetime_modified)) datetime_modified <- datetime_created
 
       stopifnot(
         length(title) <= 1L,
@@ -352,15 +367,16 @@ wbWorkbook <- R6::R6Class(
       )
 
       self$set_properties(
-        creator           = creator,
-        title             = title,
-        subject           = subject,
-        category          = category,
-        datetime_created  = datetime_created,
-        keywords          = keywords,
-        comments          = comments,
-        manager           = manager,
-        company           = company
+        creator            = creator,
+        title              = title,
+        subject            = subject,
+        category           = category,
+        datetime_created   = datetime_created,
+        datetime_modified  = datetime_modified,
+        keywords           = keywords,
+        comments           = comments,
+        manager            = manager,
+        company            = company
       )
       self$comments <- list()
       self$threadComments <- list()
@@ -966,6 +982,12 @@ wbWorkbook <- R6::R6Class(
       ## create sheet.rels to simplify id assignment
       self$worksheets_rels[[newSheetIndex]] <- from$worksheets_rels[[old]]
 
+      ## TODO actually check this and add a similar warning for embeddings
+      ## TODO it should be able to clone this
+      if (any(grepl("activeX", self$worksheets_rels[[newSheetIndex]]))) {
+        warning("The cloned sheet contains an activeX element. Cloning this is not yet handled.")
+      }
+
       new_drawing_sheet <- NULL
       if (length(from$worksheets[[old]]$relships$drawing)) {
 
@@ -987,7 +1009,7 @@ wbWorkbook <- R6::R6Class(
 
           for (cf in chartfiles) {
             chartid <- NROW(self$charts) + 1L
-            newname <- stri_join("chart", chartid, ".xml")
+            newname <- stringi::stri_join("chart", chartid, ".xml")
             old_chart <- as.integer(gsub("\\D+", "", cf))
             self$charts <- rbind(self$charts, from$charts[old_chart, ])
 
@@ -1017,13 +1039,13 @@ wbWorkbook <- R6::R6Class(
             # two charts can not point to the same rels
             if (self$charts$rels[chartid] != "") {
               self$charts$rels[chartid] <- gsub(
-                stri_join(old_chart, ".xml"),
-                stri_join(chartid, ".xml"),
+                stringi::stri_join(old_chart, ".xml"),
+                stringi::stri_join(chartid, ".xml"),
                 self$charts$rels[chartid]
               )
             }
 
-            drawings_rels[dl] <- gsub(stri_join("(?<=charts/)", cf), newname, drawings_rels[dl], perl = TRUE)
+            drawings_rels[dl] <- gsub(stringi::stri_join("(?<=charts/)", cf), newname, drawings_rels[dl], perl = TRUE)
           }
         }
 
@@ -1197,12 +1219,12 @@ wbWorkbook <- R6::R6Class(
           else
             newid <- 1L
 
-          if (any(stri_join(tbls$tab_name, suffix) %in% self$tables$tab_name)) {
-            tbls$tab_name <- stri_join(tbls$tab_name, "1")
+          if (any(stringi::stri_join(tbls$tab_name, suffix) %in% self$tables$tab_name)) {
+            tbls$tab_name <- stringi::stri_join(tbls$tab_name, "1")
           }
 
           # add _n to all table names found
-          tbls$tab_name <- stri_join(tbls$tab_name, suffix)
+          tbls$tab_name <- stringi::stri_join(tbls$tab_name, suffix)
           tbls$tab_sheet <- newSheetIndex
           # modify tab_xml with updated name, displayName and id
           tbls$tab_xml <- vapply(
@@ -2564,14 +2586,14 @@ wbWorkbook <- R6::R6Class(
 
       if (!is.null(target) && is.null(names(target))) {
         if (nrow(x) > ncol(x)) {
-          target <- as.data.frame(as.matrix(target, nrow = nrow(x), ncol = ncol(x)))
+          target <- as.data.frame(as.matrix(target, nrow = nrow(x), ncol = ncol(x)), stringsAsFactors = FALSE)
         }
         names(target) <- nams
       }
 
       if (!is.null(tooltip) && is.null(names(tooltip))) {
         if (nrow(x) > ncol(x)) {
-          tooltip <- as.data.frame(as.matrix(tooltip, nrow = nrow(x), ncol = ncol(x)))
+          tooltip <- as.data.frame(as.matrix(tooltip, nrow = nrow(x), ncol = ncol(x)), stringsAsFactors = FALSE)
         }
         names(tooltip) <- nams
       }
@@ -2902,6 +2924,15 @@ wbWorkbook <- R6::R6Class(
         stop("File already exists!")
       }
 
+      valid_extensions <- c("xlsx", "xlsm") # "xlsb"
+      file_extension   <- tolower(tools::file_ext(file))
+
+      if (!file_extension %in% valid_extensions) {
+        warning("The file extension '", file_extension,
+        "' is invalid. Expected one of: ", paste0(valid_extensions, collapse = ", "),
+        call. = FALSE)
+      }
+
       ## temp directory to save XML files prior to compressing
       tmpDir <- file.path(tempfile(pattern = "workbookTemp_"))
       on.exit(unlink(tmpDir, recursive = TRUE), add = TRUE)
@@ -2948,7 +2979,7 @@ wbWorkbook <- R6::R6Class(
       } else {
         # TODO replace with seq_len() or seq_along()
         lapply(seq_len(nThemes), function(i) {
-          con <- file(file.path(xlthemeDir, stri_join("theme", i, ".xml")), open = "wb")
+          con <- file(file.path(xlthemeDir, stringi::stri_join("theme", i, ".xml")), open = "wb")
           writeBin(charToRaw(pxml(self$theme[[i]])), con)
           close(con)
         })
@@ -3020,6 +3051,17 @@ wbWorkbook <- R6::R6Class(
         }
       }
 
+      if (length(self$activeX)) {
+        # we have to split activeX into activeX and activeX/_rels
+        activeXDir     <- dir_create(tmpDir, "xl", "activeX")
+        activeXRelsDir <- dir_create(tmpDir, "xl", "activeX", "_rels")
+        for (fl in self$activeX) {
+          if (tools::file_ext(fl) == "rels")
+            file.copy(fl, activeXRelsDir, overwrite = TRUE)
+          else
+            file.copy(fl, activeXDir, overwrite = TRUE)
+        }
+      }
 
       if (nPivots > 0) {
         # TODO consider just making a function to create a bunch of directories
@@ -3309,6 +3351,19 @@ wbWorkbook <- R6::R6Class(
         }
       }
 
+      # featurePropertyBag
+      if (length(self$featurePropertyBag)) {
+        featurePropertyBagDir <- dir_create(tmpDir, "xl", "featurePropertyBag")
+
+        write_file(
+          body = self$featurePropertyBag,
+          fl = file.path(
+            featurePropertyBagDir,
+            sprintf("featurePropertyBag.xml")
+          )
+        )
+      }
+
       if (!is.null(self$richData)) {
         richDataDir <- dir_create(tmpDir, "xl", "richData")
         if (length(self$richData$richValueRel)) {
@@ -3390,8 +3445,8 @@ wbWorkbook <- R6::R6Class(
             length(self$sharedStrings),
             attr(self$sharedStrings, "uniqueCount")
           ),
-          #body = stri_join(set_sst(attr(self$sharedStrings, "text")), collapse = "", sep = " "),
-          body = stri_join(self$sharedStrings, collapse = "", sep = ""),
+          #body = stringi::stri_join(set_sst(attr(self$sharedStrings, "text")), collapse = "", sep = " "),
+          body = stringi::stri_join(self$sharedStrings, collapse = "", sep = ""),
           tail = "</sst>",
           fl = file.path(xlDir, "sharedStrings.xml")
         )
@@ -3426,26 +3481,26 @@ wbWorkbook <- R6::R6Class(
       styleXML <- self$styles_mgr$styles
       if (length(styleXML$numFmts)) {
         styleXML$numFmts <-
-          stri_join(
+          stringi::stri_join(
             sprintf('<numFmts count="%s">', length(styleXML$numFmts)),
             pxml(styleXML$numFmts),
             "</numFmts>"
           )
       }
       styleXML$fonts <-
-        stri_join(
+        stringi::stri_join(
           sprintf('<fonts count="%s">', length(styleXML$fonts)),
           pxml(styleXML$fonts),
           "</fonts>"
         )
       styleXML$fills <-
-        stri_join(
+        stringi::stri_join(
           sprintf('<fills count="%s">', length(styleXML$fills)),
           pxml(styleXML$fills),
           "</fills>"
         )
       styleXML$borders <-
-        stri_join(
+        stringi::stri_join(
           sprintf('<borders count="%s">', length(styleXML$borders)),
           pxml(styleXML$borders),
           "</borders>"
@@ -3457,13 +3512,13 @@ wbWorkbook <- R6::R6Class(
           "</cellStyleXfs>"
         )
       styleXML$cellXfs <-
-        stri_join(
+        stringi::stri_join(
           sprintf('<cellXfs count="%s">', length(styleXML$cellXfs)),
           paste0(styleXML$cellXfs, collapse = ""),
           "</cellXfs>"
         )
       styleXML$cellStyles <-
-        stri_join(
+        stringi::stri_join(
           sprintf('<cellStyles count="%s">', length(styleXML$cellStyles)),
           pxml(styleXML$cellStyles),
           "</cellStyles>"
@@ -3471,9 +3526,9 @@ wbWorkbook <- R6::R6Class(
 
       styleXML$dxfs <-
         if (length(styleXML$dxfs)) {
-          stri_join(
+          stringi::stri_join(
             sprintf('<dxfs count="%s">', length(styleXML$dxfs)),
-            stri_join(unlist(styleXML$dxfs), sep = " ", collapse = ""),
+            stringi::stri_join(unlist(styleXML$dxfs), sep = " ", collapse = ""),
             "</dxfs>"
           )
         } else {
@@ -3534,10 +3589,10 @@ wbWorkbook <- R6::R6Class(
 
       ## write workbook.xml
       workbookXML <- self$workbook
-      workbookXML$sheets <- stri_join("<sheets>", pxml(workbookXML$sheets), "</sheets>")
+      workbookXML$sheets <- stringi::stri_join("<sheets>", pxml(workbookXML$sheets), "</sheets>")
 
       if (length(workbookXML$definedNames)) {
-        workbookXML$definedNames <- stri_join("<definedNames>", pxml(workbookXML$definedNames), "</definedNames>")
+        workbookXML$definedNames <- stringi::stri_join("<definedNames>", pxml(workbookXML$definedNames), "</definedNames>")
       }
 
       # openxml 2.8.1 expects the following order of xml nodes. While we create this per default, it is not
@@ -3945,7 +4000,7 @@ wbWorkbook <- R6::R6Class(
       if (transpose) {
         to_cols <- seq.int(start_col, start_col + to_nrow)
         to_rows <- seq.int(start_row, start_row + to_ncol)
-        from_dims_df <- as.data.frame(t(from_dims_df))
+        from_dims_df <- as.data.frame(t(from_dims_df), stringsAsFactors = FALSE)
       }
 
       to_dims       <- rowcol_to_dims(to_rows, to_cols)
@@ -3960,7 +4015,7 @@ wbWorkbook <- R6::R6Class(
 
       # TODO improve this. It should use v or inlineStr from cc
       if (as_value) {
-        data <- as.data.frame(unclass(data))
+        data <- as.data.frame(unclass(data), stringsAsFactors = FALSE)
 
         if (transpose) {
           data <- t(data)
@@ -3976,10 +4031,12 @@ wbWorkbook <- R6::R6Class(
 
       to_cc <- cc[match(from_dims, cc$r), ]
       from_cells <- to_cc$r
-      to_cc[c("r", "row_r", "c_r")] <- cbind(
-        to_dims_f,
-        gsub("\\D+", "", to_dims_f),
-        int2col(col2int(to_dims_f))
+
+      to_cc[c("r", "row_r", "c_r")] <- data.frame(
+        r     = to_dims_f,
+        row_r = gsub("\\D+", "", to_dims_f),
+        c_r   = int2col(col2int(to_dims_f)),
+        stringsAsFactors = FALSE
       )
 
       if (as_ref) {
@@ -4229,7 +4286,46 @@ wbWorkbook <- R6::R6Class(
 
     ### book views ----
 
-    #' @description Set the book views
+    #' @description Get the book views
+    #' @return A dataframe with the bookview properties
+    get_bookview = function() {
+      wbv <- self$workbook$bookViews
+      if (is.null(wbv)) {
+        wbv <- xml_node_create("workbookView")
+      } else {
+        wbv <- xml_node(wbv, "bookViews", "workbookView")
+      }
+      rbindlist(xml_attr(wbv, "workbookView"))
+    },
+
+    #' @description Get the book views
+    #' @param view view
+    #' @return The `wbWorkbook` object
+    remove_bookview = function(view = NULL) {
+
+      wbv <- self$workbook$bookViews
+
+      if (is.null(wbv)) {
+        return(invisible(self))
+      } else {
+        wbv <- xml_node(wbv, "bookViews", "workbookView")
+      }
+
+      if (!is.null(view)) {
+        if (!is.integer(view)) view <- as.integer(view)
+        # if there are three views, and 2 is removed, the indices are
+        # now 1, 2 and not 1, 3. removing -1 keeps only the first view
+        wbv <- wbv[-view]
+      }
+
+      self$workbook$bookViews <- xml_node_create(
+        "bookViews",
+        xml_children = wbv
+      )
+
+      invisible(self)
+    },
+
     #' @param active_tab activeTab
     #' @param auto_filter_date_grouping autoFilterDateGrouping
     #' @param first_sheet firstSheet
@@ -4243,6 +4339,7 @@ wbWorkbook <- R6::R6Class(
     #' @param window_width windowWidth
     #' @param x_window xWindow
     #' @param y_window yWindow
+    #' @param view view
     #' @return The `wbWorkbook` object
     set_bookview = function(
       active_tab                = NULL,
@@ -4258,6 +4355,7 @@ wbWorkbook <- R6::R6Class(
       window_width              = NULL,
       x_window                  = NULL,
       y_window                  = NULL,
+      view                      = 1L,
       ...
     ) {
 
@@ -4271,8 +4369,20 @@ wbWorkbook <- R6::R6Class(
         wbv <- xml_node(wbv, "bookViews", "workbookView")
       }
 
-      wbv <- xml_attr_mod(
-        wbv,
+      if (view > length(wbv)) {
+        if (view == length(wbv) + 1L) {
+          wbv <- c(wbv, xml_node_create("workbookView"))
+        } else {
+          msg <- paste0(
+            "There is more than one workbook view missing.",
+            " Available: ", length(wbv), ". Requested: ", view
+          )
+          stop(msg, call. = FALSE)
+        }
+      }
+
+      wbv[view] <- xml_attr_mod(
+        wbv[view],
         xml_attributes = c(
           activeTab              = as_xml_attr(active_tab),
           autoFilterDateGrouping = as_xml_attr(auto_filter_date_grouping),
@@ -4491,6 +4601,10 @@ wbWorkbook <- R6::R6Class(
         right <- TRUE
 
       if (is.list(cols)) {
+        cols <- lapply(cols, function(x) {
+          if (is.list(x)) lapply(x, col2int)
+          else col2int(x)
+        })
         unis <- unique(unlist(cols))
         levels <- vector("character", length(unis))
 
@@ -4506,6 +4620,7 @@ wbWorkbook <- R6::R6Class(
         }
         cols <- unlist(cols)
       } else {
+        cols <- col2int(cols)
         levels <- levels %||% rep("1", length(cols))
         collapse_in <- ifelse(right, length(levels), 1)
         levels[collapse_in] <- ""
@@ -4576,7 +4691,7 @@ wbWorkbook <- R6::R6Class(
       col_attr <- self$worksheets[[sheet]]$unfold_cols()
 
       # get the selection based on the col_attr frame.
-      select <- col_attr$min %in% as.character(cols)
+      select <- col_attr$min %in% as.character(col2int(cols))
 
       if (length(select)) {
         col_attr$outlineLevel[select] <- ""
@@ -4688,6 +4803,24 @@ wbWorkbook <- R6::R6Class(
 
       if (any(widths == "auto")) {
         df <- wb_to_df(self, sheet = sheet, cols = cols, colNames = FALSE)
+        # exclude merged cells from width calculation.
+        # adapted from wb_to_df(fill_merged_cells = TRUE)
+        mc <- self$worksheets[[sheet]]$mergeCells
+        if (length(mc)) {
+          mc <- unlist(xml_attr(mc, "mergeCell"))
+
+          for (i in seq_along(mc)) {
+            filler <- stringi::stri_split_fixed(mc[i], pattern = ":")[[1]][1]
+
+            dms <- dims_to_dataframe(mc[i])
+
+            if (any(row_sel <- rownames(df) %in% rownames(dms)) &&
+                any(col_sel <- colnames(df) %in% colnames(dms))) {
+
+              df[row_sel,  col_sel] <- NA
+            }
+          }
+        }
         # TODO format(x) might not be the way it is formatted in the xlsx file.
         col_width <- vapply(df, function(x) max(nchar(format(x))), NA_real_)
       }
@@ -4946,13 +5079,13 @@ wbWorkbook <- R6::R6Class(
         fileNo <- reg_match0(removeRels, "(?<=pivotTable)[0-9]+(?=\\.xml)")
         fileNo <- as.integer(unlist(fileNo))
 
-        toRemove <- stri_join(
+        toRemove <- stringi::stri_join(
           sprintf("(pivotCacheDefinition%i\\.xml)", fileNo),
           sep = " ",
           collapse = "|"
         )
 
-        toRemove <- stri_join(
+        toRemove <- stringi::stri_join(
           sprintf("(pivotCacheDefinition%i\\.xml)", grep(toRemove, self$pivotTables.xml.rels)),
           sep = " ",
           collapse = "|"
@@ -5003,15 +5136,15 @@ wbWorkbook <- R6::R6Class(
       if (nSheets > 1) {
         for (i in (sheet + 1L):nSheets) {
           self$workbook$sheets <- gsub(
-            stri_join("rId", i),
-            stri_join("rId", i - 1L),
+            stringi::stri_join("rId", i),
+            stringi::stri_join("rId", i - 1L),
             self$workbook$sheets,
             fixed = TRUE
           )
           # these are zero indexed
           self$workbook$bookViews <- gsub(
-            stri_join("activeTab=\"", i - 1L, "\""),
-            stri_join("activeTab=\"", i - 2L, "\""),
+            stringi::stri_join("activeTab=\"", i - 1L, "\""),
+            stringi::stri_join("activeTab=\"", i - 2L, "\""),
             self$workbook$bookViews,
             fixed = TRUE
           )
@@ -5159,8 +5292,9 @@ wbWorkbook <- R6::R6Class(
     #' @description
     #' Set cell merging for a sheet
     #' @param solve logical if intersecting cells should be solved
+    #' @param direction direction in which to split the cell merging. Allows "row" or "col".
     #' @return The `wbWorkbook` object, invisibly
-    merge_cells = function(sheet = current_sheet(), dims = NULL, solve = FALSE, ...) {
+    merge_cells = function(sheet = current_sheet(), dims = NULL, solve = FALSE, direction = NULL, ...) {
 
       cols <- list(...)[["cols"]]
       rows <- list(...)[["rows"]]
@@ -5176,17 +5310,8 @@ wbWorkbook <- R6::R6Class(
         dims <- rowcol_to_dims(rows, cols)
       }
 
-      ddims <- dims_to_rowcol(dims)
-
-      rows <- ddims[[2]]
-      cols <- ddims[[1]]
-
       sheet <- private$get_sheet_index(sheet)
-      self$worksheets[[sheet]]$merge_cells(
-        rows   = rows,
-        cols   = cols,
-        solve  = solve
-      )
+      self$worksheets[[sheet]]$merge_cells(dims = dims, solve = solve, direction = direction)
       invisible(self)
     },
 
@@ -5309,8 +5434,8 @@ wbWorkbook <- R6::R6Class(
 
           sprintf(
             '<pane %s topLeftCell="%s" activePane="%s" state="frozen"/><selection pane="%s"/>',
-            stri_join(attrs, collapse = " ", sep = " "),
-            get_cell_refs(data.frame(first_active_row, first_active_col)),
+            stringi::stri_join(attrs, collapse = " ", sep = " "),
+            get_cell_refs(data.frame(first_active_row, first_active_col, stringsAsFactors = FALSE)),
             activePane,
             activePane
           )
@@ -5379,7 +5504,7 @@ wbWorkbook <- R6::R6Class(
 
       cmts <- list()
       if (length(cmmt) && length(self$comments) <= cmmt) {
-        cmts <- as.data.frame(do.call("rbind", self$comments[[cmmt]]))
+        cmts <- as.data.frame(do.call("rbind", self$comments[[cmmt]]), stringsAsFactors = FALSE)
         if (!is.null(dims)) cmts <- cmts[cmts$ref %in% dims, ]
         # print(cmts)
         cmts <- cmts[c("ref", "author", "comment")]
@@ -5514,6 +5639,7 @@ wbWorkbook <- R6::R6Class(
         done <- as_xml_attr(resolve)
         if (reply) done <- NULL
 
+        # Internal option to alleviate timing problems in CI and CRAN
         ts <- getOption("openxlsx2.datetimeCreated", default = Sys.time())
 
         tc <- xml_node_create(
@@ -5542,7 +5668,8 @@ wbWorkbook <- R6::R6Class(
 
         tc <- cbind(
           rbindlist(xml_attr(self$threadComments[[thread_id]], "threadedComment")),
-          text = xml_value(self$threadComments[[thread_id]], "threadedComment", "text")
+          text = xml_value(self$threadComments[[thread_id]], "threadedComment", "text"),
+          stringsAsFactors = FALSE
         )
 
         # probably correclty ordered, but we could order these by date?
@@ -5579,7 +5706,8 @@ wbWorkbook <- R6::R6Class(
 
       tc <- cbind(
         rbindlist(xml_attr(self$threadComments[[thrd]], "threadedComment")),
-        text = xml_value(self$threadComments[[thrd]], "threadedComment", "text")
+        text = xml_value(self$threadComments[[thrd]], "threadedComment", "text"),
+        stringsAsFactors = FALSE
       )
 
       if (!is.null(dims) && any(grepl(":", dims)))
@@ -5704,7 +5832,7 @@ wbWorkbook <- R6::R6Class(
           if (!grepl("[A-Z]", substr(rule, 1, 2))) {
             ## formula looks like "operatorX" , attach top left cell to rule
             rule <- paste0(
-              get_cell_refs(data.frame(min(rows), min(cols))),
+              get_cell_refs(data.frame(min(rows), min(cols), stringsAsFactors = FALSE)),
               rule
             )
           } ## else, there is a letter in the formula and apply as is
@@ -6056,7 +6184,7 @@ wbWorkbook <- R6::R6Class(
 
       pos <- '<xdr:pos x="0" y="0" />'
 
-      drawingsXML <- stri_join(
+      drawingsXML <- stringi::stri_join(
         "<xdr:absoluteAnchor>",
         pos,
         sprintf('<xdr:ext cx="%s" cy="%s"/>', width, height),
@@ -6426,7 +6554,8 @@ wbWorkbook <- R6::R6Class(
         style   = styleplot_xml,
         rels    = chart1_rels_xml(next_chart),
         chartEx = "",
-        relsEx  = ""
+        relsEx  = "",
+        stringsAsFactors = FALSE
       )
 
       self$charts <- rbind(self$charts, chart)
@@ -6728,7 +6857,7 @@ wbWorkbook <- R6::R6Class(
         showText <-
           c(showText, sprintf(
             "Write order: %s",
-            stri_join(self$sheetOrder, sep = " ", collapse = ", ")
+            stringi::stri_join(self$sheetOrder, sep = " ", collapse = ", ")
           ))
       }
 
@@ -6890,21 +7019,23 @@ wbWorkbook <- R6::R6Class(
     },
 
     #' @description Set a property of a workbook
-    #' @param title,subject,category,datetime_created,modifier,keywords,comments,manager,company,custom A workbook property to set
+    #' @param title,subject,category,datetime_created,datetime_modified,modifier,keywords,comments,manager,company,custom A workbook property to set
     set_properties = function(
-      creator          = NULL,
-      title            = NULL,
-      subject          = NULL,
-      category         = NULL,
-      datetime_created = Sys.time(),
-      modifier         = NULL,
-      keywords         = NULL,
-      comments         = NULL,
-      manager          = NULL,
-      company          = NULL,
-      custom           = NULL
+      creator           = NULL,
+      title             = NULL,
+      subject           = NULL,
+      category          = NULL,
+      datetime_created  = NULL,
+      datetime_modified = NULL,
+      modifier          = NULL,
+      keywords          = NULL,
+      comments          = NULL,
+      manager           = NULL,
+      company           = NULL,
+      custom            = NULL
     ) {
 
+      # Internal option to alleviate timing problems in CI and CRAN
       datetime_created <-
         getOption("openxlsx2.datetimeCreated", datetime_created)
 
@@ -6970,12 +7101,23 @@ wbWorkbook <- R6::R6Class(
         self$app$Company <- xml_node_create("Company", xml_children = company)
       }
 
-      xml_properties[core_created] <- xml_node_create(core_created,
-        xml_attributes = c(
-          `xsi:type` = "dcterms:W3CDTF"
-        ),
-        xml_children = format(as_POSIXct_utc(datetime_created), "%Y-%m-%dT%H:%M:%SZ")
-      )
+      if (!is.null(datetime_created)) {
+        xml_properties[core_created] <- xml_node_create(core_created,
+          xml_attributes = c(
+            `xsi:type` = "dcterms:W3CDTF"
+          ),
+          xml_children = format(as_POSIXct_utc(datetime_created), "%Y-%m-%dT%H:%M:%SZ")
+        )
+      }
+
+      if (!is.null(datetime_modified)) {
+        xml_properties[core_modifid] <- xml_node_create(core_modifid,
+          xml_attributes = c(
+            `xsi:type` = "dcterms:W3CDTF"
+          ),
+          xml_children = format(as_POSIXct_utc(datetime_modified), "%Y-%m-%dT%H:%M:%SZ")
+        )
+      }
 
       if (!is.null(modifier)) {
         xml_properties[core_lastmod] <- xml_node_create(core_lastmod, xml_children = modifier)
@@ -7513,29 +7655,23 @@ wbWorkbook <- R6::R6Class(
 
       sheet <- private$get_sheet_index(sheet)
 
-      if (!is.null(header) && length(header) != 3) {
-        stop("header must have length 3 where elements correspond to positions: left, center, right.")
+      not_three_or_na <- function(x) {
+        nam <- deparse(substitute(x))
+        msg <- sprintf(
+          "`%s` must have length 3 where elements correspond to positions: left, center, right.",
+          nam
+        )
+
+        if (!is.null(x) && !(length(x) == 3 || (length(x) == 1 && is.na(x))))
+          stop(msg, call. = FALSE)
       }
 
-      if (!is.null(footer) && length(footer) != 3) {
-        stop("footer must have length 3 where elements correspond to positions: left, center, right.")
-      }
-
-      if (!is.null(even_header) && length(even_header) != 3) {
-        stop("evenHeader must have length 3 where elements correspond to positions: left, center, right.")
-      }
-
-      if (!is.null(even_footer) && length(even_footer) != 3) {
-        stop("evenFooter must have length 3 where elements correspond to positions: left, center, right.")
-      }
-
-      if (!is.null(first_header) && length(first_header) != 3) {
-        stop("firstHeader must have length 3 where elements correspond to positions: left, center, right.")
-      }
-
-      if (!is.null(first_footer) && length(first_footer) != 3) {
-        stop("firstFooter must have length 3 where elements correspond to positions: left, center, right.")
-      }
+      not_three_or_na(header)
+      not_three_or_na(footer)
+      not_three_or_na(even_header)
+      not_three_or_na(even_footer)
+      not_three_or_na(first_header)
+      not_three_or_na(first_footer)
 
       # TODO this could probably be moved to the hf assignment
       oddHeader   <- headerFooterSub(header)
@@ -7556,6 +7692,17 @@ wbWorkbook <- R6::R6Class(
 
       if (all(lengths(hf) == 0)) {
         hf <- NULL
+      } else {
+        if (!is.null(old_hf <- self$worksheets[[sheet]]$headerFooter)) {
+          for (nam in names(hf)) {
+            # Update using new_vector if it exists, keeping original values where NA
+            if (length(hf[[nam]]) && length(old_hf[[nam]])) {
+              sel <- if (is.list(hf[[nam]]) && length(hf[[nam]]) == 0) sel <- seq_len(3)
+                      else which(vapply(hf[[nam]], is.null, NA))
+              hf[[nam]][sel] <- old_hf[[nam]][sel]
+            }
+          }
+        }
       }
 
       if (!is.null(scale_with_doc)) {
@@ -7662,7 +7809,7 @@ wbWorkbook <- R6::R6Class(
 
       self$worksheets[[sheet]]$autoFilter <- sprintf(
         '<autoFilter ref="%s"/>',
-        paste(get_cell_refs(data.frame("x" = c(rows, rows), "y" = c(min(cols), max(cols)))), collapse = ":")
+        paste(get_cell_refs(data.frame("x" = c(rows, rows), "y" = c(min(cols), max(cols)), stringsAsFactors = FALSE)), collapse = ":")
       )
 
       invisible(self)
@@ -8996,6 +9143,7 @@ wbWorkbook <- R6::R6Class(
       sparklines
     ) {
       sheet <- private$get_sheet_index(sheet)
+      sparklines <- replace_waiver(sparklines, wb = self)
       self$worksheets[[sheet]]$add_sparklines(sparklines)
       invisible(self)
     },
@@ -9417,7 +9565,7 @@ wbWorkbook <- R6::R6Class(
 
       ## write file path to media slot to copy across on save
       tmp <- file
-      names(tmp) <- stri_join("image", mediaNo, ".", imageType)
+      names(tmp) <- stringi::stri_join("image", mediaNo, ".", imageType)
       self$append("media", tmp)
 
       invisible(self)
@@ -9505,7 +9653,7 @@ wbWorkbook <- R6::R6Class(
 
             write_file(
               body = self$charts$chart[crt],
-              fl = file.path(xlchartsDir, stri_join("chart", crt, ".xml"))
+              fl = file.path(xlchartsDir, stringi::stri_join("chart", crt, ".xml"))
             )
           }
 
@@ -9514,7 +9662,7 @@ wbWorkbook <- R6::R6Class(
 
             write_file(
               body = self$charts$chartEx[crt],
-              fl = file.path(xlchartsDir, stri_join("chartEx", crt, ".xml"))
+              fl = file.path(xlchartsDir, stringi::stri_join("chartEx", crt, ".xml"))
             )
           }
 
@@ -9523,7 +9671,7 @@ wbWorkbook <- R6::R6Class(
 
             write_file(
               body = self$charts$colors[crt],
-              fl = file.path(xlchartsDir, stri_join("colors", crt, ".xml"))
+              fl = file.path(xlchartsDir, stringi::stri_join("colors", crt, ".xml"))
             )
           }
 
@@ -9532,21 +9680,21 @@ wbWorkbook <- R6::R6Class(
 
             write_file(
               body = self$charts$style[crt],
-              fl = file.path(xlchartsDir, stri_join("style", crt, ".xml"))
+              fl = file.path(xlchartsDir, stringi::stri_join("style", crt, ".xml"))
             )
           }
 
           if (self$charts$rels[crt] != "") {
             write_file(
               body = self$charts$rels[crt],
-              fl = file.path(xlchartsRelsDir, stri_join("chart", crt, ".xml.rels"))
+              fl = file.path(xlchartsRelsDir, stringi::stri_join("chart", crt, ".xml.rels"))
             )
           }
 
           if (self$charts$relsEx[crt] != "") {
             write_file(
               body = self$charts$relsEx[crt],
-              fl = file.path(xlchartsRelsDir, stri_join("chartEx", crt, ".xml.rels"))
+              fl = file.path(xlchartsRelsDir, stringi::stri_join("chartEx", crt, ".xml.rels"))
             )
           }
         }
@@ -9565,14 +9713,14 @@ wbWorkbook <- R6::R6Class(
             head = "",
             body = pxml(self$drawings[[i]]),
             tail = "",
-            fl = file.path(xldrawingsDir, stri_join("drawing", i, ".xml"))
+            fl = file.path(xldrawingsDir, stringi::stri_join("drawing", i, ".xml"))
           )
           if (!all(self$drawings_rels[[i]] == "")) {
             write_file(
               head = '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
               body = pxml(self$drawings_rels[[i]]),
               tail = '</Relationships>',
-              fl = file.path(xldrawingsRelsDir, stri_join("drawing", i, ".xml.rels"))
+              fl = file.path(xldrawingsRelsDir, stringi::stri_join("drawing", i, ".xml.rels"))
             )
           }
 
@@ -9608,7 +9756,7 @@ wbWorkbook <- R6::R6Class(
 
           write_file(
             body = self$worksheets[[i]]$get_prior_sheet_data(),
-            fl = file.path(chartSheetDir, stri_join("sheet", i, ".xml"))
+            fl = file.path(chartSheetDir, stringi::stri_join("sheet", i, ".xml"))
           )
 
           if (length(self$worksheets_rels[[i]])) {
@@ -9631,7 +9779,7 @@ wbWorkbook <- R6::R6Class(
 
 
           if (!is.null(cc)) {
-            cc$r <- stri_join(cc$c_r, cc$row_r)
+            cc$r <- stringi::stri_join(cc$c_r, cc$row_r)
             # prepare data for output
 
             # there can be files, where row_attr is incomplete because a row
@@ -9796,8 +9944,8 @@ wbWorkbook <- R6::R6Class(
       # TODO rename: setConditionFormatting?  Or addConditionalFormatting
       # TODO can this be moved to the sheet data?
       sheet <- private$get_sheet_index(sheet)
-      sqref <- stri_join(
-        get_cell_refs(data.frame(x = c(startRow, endRow), y = c(startCol, endCol))),
+      sqref <- stringi::stri_join(
+        get_cell_refs(data.frame(x = c(startRow, endRow), y = c(startCol, endCol), stringsAsFactors = FALSE)),
         collapse = ":"
       )
 
@@ -9998,6 +10146,15 @@ wbWorkbook <- R6::R6Class(
         )
       }
 
+      if (!is.null(self$featurePropertyBag)) {
+        self$append("workbook.xml.rels",
+          sprintf(
+            '<Relationship Id="rId%s" Type="http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag" Target="featurePropertyBag/featurePropertyBag.xml"/>',
+            1L + length(self$workbook.xml.rels)
+          )
+        )
+      }
+
       ## Reassign rId to workbook sheet elements, (order sheets by sheetId first)
       self$workbook$sheets <-
         unapply(
@@ -10039,9 +10196,9 @@ wbWorkbook <- R6::R6Class(
       ## update workbook r:id to match reordered workbook.xml.rels externalLink element
       if (length(extRefInds)) {
         newInds <- seq_along(extRefInds) + length(sheetInds)
-        self$workbook$externalReferences <- stri_join(
+        self$workbook$externalReferences <- stringi::stri_join(
           "<externalReferences>",
-          stri_join(sprintf('<externalReference r:id=\"rId%s\"/>', newInds), collapse = ""),
+          stringi::stri_join(sprintf('<externalReference r:id=\"rId%s\"/>', newInds), collapse = ""),
           "</externalReferences>"
         )
       }

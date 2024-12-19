@@ -302,14 +302,14 @@ test_that("NA works as expected", {
 test_that("writeData() forces evaluation of x (#264)", {
 
   x <- format(123.4)
-  df <- data.frame(d = format(123.4))
-  df2 <- data.frame(e = x)
+  df <- data.frame(d = format(123.4), stringsAsFactors = FALSE)
+  df2 <- data.frame(e = x, stringsAsFactors = FALSE)
 
   wb <- wb_workbook()
   wb$add_worksheet("sheet")
-  wb$add_data(start_col = 1, x = data.frame(a = format(123.4)))
-  wb$add_data(start_col = 2, x = data.frame(b = as.character(123.4)))
-  wb$add_data(start_col = 3, x = data.frame(c = "123.4"))
+  wb$add_data(start_col = 1, x = data.frame(a = format(123.4), stringsAsFactors = FALSE))
+  wb$add_data(start_col = 2, x = data.frame(b = as.character(123.4), stringsAsFactors = FALSE))
+  wb$add_data(start_col = 3, x = data.frame(c = "123.4", stringsAsFactors = FALSE))
   wb$add_data(start_col = 4, x = df)
   wb$add_data(start_col = 5, x = df2)
 
@@ -914,6 +914,45 @@ test_that("writing labeled variables works", {
 
 })
 
+test_that("partial labels work", {
+  vec <- sample(c(0, 1, 2), size = 10, replace = TRUE)
+
+  df <- data.frame(
+    var1 = vec,
+    var2 = vec,
+    var3 = vec,
+    var4 = vec,
+    var5 = vec,
+    var6 = vec,
+    var7 = ifelse(vec == 0, "No", ifelse(vec == 1, "Yes", "Maybe"))
+  )
+
+  attr(df$var1, "labels") <- c(No = 0, Yes = 1, Maybe = 2)       # ordered labels
+  attr(df$var2, "labels") <- c(Yes = 1, Maybe = 2, No = 0)       # unordered labels
+  attr(df$var3, "labels") <- c(Yes = 1, Maybe = 2)               # partial labels
+  attr(df$var4, "labels") <- c(No = 0, Maybe = 2)                # partial labels
+  attr(df$var5, "labels") <- c(Undecided = -1)                   # unmatched label
+
+  df$var6 <- factor(df$var6, levels = c(1, 0, 2), label = c("Yes", "No", "Maybe"))
+
+
+  got <- write_xlsx(x = df)$to_df()
+  expect_equal(got$var1, got$var7)
+  expect_equal(got$var2, got$var7)
+  expect_equal(which(got$var3 != "0"), which(got$var7 != "No"))
+  expect_equal(which(got$var3 == "0"), which(got$var7 == "No"))
+
+  expect_equal(which(got$var4 != "1"), which(got$var7 != "Yes"))
+  expect_equal(which(got$var4 == "1"), which(got$var7 == "Yes"))
+
+  expect_equal(which(got$var5 == "0"), which(got$var7 == "No"))
+  expect_equal(which(got$var5 == "1"), which(got$var7 == "Yes"))
+  expect_equal(which(got$var5 == "2"), which(got$var7 == "Maybe"))
+
+  expect_equal(got$var6, got$var7)
+
+})
+
 test_that("writing in specific encoding works", {
 
   skip_on_cran()
@@ -1063,7 +1102,8 @@ test_that("writing total row works", {
     E = "SUBTOTAL(109,Table1[drat])", F = "SUBTOTAL(109,Table1[wt])",
     G = "SUBTOTAL(109,Table1[qsec])", H = "SUBTOTAL(109,Table1[vs])",
     I = "SUBTOTAL(109,Table1[am])", J = "SUBTOTAL(109,Table1[gear])",
-    K = "SUBTOTAL(109,Table1[carb])"
+    K = "SUBTOTAL(109,Table1[carb])",
+    stringsAsFactors = FALSE
   )
   got <- wb_to_df(wb, dims = wb_dims(rows = 34, cols = "A:K"),
                   show_formula = TRUE, col_names = FALSE)
@@ -1075,7 +1115,8 @@ test_that("writing total row works", {
   exp <- data.frame(
     A = NA_real_, B = NA_real_, C = NA_real_, D = NA_real_,
     E = NA_real_, F = NA_real_, G = NA_real_, H = NA_real_, I = NA_real_,
-    J = NA_real_, K = NA_real_
+    J = NA_real_, K = NA_real_,
+    stringsAsFactors = FALSE
   )
   got <- wb_to_df(wb, dims = wb_dims(rows = 34, cols = "A:K"),
                   show_formula = TRUE, col_names = FALSE)
@@ -1084,7 +1125,7 @@ test_that("writing total row works", {
   # total row with text only
   wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c(text = "Result", text = "sum"))
 
-  exp <- data.frame(A = "Result", B = "sum")
+  exp <- data.frame(A = "Result", B = "sum", stringsAsFactors = FALSE)
   got <- wb_to_df(wb, dims = wb_dims(rows = 52, cols = "A:B"),
                   show_formula = TRUE, col_names = FALSE)
   expect_equal(exp, got, ignore_attr = TRUE)
@@ -1092,7 +1133,7 @@ test_that("writing total row works", {
   # total row with text and formula
   wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c(text = "Result", "sum"))
 
-  exp <- data.frame(A = "Result", B = "SUBTOTAL(109,Table1[dist])")
+  exp <- data.frame(A = "Result", B = "SUBTOTAL(109,Table1[dist])", stringsAsFactors = FALSE)
   got <- wb_to_df(wb, dims = wb_dims(rows = 52, cols = "A:B"),
                   show_formula = TRUE, col_names = FALSE)
   expect_equal(exp, got, ignore_attr = TRUE)
@@ -1100,7 +1141,7 @@ test_that("writing total row works", {
   # total row with none and custom formula
   wb <- wb_workbook()$add_worksheet()$add_data_table(x = cars, total_row = c("none", "COUNTA"))
 
-  exp <- data.frame(A = NA_real_, B = "COUNTA(Table1[dist])")
+  exp <- data.frame(A = NA_real_, B = "COUNTA(Table1[dist])", stringsAsFactors = FALSE)
   got <- wb_to_df(wb, dims = wb_dims(rows = 52, cols = "A:B"),
                   show_formula = TRUE, col_names = FALSE)
   expect_equal(exp, got, ignore_attr = TRUE)
@@ -1108,7 +1149,7 @@ test_that("writing total row works", {
   # with rownames
   wb <- wb_workbook()$add_worksheet()$
     add_data_table(
-      x = as.data.frame(USPersonalExpenditure),
+      x = as.data.frame(USPersonalExpenditure, stringsAsFactors = FALSE),
       row_names = TRUE,
       total_row = c(text = "Total", "none", "sum", "sum", "sum", "SUM")
     )
@@ -1116,7 +1157,8 @@ test_that("writing total row works", {
   exp <- data.frame(
     A = "Total", B = NA_real_, C = "SUBTOTAL(109,Table1[1945])",
     D = "SUBTOTAL(109,Table1[1950])", E = "SUBTOTAL(109,Table1[1955])",
-    F = "SUM(Table1[1960])"
+    F = "SUM(Table1[1960])",
+    stringsAsFactors = FALSE
   )
   got <- wb_to_df(wb, dims = wb_dims(rows = 7, cols = "A:F"), col_names = FALSE, show_formula = TRUE)
   expect_equal(exp, got, ignore_attr = TRUE)
@@ -1233,7 +1275,11 @@ test_that("writing zero row data frames works", {
   expect_equal(exp, got)
 
   # write a data frame containing an empty date vector
-  dat <- data.frame(date = base::as.Date(NULL))
+  if (getRversion() < "4.0.0") {
+    dat <- data.frame(date = base::as.Date(character()))
+  } else {
+    dat <- data.frame(date = base::as.Date(NULL))
+  }
   expect_silent(wb <- wb_workbook()$add_worksheet()$add_data(x = dat))
 
   exp <- "date"
@@ -1373,6 +1419,84 @@ test_that("incomplete types work and character types work as well", {
   x <- wb_to_df(wb1, cols = c(2, 1), types = c("Var1" = 0, "Var3" = 1))
   exp <- c("numeric", "character")
   got <- vapply(x, class, NA_character_, USE.NAMES = FALSE)
+  expect_equal(exp, got)
+
+})
+
+test_that("writing list with sep works", {
+
+  # input data
+  df <- structure(
+    list(
+      CharCol = c("A", "B", "C", "D", "E"),
+      ListCol = list(c("X", "F", "Q", "R", "J"),
+                     c("Q", "E", "O", "E", "O"),
+                     c("X", "O", "F", "Z", "P"),
+                     c("T", "W", "U", "J", "S"),
+                     c("R", "S", "U", "W", "L")
+      )
+    ),
+    class = "data.frame",
+    row.names = c(NA, -5L)
+  )
+
+  wb <- wb_workbook() %>%
+    # basic
+    wb_add_worksheet() %>%
+    wb_add_data(
+      x = df
+    ) %>%
+    wb_add_worksheet() %>%
+    wb_add_data_table(
+      x = df
+    ) %>%
+    # with different sep
+    wb_add_worksheet() %>%
+    wb_add_data(
+      x = df, sep = "_"
+    ) %>%
+    wb_add_worksheet() %>%
+    wb_add_data_table(
+      x = df, sep = "_"
+    )
+
+  # basic
+  exp <- structure(list(CharCol = c("A", "B", "C", "D", "E"),
+                        ListCol = c("X, F, Q, R, J", "Q, E, O, E, O", "X, O, F, Z, P", "T, W, U, J, S", "R, S, U, W, L")),
+                   row.names = 2:6, class = "data.frame")
+
+  got <- wb_to_df(wb, sheet = 1)
+  expect_equal(exp, got)
+
+  got <- wb_to_df(wb, sheet = 2)
+  expect_equal(exp, got)
+
+  # with custom
+  exp <- structure(list(CharCol = c("A", "B", "C", "D", "E"),
+                        ListCol = c("X_F_Q_R_J", "Q_E_O_E_O", "X_O_F_Z_P", "T_W_U_J_S", "R_S_U_W_L")),
+                   row.names = 2:6, class = "data.frame")
+
+  got <- wb_to_df(wb, sheet = 3)
+  expect_equal(exp, got)
+
+  got <- wb_to_df(wb, sheet = 4)
+  expect_equal(exp, got)
+
+})
+
+test_that("guarding against overwriting shared formula reference works", {
+
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = 1)$
+    add_formula(dims = "B1:D1", x = "A1 + 1", shared = TRUE)
+
+  expect_warning(
+    wb$add_data(x = 2, dims = "B1"),
+    "A shared formula reference cell was overwritten."
+  )
+
+  exp <- c("1", "2", "B1 + 1", "C1 + 1")
+  got <- unname(unlist(wb$to_df(show_formula = TRUE, col_names = FALSE)))
   expect_equal(exp, got)
 
 })

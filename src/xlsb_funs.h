@@ -21,36 +21,44 @@ bool is_big_endian() {
   uint8_t* bytePtr = reinterpret_cast<uint8_t*>(&num);
   return bytePtr[0] == 0;
 }
+#include <type_traits>
+#include <cstdint>
 
-#define GCC_VERSION (__GNUC__ * 10000 \
-+ __GNUC_MINOR__ * 100                \
-+ __GNUC_PATCHLEVEL__)
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 
 /* Test for GCC < 4.8.0 */
-#if GCC_VERSION < 40800 & !__clang__
-static inline unsigned short __builtin_bswap16(unsigned short a)
-{
-  return (a<<8)|(a>>8);
+#if GCC_VERSION < 40800 && !__clang__
+static inline uint16_t __builtin_bswap16(uint16_t a) {
+  return static_cast<uint16_t>((a << 8) | (a >> 8));
 }
 #endif
 
-// start swap_endian
+// Start swap_endian
 template <typename T>
-typename std::enable_if<std::is_same<T, int16_t>::value || std::is_same<T, uint16_t>::value, T>::type
+typename std::enable_if<
+  std::is_same<T, int16_t>::value || std::is_same<T, uint16_t>::value, T>::type
 swap_endian(T t) {
-  return __builtin_bswap16(t);
+  using UnsignedType = typename std::make_unsigned<T>::type;
+  UnsignedType swapped = __builtin_bswap16(static_cast<UnsignedType>(t));
+  return static_cast<T>(swapped);
 }
 
 template <typename T>
-typename std::enable_if<std::is_same<T, int32_t>::value || std::is_same<T, uint32_t>::value, T>::type
+typename std::enable_if<
+  std::is_same<T, int32_t>::value || std::is_same<T, uint32_t>::value, T>::type
 swap_endian(T t) {
-  return __builtin_bswap32(t);
+  using UnsignedType = typename std::make_unsigned<T>::type;
+  UnsignedType swapped = __builtin_bswap32(static_cast<UnsignedType>(t));
+  return static_cast<T>(swapped);
 }
 
 template <typename T>
-typename std::enable_if<std::is_same<T, int64_t>::value || std::is_same<T, uint64_t>::value, T>::type
+typename std::enable_if<
+  std::is_same<T, int64_t>::value || std::is_same<T, uint64_t>::value, T>::type
 swap_endian(T t) {
-  return __builtin_bswap64(t);
+  using UnsignedType = typename std::make_unsigned<T>::type;
+  UnsignedType swapped = __builtin_bswap64(static_cast<UnsignedType>(t));
+  return static_cast<T>(swapped);
 }
 
 template <typename T>
@@ -78,18 +86,20 @@ swap_endian(T t) {
 }
 
 template <typename T>
-typename std::enable_if<!std::is_same<T, int16_t>::value &&
-!std::is_same<T, uint16_t>::value &&
-!std::is_same<T, int32_t>::value &&
-!std::is_same<T, uint32_t>::value &&
-!std::is_same<T, int64_t>::value &&
-!std::is_same<T, uint64_t>::value &&
-!std::is_same<T, float>::value &&
-!std::is_same<T, double>::value, T>::type
-swap_endian(T t) {
-  return t;
-}
-// end swap_endian
+typename std::enable_if<
+  !std::is_same<T, int16_t>::value &&
+  !std::is_same<T, uint16_t>::value &&
+  !std::is_same<T, int32_t>::value &&
+  !std::is_same<T, uint32_t>::value &&
+  !std::is_same<T, int64_t>::value &&
+  !std::is_same<T, uint64_t>::value &&
+  !std::is_same<T, float>::value &&
+  !std::is_same<T, double>::value, T>::type
+  swap_endian(T t) {
+    return t;
+  }
+// End swap_endian
+
 // #nocov end
 
 template <typename T>
@@ -199,7 +209,7 @@ std::string to_utf8(const std::u16string& u16str) {
         char16_t low_surrogate = u16str[++i];
 
         // Calculate the code point from the surrogate pair
-        int code_point = ((high_surrogate - 0xD800) << 10) + (low_surrogate - 0xDC00) + 0x10000;
+        int32_t code_point = ((high_surrogate - 0xD800) << 10) + (low_surrogate - 0xDC00) + 0x10000;
 
         // Four-byte UTF-8 character (0x10000 - 0x10FFFF)
         utf8str.push_back(static_cast<char>(0xF0 | (code_point >> 18)));
@@ -224,7 +234,7 @@ std::string read_xlwidestring(std::string &mystring, std::istream& sas) {
   std::u16string str;
   str.resize(size * 2);
 
-  if (!sas.read((char*)&str[0], str.size()))
+  if (!sas.read((char*)&str[0], static_cast<uint32_t>(str.size())))
     Rcpp::stop("char: a binary read error occurred");
 
   std::string outstr = to_utf8(str);
@@ -336,7 +346,7 @@ int32_t RECORD_SIZE(std::istream& sas, bool swapit) {
   return -1;
 }
 
-int32_t RECORD(int &rid, int &rsize, std::istream& sas, bool swapit) {
+int32_t RECORD(int32_t &rid, int32_t &rsize, std::istream& sas, bool swapit) {
 
   /* Record ID ---------------------------------------------------------------*/
   rid = RECORD_ID(sas, swapit);
@@ -347,7 +357,7 @@ int32_t RECORD(int &rid, int &rsize, std::istream& sas, bool swapit) {
   return 0;
 }
 
-std::string cell_style(int style) {
+std::string cell_style(int32_t style) {
   std::string out = "";
   if (style > 0) {
     out = out + " s=\"" + std::to_string(style) + "\"";
@@ -356,7 +366,7 @@ std::string cell_style(int style) {
 }
 
 
-std::string halign(int style) {
+std::string halign(int32_t style) {
   std::string out = "";
   std::string hali = "";
   if (style > 0) {
@@ -406,7 +416,7 @@ std::string to_iconset(uint32_t style) {
   return out;
 }
 
-std::string valign(int style) {
+std::string valign(int32_t style) {
   std::string out = "";
   std::string vali = "";
   if (style >= 0) {
@@ -438,12 +448,12 @@ std::vector<std::pair<int, int>> StrRun(std::istream& sas, uint32_t dwSizeStrRun
 }
 
 // Function to get a safe substring from a UTF-8 string
-std::string utf8_substr(const std::string& str, size_t start, size_t length) {
+std::string utf8_substr(const std::string& str, int32_t start, int32_t length) {
     size_t byte_pos = 0; // Byte position in the original string
     size_t char_pos = 0; // Character position
 
     // Find the byte position of the start character
-    while (char_pos < start && byte_pos < str.size()) {
+    while (char_pos < static_cast<size_t>(start) && byte_pos < str.size()) {
         if ((str[byte_pos] & 0x80) == 0) {
             // Single-byte character (ASCII)
             byte_pos += 1;
@@ -465,7 +475,7 @@ std::string utf8_substr(const std::string& str, size_t start, size_t length) {
     size_t start_byte_pos = byte_pos;
 
     // Find the byte position of the end character
-    while (char_pos < start + length && byte_pos < str.size()) {
+    while (char_pos < static_cast<size_t>(start + length) && byte_pos < str.size()) {
         if ((str[byte_pos] & 0x80) == 0) {
             // Single-byte character (ASCII)
             byte_pos += 1;
@@ -489,7 +499,7 @@ std::string utf8_substr(const std::string& str, size_t start, size_t length) {
 
 std::string to_rich_text(const std::string& str, const std::vector<std::pair<int, int>>& str_runs) {
     std::string result;
-    int start = 0, len = 0;
+    int32_t start = 0, len = 0;
 
     for (size_t str_run = 0; str_run < str_runs.size(); ++str_run) {
 
@@ -507,7 +517,7 @@ std::string to_rich_text(const std::string& str, const std::vector<std::pair<int
           if ((str_run + 1) < str_runs.size())
             len = str_runs[str_run + 1].first - start;
           else
-            len = str.size() - start;
+            len = static_cast<int32_t>(str.size()) - start;
 
           std::string part = utf8_substr(str, start, len);
 
@@ -586,9 +596,9 @@ void ProductVersion(std::istream& sas, bool swapit, bool debug) {
   // if (debug) Rprintf("ProductVersion: %d: %d: %d\n", version, fields->product, fields->reserved);
 }
 
-std::vector<int> UncheckedRfX(std::istream& sas, bool swapit) {
+std::vector<int32_t> UncheckedRfX(std::istream& sas, bool swapit) {
 
-  std::vector<int> out;
+  std::vector<int32_t> out;
   int32_t rwFirst= 0, rwLast= 0, colFirst= 0, colLast= 0;
 
   out.push_back(readbin(rwFirst, sas, swapit));
@@ -599,15 +609,15 @@ std::vector<int> UncheckedRfX(std::istream& sas, bool swapit) {
   return(out);
 }
 
-std::vector<int> UncheckedSqRfX(std::istream& sas, bool swapit) {
+std::vector<int32_t> UncheckedSqRfX(std::istream& sas, bool swapit) {
 
-  std::vector<int> out;
+  std::vector<int32_t> out;
   int32_t crfx = 0;
   crfx = readbin(crfx, sas, swapit);
   out.push_back(crfx);
 
   for (int32_t i = 0; i < crfx; ++i) {
-    std::vector<int> ucrfx = UncheckedRfX(sas, swapit);
+    std::vector<int32_t> ucrfx = UncheckedRfX(sas, swapit);
     out.insert(out.end(), ucrfx.begin(), ucrfx.end());
   }
 
@@ -615,7 +625,7 @@ std::vector<int> UncheckedSqRfX(std::istream& sas, bool swapit) {
 }
 
 
-int UncheckedCol(std::istream& sas, bool swapit) {
+int32_t UncheckedCol(std::istream& sas, bool swapit) {
   int32_t col = 0;
   col = readbin(col, sas, swapit);
   if (col >= 0 && col <= 16383)
@@ -624,7 +634,7 @@ int UncheckedCol(std::istream& sas, bool swapit) {
     Rcpp::stop("col size bad: %d @ %d", col, sas.tellg());
 }
 
-int UncheckedRw(std::istream& sas, bool swapit) {
+int32_t UncheckedRw(std::istream& sas, bool swapit) {
   int32_t row = 0;
   row = readbin(row, sas, swapit);
   if (row >= 0 && row <= 1048575)
@@ -642,7 +652,7 @@ uint16_t ColShort(std::istream& sas, bool swapit) {
     Rcpp::stop("col size bad: %d @ %d", col, sas.tellg());
 }
 
-std::vector<int> ColRelShort(std::istream& sas, bool swapit) {
+std::vector<int32_t> ColRelShort(std::istream& sas, bool swapit) {
   uint16_t tmp = 0;
   tmp = readbin(tmp, sas, swapit);
 
@@ -651,7 +661,7 @@ std::vector<int> ColRelShort(std::istream& sas, bool swapit) {
   fColRel = (tmp >> 14) & 0x0001;
   fRwRel  = (tmp >> 15) & 0x0001;
 
-  std::vector<int> out(3);
+  std::vector<int32_t> out(3);
   out[0] = col;
   out[1] = fColRel;
   out[2] = fRwRel;
@@ -661,8 +671,8 @@ std::vector<int> ColRelShort(std::istream& sas, bool swapit) {
 
 std::string Loc(std::istream& sas, bool swapit) {
 
-  std::vector<int> col;
-  uint32_t row = 0;
+  std::vector<int32_t> col;
+  int32_t row = 0;
   row = UncheckedRw(sas, swapit);
   col = ColRelShort(sas, swapit);
 
@@ -681,9 +691,9 @@ std::string Loc(std::istream& sas, bool swapit) {
 }
 
 // RgceLocRel
-std::string LocRel(std::istream& sas, bool swapit, int col, int row) {
+std::string LocRel(std::istream& sas, bool swapit, int32_t col, int32_t row) {
 
-  std::vector<int> col_rel;
+  std::vector<int32_t> col_rel;
   int32_t row_rel = 0;
   row_rel = readbin(row_rel, sas, swapit);
   col_rel = ColRelShort(sas, swapit);
@@ -722,8 +732,8 @@ std::string LocRel(std::istream& sas, bool swapit, int col, int row) {
 
 std::string Area(std::istream& sas, bool swapit) {
 
-  std::vector<int> col0(3), col1(3);
-  uint32_t row0 = 0, row1 = 0;
+  std::vector<int32_t> col0(3), col1(3);
+  int32_t row0 = 0, row1 = 0;
   row0 = UncheckedRw(sas, swapit); // rowFirst
   row1 = UncheckedRw(sas, swapit); // rowLast
   col0 = ColRelShort(sas, swapit); // columnFirst
@@ -753,9 +763,9 @@ std::string Area(std::istream& sas, bool swapit) {
   return out;
 }
 
-std::string AreaRel(std::istream& sas, bool swapit, int col, int row) {
+std::string AreaRel(std::istream& sas, bool swapit, int32_t col, int32_t row) {
 
-  std::vector<int> col_rel0(3), col_rel1(3);
+  std::vector<int32_t> col_rel0(3), col_rel1(3);
   int32_t row_rel0 = 0, row_rel1 = 0;
   row_rel0 = UncheckedRw(sas, swapit); // rowFirst
   row_rel1 = UncheckedRw(sas, swapit); // rowLast
@@ -822,9 +832,9 @@ std::string AreaRel(std::istream& sas, bool swapit, int col, int row) {
   return out;
 }
 
-std::vector<int> Cell(std::istream& sas, bool swapit) {
+std::vector<int32_t> Cell(std::istream& sas, bool swapit) {
 
-  std::vector<int> out(3);
+  std::vector<int32_t> out(3);
 
   out[0] = UncheckedCol(sas, swapit);
 
@@ -838,9 +848,9 @@ std::vector<int> Cell(std::istream& sas, bool swapit) {
   return(out);
 }
 
-std::vector<std::string> dims_to_cells(int firstRow, int lastRow, int firstCol, int lastCol) {
+std::vector<std::string> dims_to_cells(int32_t firstRow, int32_t lastRow, int32_t firstCol, int32_t lastCol) {
 
-  std::vector<int> cols, rows;
+  std::vector<int32_t> cols, rows;
   for (int32_t i = firstCol; i <= lastCol; ++i) {
     cols.push_back(i);
   }
@@ -859,7 +869,7 @@ std::vector<std::string> dims_to_cells(int firstRow, int lastRow, int firstCol, 
   return cells;
 }
 
-std::vector<int> brtColor(std::istream& sas, bool swapit) {
+std::vector<int32_t> brtColor(std::istream& sas, bool swapit) {
 
   uint8_t AB = 0, xColorType = 0, index = 0,
     bRed = 0, bGreen = 0, bBlue = 0, bAlpha = 0;
@@ -903,7 +913,7 @@ std::vector<int> brtColor(std::istream& sas, bool swapit) {
   return out;
 }
 
-std::string as_border_style(int style) {
+std::string as_border_style(int32_t style) {
   if (style == 0) return "none";
   if (style == 1) return "thin";
   if (style == 2) return "medium";
@@ -921,7 +931,7 @@ std::string as_border_style(int style) {
   return "";
 }
 
-std::string to_argb(int a, int r, int g, int b) {
+std::string to_argb(int32_t a, int32_t r, int32_t g, int32_t b) {
   std::stringstream out;
   out << std::uppercase << std::hex <<
     std::setw(2) << std::setfill('0') << (int32_t)a <<
@@ -937,7 +947,7 @@ std::string brtBorder(std::string type, std::istream& sas, bool swapit) {
   dg = readbin(dg, sas, swapit);
   reserved = readbin(reserved, sas, swapit);
 
-  std::vector<int> color = brtColor(sas, swapit);
+  std::vector<int32_t> color = brtColor(sas, swapit);
 
   std::stringstream out;
 
@@ -977,10 +987,10 @@ static double RkNumber(int32_t val) {
 
   double out;
   if (val & 0x02) { // integer
-    int32_t tmp = (int32_t)val >> 2;
-    out = (double)tmp;
+    int32_t tmp = val >> 2;
+    out = static_cast<double>(tmp);;
   } else { // double
-    uint64_t tmp = val & 0xfffffffc;
+    uint64_t tmp = static_cast<uint32_t>(val) & 0xfffffffcU;
     tmp <<= 32;
     memcpy(&out, &tmp, sizeof(uint64_t));
   }
@@ -1035,9 +1045,9 @@ std::string typOperator(uint8_t oprtr) {
   return "unknown_operator";
 }
 
-std::vector<int> Xti(std::istream& sas, bool swapit) {
+std::vector<int32_t> Xti(std::istream& sas, bool swapit) {
   int32_t firstSheet = 0, lastSheet = 0;
-  uint32_t externalLink = 0;
+  int32_t externalLink = 0; // TODO actually uint32?
   externalLink = readbin(externalLink, sas, swapit);
   // scope
   // -2 workbook
@@ -1047,7 +1057,7 @@ std::vector<int> Xti(std::istream& sas, bool swapit) {
   lastSheet = readbin(lastSheet, sas, swapit);
 
   // Rprintf("Xti: %d %d %d\n", externalLink, firstSheet, lastSheet);
-  std::vector<int> out(3);
+  std::vector<int32_t> out(3);
   out[0] = externalLink;
   out[1] = firstSheet;
   out[2] = lastSheet;
@@ -1064,14 +1074,14 @@ std::vector<int> Xti(std::istream& sas, bool swapit) {
 // }
 
 
-std::string array_elements(const std::vector<std::string>& elements, int n, int k) {
+std::string array_elements(const std::vector<std::string>& elements, int32_t n, int32_t k) {
     std::stringstream ss;
     ss << "{";
-    for (int i = 0; i < n; ++i) {
+    for (int32_t i = 0; i < n; ++i) {
         if (i > 0) ss << ";";
-        for (int j = 0; j < k; ++j) {
+        for (int32_t j = 0; j < k; ++j) {
             if (j > 0) ss << ",";
-            size_t index = i * k + j;
+            size_t index = static_cast<size_t>(i * k + j);
             if (index < elements.size()) {
               // check if it needs escaping
                 ss << "\"";
@@ -1151,11 +1161,11 @@ std::string parseRPN(const std::string& expression) {
   return parsedFormula;
 }
 
-std::string rgce(std::string fml_out, std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml, bool has_revision_record, size_t pos, std::vector<int32_t> &ptgextra) {
+std::string rgce(std::string fml_out, std::istream& sas, bool swapit, bool debug, int32_t col, int32_t row, int32_t &sharedFml, bool has_revision_record, std::streampos pos, std::vector<int32_t> &ptgextra) {
 
   int8_t val1 = 0;
   // std::vector<int32_t> ptgextra;
-    while((size_t)sas.tellg() < pos) {
+    while(sas.tellg() < pos) {
 
     if (debug) Rcpp::Rcout << ".";
 
@@ -1189,7 +1199,7 @@ std::string rgce(std::string fml_out, std::istream& sas, bool swapit, bool debug
         if (debug) Rcpp::Rcout << "PtgList " << sas.tellg() << std::endl;
         uint16_t ixti = 0, flags = 0;
         uint32_t listIndex = 0;
-        int16_t colFirst = 0, colLast = 0;
+        uint16_t colFirst = 0, colLast = 0;
 
         // ixti = location of table
         ixti = readbin(ixti, sas, swapit);
@@ -1994,9 +2004,9 @@ std::string rgce(std::string fml_out, std::istream& sas, bool swapit, bool debug
       if (debug) Rcpp::Rcout << "PtgExp" <<std::endl;
 
       // this is a reference to the cell that contains the shared formula
-      uint32_t row = UncheckedRw(sas, swapit) + 1;
-      if (debug) Rcpp::Rcout << "PtgExp: " << row << std::endl;
-      sharedFml = row;
+      int32_t ptg_row = UncheckedRw(sas, swapit) + 1;
+      if (debug) Rcpp::Rcout << "PtgExp: " << ptg_row << std::endl;
+      sharedFml = ptg_row;
       break;
     }
 
@@ -2061,7 +2071,7 @@ std::string rgce(std::string fml_out, std::istream& sas, bool swapit, bool debug
 
   }
 
-  if ((size_t)sas.tellg() != pos) {
+  if (sas.tellg() != pos) {
     // somethings not correct
     Rcpp::Rcout << "[fml] unexpected position when parsing head" << std::endl;
     sas.seekg(pos, sas.beg);
@@ -2070,14 +2080,14 @@ std::string rgce(std::string fml_out, std::istream& sas, bool swapit, bool debug
   return fml_out;
 }
 
-std::string rgcb(std::string fml_out, std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml, bool has_revision_record, size_t pos, std::vector<int32_t> &ptgextra) {
+std::string rgcb(std::string fml_out, std::istream& sas, bool swapit, bool debug, int32_t col, int32_t row, int32_t &sharedFml, bool has_revision_record, std::streampos pos, std::vector<int32_t> &ptgextra) {
 
   int8_t val1 = 0;
   // std::vector<int32_t> ptgextra;
   // RgbExtra
   for (size_t cntr = 0; cntr < ptgextra.size(); ++cntr) {
 
-    val1 = ptgextra[cntr];
+    val1 = static_cast<int8_t>(ptgextra[cntr]);
 
 
     if (debug)
@@ -2090,10 +2100,10 @@ std::string rgcb(std::string fml_out, std::istream& sas, bool swapit, bool debug
 
       // need_ptg_extra_col = true;
       if (debug) Rcpp::Rcout << "PtgExtraCol" << std::endl;
-      int32_t col = UncheckedCol(sas, swapit);
-      if (debug) Rcpp::Rcout << "cb PtgExp: " << int_to_col(col+1) << std::endl;
+      int32_t ptg_col = UncheckedCol(sas, swapit);
+      if (debug) Rcpp::Rcout << "cb PtgExp: " << int_to_col(ptg_col+1) << std::endl;
 
-      fml_out += int_to_col(col + 1);
+      fml_out += int_to_col(ptg_col + 1);
       fml_out += std::to_string(row);
       fml_out += "\n";
       break;
@@ -2115,8 +2125,8 @@ std::string rgcb(std::string fml_out, std::istream& sas, bool swapit, bool debug
       if (debug) Rcpp::Rcout << rows << ": " << cols << std::endl;
 
       // number of elements in row order: must be equal to rows * cols
-      for (int32_t row = 0; row < rows; ++row) {
-        for (int32_t col = 0; col < cols; ++col) {
+      for (int32_t rr = 0; rr < rows; ++rr) {
+        for (int32_t cc = 0; cc < cols; ++cc) {
 
           // blob (it is actually called this way)
           uint8_t reserved = 0;
@@ -2201,7 +2211,7 @@ std::string rgcb(std::string fml_out, std::istream& sas, bool swapit, bool debug
       count = readbin(count, sas, swapit);
 
       for (int32_t cnt = 0; cnt < count; ++cnt) {
-        std::vector<int> ucrfx = UncheckedRfX(sas, swapit);
+        std::vector<int32_t> ucrfx = UncheckedRfX(sas, swapit);
       }
 
       break;
@@ -2266,7 +2276,7 @@ std::string rgcb(std::string fml_out, std::istream& sas, bool swapit, bool debug
     }
   }
 
-  if ((size_t)sas.tellg() != pos) {
+  if (sas.tellg() != pos) {
     // somethings not correct
     sas.seekg(pos, sas.beg);
   }
@@ -2275,7 +2285,7 @@ std::string rgcb(std::string fml_out, std::istream& sas, bool swapit, bool debug
 }
 
 
-std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml, bool has_revision_record) {
+std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int32_t col, int32_t row, int32_t &sharedFml, bool has_revision_record) {
   // bool ptg_extra_array = false;
   uint32_t  cce= 0, cb= 0;
   std::vector<int32_t> ptgextra;
@@ -2286,7 +2296,7 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
   if (cce >= 16385) Rcpp::stop("wrong cce size");
   if (debug) Rcpp::Rcout << "cce: " << cce << std::endl;
 
-  size_t pos = sas.tellg();
+  std::streampos pos = sas.tellg();
   // sas.seekg(cce, sas.cur);
   pos += cce;
 
@@ -2324,7 +2334,7 @@ std::string CellParsedFormula(std::istream& sas, bool swapit, bool debug, int co
   return inflix;
 }
 
-std::string FRTParsedFormula(std::istream& sas, bool swapit, bool debug, int col, int row, int &sharedFml, bool has_revision_record) {
+std::string FRTParsedFormula(std::istream& sas, bool swapit, bool debug, int32_t col, int32_t row, int32_t &sharedFml, bool has_revision_record) {
   // bool ptg_extra_array = false;
   uint32_t  cce= 0, cb= 0;
   std::vector<int32_t> ptgextra;
@@ -2337,7 +2347,7 @@ std::string FRTParsedFormula(std::istream& sas, bool swapit, bool debug, int col
 
   cb = readbin(cb, sas, swapit); // is there a control bit, even if CB is empty?
 
-  size_t pos = sas.tellg();
+  std::streampos pos = sas.tellg();
   pos += cce;
 
   std::string fml_out;

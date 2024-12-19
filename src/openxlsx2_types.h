@@ -25,19 +25,6 @@ typedef struct {
   std::string is;    // inlineStr
 } xml_col;
 
-
-typedef struct {
-  std::string v;
-  std::string c_cm;
-  std::string c_t;
-  std::string is;
-  std::string f;
-  std::string f_t;
-  std::string f_ref;
-  std::string typ;
-  std::string r;
-} celltyp;
-
 typedef std::vector<std::string> vec_string;
 
 // matches openxlsx2_celltype in openxlsx2.R
@@ -58,7 +45,8 @@ enum celltype {
   string_num     = 13,
   cm_formula     = 14,
   hms_time       = 15,
-  currency       = 16
+  currency       = 16,
+  list           = 17
 };
 
 // check for 1.0.8.0
@@ -75,7 +63,7 @@ namespace Rcpp {
 template <>
 inline SEXP wrap(const std::vector<xml_col> &x) {
 
-  size_t n = x.size();
+  R_xlen_t n = static_cast<R_xlen_t>(x.size());
 
   // Vector structure identical to xml_col from openxlsx2_types.h
   Rcpp::CharacterVector r(no_init(n));         // cell name: A1, A2 ...
@@ -97,22 +85,23 @@ inline SEXP wrap(const std::vector<xml_col> &x) {
   Rcpp::CharacterVector is(no_init(n));        // <is> tag
 
   // struct to vector
-  for (size_t i = 0; i < n; ++i) {
-    if (!x[i].r.empty())     r[i]     = Rcpp::String(x[i].r);
-    if (!x[i].row_r.empty()) row_r[i] = Rcpp::String(x[i].row_r);
-    if (!x[i].c_r.empty())   c_r[i]   = Rcpp::String(x[i].c_r);
-    if (!x[i].c_s.empty())   c_s[i]   = Rcpp::String(x[i].c_s);
-    if (!x[i].c_t.empty())   c_t[i]   = Rcpp::String(x[i].c_t);
-    if (!x[i].c_cm.empty())  c_cm[i]  = Rcpp::String(x[i].c_cm);
-    if (!x[i].c_ph.empty())  c_ph[i]  = Rcpp::String(x[i].c_ph);
-    if (!x[i].c_vm.empty())  c_vm[i]  = Rcpp::String(x[i].c_vm);
-    if (!x[i].v.empty())     v[i]     = Rcpp::String(x[i].v);
-    if (!x[i].f.empty())     f[i]     = Rcpp::String(x[i].f);
-    if (!x[i].f_t.empty())   f_t[i]   = Rcpp::String(x[i].f_t);
-    if (!x[i].f_ref.empty()) f_ref[i] = Rcpp::String(x[i].f_ref);
-    if (!x[i].f_ca.empty())  f_ca[i]  = Rcpp::String(x[i].f_ca);
-    if (!x[i].f_si.empty())  f_si[i]  = Rcpp::String(x[i].f_si);
-    if (!x[i].is.empty())    is[i]    = Rcpp::String(x[i].is);
+  for (R_xlen_t i = 0; i < n; ++i) {
+    size_t ii = static_cast<size_t>(i);
+    if (!x[ii].r.empty())     r[i]     = Rcpp::String(x[ii].r);
+    if (!x[ii].row_r.empty()) row_r[i] = Rcpp::String(x[ii].row_r);
+    if (!x[ii].c_r.empty())   c_r[i]   = Rcpp::String(x[ii].c_r);
+    if (!x[ii].c_s.empty())   c_s[i]   = Rcpp::String(x[ii].c_s);
+    if (!x[ii].c_t.empty())   c_t[i]   = Rcpp::String(x[ii].c_t);
+    if (!x[ii].c_cm.empty())  c_cm[i]  = Rcpp::String(x[ii].c_cm);
+    if (!x[ii].c_ph.empty())  c_ph[i]  = Rcpp::String(x[ii].c_ph);
+    if (!x[ii].c_vm.empty())  c_vm[i]  = Rcpp::String(x[ii].c_vm);
+    if (!x[ii].v.empty())     v[i]     = Rcpp::String(x[ii].v);
+    if (!x[ii].f.empty())     f[i]     = Rcpp::String(x[ii].f);
+    if (!x[ii].f_t.empty())   f_t[i]   = Rcpp::String(x[ii].f_t);
+    if (!x[ii].f_ref.empty()) f_ref[i] = Rcpp::String(x[ii].f_ref);
+    if (!x[ii].f_ca.empty())  f_ca[i]  = Rcpp::String(x[ii].f_ca);
+    if (!x[ii].f_si.empty())  f_si[i]  = Rcpp::String(x[ii].f_si);
+    if (!x[ii].is.empty())    is[i]    = Rcpp::String(x[ii].is);
   }
 
   // Assign and return a dataframe
@@ -141,12 +130,12 @@ inline SEXP wrap(const std::vector<xml_col> &x) {
 template <>
 inline SEXP wrap(const vec_string &x) {
 
-  size_t n = x.size();
+  R_xlen_t n = static_cast<R_xlen_t>(x.size());
 
   Rcpp::CharacterVector z(no_init(n));
 
-  for (size_t i = 0; i < n; ++i) {
-    z[i] = Rcpp::String(x[i]);
+  for (R_xlen_t i = 0; i < n; ++i) {
+    z[i] = Rcpp::String(x[static_cast<size_t>(i)]);
   }
 
   return Rcpp::wrap(z);

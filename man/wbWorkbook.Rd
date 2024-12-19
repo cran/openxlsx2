@@ -81,11 +81,15 @@ Note that the documentation is more complete in each of the wrapper functions.
 
 \item{\code{docMetadata}}{doc_meta_data}
 
+\item{\code{activeX}}{activeX}
+
 \item{\code{embeddings}}{embeddings}
 
 \item{\code{externalLinks}}{externalLinks}
 
 \item{\code{externalLinksRels}}{externalLinksRels}
+
+\item{\code{featurePropertyBag}}{featurePropertyBag}
 
 \item{\code{headFoot}}{The header and footer}
 
@@ -186,6 +190,8 @@ worksheet names.}
 \item \href{#method-wbWorkbook-get_base_colours}{\code{wbWorkbook$get_base_colours()}}
 \item \href{#method-wbWorkbook-set_base_colors}{\code{wbWorkbook$set_base_colors()}}
 \item \href{#method-wbWorkbook-set_base_colours}{\code{wbWorkbook$set_base_colours()}}
+\item \href{#method-wbWorkbook-get_bookview}{\code{wbWorkbook$get_bookview()}}
+\item \href{#method-wbWorkbook-remove_bookview}{\code{wbWorkbook$remove_bookview()}}
 \item \href{#method-wbWorkbook-set_bookview}{\code{wbWorkbook$set_bookview()}}
 \item \href{#method-wbWorkbook-get_sheet_names}{\code{wbWorkbook$get_sheet_names()}}
 \item \href{#method-wbWorkbook-set_sheet_names}{\code{wbWorkbook$set_sheet_names()}}
@@ -279,6 +285,7 @@ Creates a new \code{wbWorkbook} object
   subject = NULL,
   category = NULL,
   datetime_created = Sys.time(),
+  datetime_modified = NULL,
   theme = NULL,
   keywords = NULL,
   comments = NULL,
@@ -298,6 +305,9 @@ Creates a new \code{wbWorkbook} object
 \item{\code{datetime_created}}{The datetime (as \code{POSIXt}) the workbook is
 created.  Defaults to the current \code{Sys.time()} when the workbook object
 is created, not when the Excel files are saved.}
+
+\item{\code{datetime_modified}}{The datetime (as \code{POSIXt}) that should be recorded
+as last modification date. Defaults to the creation date.}
 
 \item{\code{theme}}{Optional theme identified by string or number}
 
@@ -1385,10 +1395,42 @@ The \code{wbWorkbook} object
 }
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-get_bookview"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-get_bookview}{}}}
+\subsection{Method \code{get_bookview()}}{
+Get the book views
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$get_bookview()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A dataframe with the bookview properties
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-wbWorkbook-remove_bookview"></a>}}
+\if{latex}{\out{\hypertarget{method-wbWorkbook-remove_bookview}{}}}
+\subsection{Method \code{remove_bookview()}}{
+Get the book views
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$remove_bookview(view = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{view}}{view}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+The \code{wbWorkbook} object
+}
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-wbWorkbook-set_bookview"></a>}}
 \if{latex}{\out{\hypertarget{method-wbWorkbook-set_bookview}{}}}
 \subsection{Method \code{set_bookview()}}{
-Set the book views
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{wbWorkbook$set_bookview(
   active_tab = NULL,
@@ -1404,6 +1446,7 @@ Set the book views
   window_width = NULL,
   x_window = NULL,
   y_window = NULL,
+  view = 1L,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -1436,6 +1479,8 @@ Set the book views
 \item{\code{x_window}}{xWindow}
 
 \item{\code{y_window}}{yWindow}
+
+\item{\code{view}}{view}
 
 \item{\code{...}}{additional arguments}
 }
@@ -1816,6 +1861,7 @@ Set cell merging for a sheet
   sheet = current_sheet(),
   dims = NULL,
   solve = FALSE,
+  direction = NULL,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -1828,6 +1874,8 @@ Set cell merging for a sheet
 \item{\code{dims}}{Cell range in a sheet}
 
 \item{\code{solve}}{logical if intersecting cells should be solved}
+
+\item{\code{direction}}{direction in which to split the cell merging. Allows "row" or "col".}
 
 \item{\code{...}}{additional arguments}
 }
@@ -2459,7 +2507,8 @@ Set a property of a workbook
   title = NULL,
   subject = NULL,
   category = NULL,
-  datetime_created = Sys.time(),
+  datetime_created = NULL,
+  datetime_modified = NULL,
   modifier = NULL,
   keywords = NULL,
   comments = NULL,
@@ -2474,7 +2523,7 @@ Set a property of a workbook
 \describe{
 \item{\code{creator}}{character vector of creators. Duplicated are ignored.}
 
-\item{\code{title, subject, category, datetime_created, modifier, keywords, comments, manager, company, custom}}{A workbook property to set}
+\item{\code{title, subject, category, datetime_created, datetime_modified, modifier, keywords, comments, manager, company, custom}}{A workbook property to set}
 }
 \if{html}{\out{</div>}}
 }

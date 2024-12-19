@@ -2,8 +2,14 @@
 % Please edit documentation in R/class-workbook-wrappers.R
 \name{wb_set_bookview}
 \alias{wb_set_bookview}
-\title{Set the workbook position, size and filter}
+\alias{wb_get_bookview}
+\alias{wb_remove_bookview}
+\title{Get and Set the workbook position, size and filter}
 \usage{
+wb_get_bookview(wb)
+
+wb_remove_bookview(wb, view = NULL)
+
 wb_set_bookview(
   wb,
   active_tab = NULL,
@@ -19,11 +25,14 @@ wb_set_bookview(
   window_width = NULL,
   x_window = NULL,
   y_window = NULL,
+  view = 1L,
   ...
 )
 }
 \arguments{
 \item{wb}{A \link{wbWorkbook} object}
+
+\item{view}{Which view to modify. Default is \code{1} (the first view).}
 
 \item{active_tab}{activeTab}
 
@@ -54,8 +63,33 @@ wb_set_bookview(
 \item{...}{additional arguments}
 }
 \value{
+A data frame with the bookview properties
+
+The Workbook object
+
 The Workbook object
 }
 \description{
-Set the workbook position, size and filter
+Get and Set the workbook position, size and filter
+}
+\examples{
+ wb <- wb_workbook() \%>\% wb_add_worksheet()
+
+ # set the first and second bookview (horizontal split)
+ wb <- wb \%>\%
+   wb_set_bookview(
+     window_height = 17600, window_width = 15120,
+     x_window = 15120, y_window = 760) \%>\%
+   wb_set_bookview(
+     window_height = 17600, window_width = 15040,
+     x_window = 0, y_window = 760, view = 2
+   )
+
+ wb \%>\% wb_get_bookview()
+
+ # remove the first view
+ wb \%>\% wb_remove_bookview(view = 1) \%>\% wb_get_bookview()
+
+ # keep only the first view
+ wb \%>\% wb_remove_bookview(view = -1) \%>\% wb_get_bookview()
 }

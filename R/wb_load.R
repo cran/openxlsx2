@@ -106,15 +106,21 @@ wb_load <- function(
   wb <- wb_workbook()
   wb$path <- file
 
-  grep_xml <- function(pattern, perl = TRUE, value = TRUE, ...) {
+  # There is one known file in #1194. this file has lower case folders, while
+  # the references in the file are the usual camel case.
+  needs_lower <- ifelse(any(grepl("\\[content_types\\].xml$", xmlFiles)), TRUE, FALSE)
+
+  grep_xml <- function(pattern, perl = TRUE, value = TRUE, to_lower = needs_lower, ...) {
     # targets xmlFiles; has presents
+    if (to_lower) pattern <- tolower(pattern)
     grep(pattern, xmlFiles, perl = perl, value = value, ...)
   }
 
-  ## Not used
+  ## We have found a zip file, but it must not necessarily be a spreadsheet
   ContentTypesXML   <- grep_xml("\\[Content_Types\\].xml$")
+  worksheetsXML     <- grep_xml("/worksheets/sheet[0-9]+")
 
-  if (length(ContentTypesXML) == 0 && !debug) {
+  if ((length(ContentTypesXML) == 0 || length(worksheetsXML) == 0) && !debug) {
     msg <- paste("File does not appear to be xlsx, xlsm or xlsb: ", file)
     stop(msg)
   }
@@ -134,7 +140,6 @@ wb_load <- function(
   workbookXMLRels   <- grep_xml("workbook.xml.rels")
 
   drawingsXML       <- grep_xml("drawings/drawing[0-9]+.xml$")
-  worksheetsXML     <- grep_xml("/worksheets/sheet[0-9]+")
 
   stylesBIN         <- grep_xml("styles.bin$")
   stylesXML         <- grep_xml("styles.xml$")
@@ -150,6 +155,7 @@ wb_load <- function(
   vmlDrawingRelsXML <- grep_xml("vmlDrawing[0-9]+.vml.rels$")
   calcChainXML      <- grep_xml("xl/calcChain.xml")
   embeddings        <- grep_xml("xl/embeddings")
+  activeX           <- grep_xml("xl/activeX")
 
   # comments
   commentsBIN       <- grep_xml("xl/comments[0-9]+\\.bin")
@@ -207,11 +213,14 @@ wb_load <- function(
   ## VBA Macro
   vbaProject        <- grep_xml("vbaProject\\.bin$")
 
+  ## feature property bag
+  featureProperty   <- grep_xml("featurePropertyBag.xml$")
+
   ## remove all EXCEPT media and charts
   on.exit(
     unlink(
       # TODO: this removes all files, the folders remain. grep instead grep_xml?
-      grep_xml("media|vmlDrawing|customXml|embeddings|vbaProject", ignore.case = TRUE, invert = TRUE),
+      grep_xml("media|vmlDrawing|customXml|embeddings|activeX|vbaProject", ignore.case = TRUE, invert = TRUE),
       recursive = TRUE, force = TRUE
     ),
     add = TRUE
@@ -219,12 +228,13 @@ wb_load <- function(
 
   file_folders <- unique(basename(dirname(xmlFiles)))
   known <- c(
-    basename(xmlDir), "_rels", "charts", "chartsheets", "ctrlProps",
-    "customXml", "docMetadata", "docProps", "drawings", "embeddings",
-    "externalLinks", "media", "persons", "pivotCache", "pivotTables",
-    "printerSettings", "queryTables", "richData", "slicerCaches",
-    "slicers", "tables", "theme", "threadedComments", "timelineCaches",
-    "timelines", "worksheets", "xl", "[trash]"
+    basename(xmlDir), "_rels", "activeX", "charts", "chartsheets",
+    "ctrlProps", "customXml", "docMetadata", "docProps", "drawings",
+    "embeddings", "externalLinks", "featurePropertyBag", "media",
+    "persons", "pivotCache", "pivotTables", "printerSettings",
+    "queryTables", "richData", "slicerCaches", "slicers", "tables",
+    "theme", "threadedComments", "timelineCaches", "timelines",
+    "worksheets", "xl", "[trash]"
   )
   unknown <- file_folders[!file_folders %in% known]
   # nocov start
@@ -422,11 +432,15 @@ wb_load <- function(
     sheets <- xml_attr(workbook_xml, "workbook", "sheets", "sheet")
     sheets <- rbindlist(sheets)
 
+    # Usually the id variable is called `r:id`, but there is one known sheet
+    # that has `d3p1:id`
+    r_id <- names(sheets)[grepl(":id", names(sheets))]
+
     ## Some veryHidden sheets do not have a sheet content and their rId is empty.
     ## Such sheets need to be filtered out because otherwise their sheet names
     ## occur in the list of all sheet names, leading to a wrong association
     ## of sheet names with sheet indeces.
-    sheets <- sheets[sheets$`r:id` != "", ]
+    sheets <- sheets[sheets[r_id] != "", ]
 
     # if wb_relsxml is not available, the workbook has no relationships, not
     # sure if this is possible
@@ -438,7 +452,7 @@ wb_load <- function(
 
     sheets <- merge(
       sheets, wb_rels_xml,
-      by.x = "r:id", by.y = "Id",
+      by.x = r_id, by.y = "Id",
       all.x = TRUE,
       all.y = FALSE,
       sort = FALSE
@@ -451,7 +465,7 @@ wb_load <- function(
     ## sheet rId links to the workbook.xml.resl which links worksheets/sheet(i).xml file
     ## order they appear here gives order of worksheets in xlsx file
     sheets$typ <- basename(sheets$Type)
-    sheets$target <- stri_join(xmlDir, xl_path, sheets$Target)
+    sheets$target <- stringi::stri_join(xmlDir, xl_path, sheets$Target)
     sheets$id <- as.numeric(sheets$sheetId)
 
     if (is.null(sheets$state)) sheets$state <- "visible"
@@ -614,7 +628,7 @@ wb_load <- function(
   }
 
 
-  ## xl\sharedStrings
+  ## xl\metadata
   if (!data_only && length(metadataXML)) {
     wb$append(
       "Content_Types",
@@ -735,7 +749,8 @@ wb_load <- function(
       colors  = empty_chr,
       style   = empty_chr,
       rels    = empty_chr,
-      relsEx  = empty_chr
+      relsEx  = empty_chr,
+      stringsAsFactors = FALSE
     )
 
     chartsXML_id        <- filename_id(chartsXML)
@@ -801,6 +816,15 @@ wb_load <- function(
   ## externalLinksRels
   if (!data_only && length(extLinksRelsXML)) {
     wb$externalLinksRels <- lapply(extLinksRelsXML, read_xml, pointer = FALSE)
+  }
+
+  ## featurePropertyBag
+  if (!data_only && length(featureProperty)) {
+    wb$append(
+      "Content_Types",
+      '<Override PartName="/xl/featurePropertyBag/featurePropertyBag.xml" ContentType="application/vnd.ms-excel.featurepropertybag+xml"/>'
+    )
+    wb$featurePropertyBag <- read_xml(featureProperty, pointer = FALSE)
   }
 
 
@@ -1383,7 +1407,7 @@ wb_load <- function(
     }
 
     ## Embedded docx
-    if (length(embeddings) > 0) {
+    if (length(embeddings)) {
 
       # get the embedded files extensions
       files <- unique(gsub(".+\\.(\\w+)$", "\\1", embeddings))
@@ -1399,6 +1423,17 @@ wb_load <- function(
       wb$append("Content_Types", default)
 
       wb$embeddings <- embeddings
+    }
+
+    ## xl\activeX
+    if (length(activeX)) {
+
+      wb$activeX <- activeX
+      ax_sel <- tools::file_ext(activeX) == "xml"
+      ax_fls <- basename2(activeX[ax_sel])
+
+      wb$append("Content_Types", '<Default Extension="bin" ContentType="application/vnd.ms-office.activeX"/>')
+      wb$append("Content_Types", sprintf('<Override PartName="/xl/activeX/%s" ContentType="application/vnd.ms-office.activeX+xml"/>', ax_fls))
     }
 
   } else {

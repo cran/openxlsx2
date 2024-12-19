@@ -14,6 +14,7 @@
 #' @param creator Creator of the workbook (your name). Defaults to login username or `options("openxlsx2.creator")` if set.
 #' @param title,subject,category,keywords,comments,manager,company Workbook property, a string.
 #' @param datetime_created The time of the workbook is created
+#' @param datetime_modified The time of the workbook was last modified
 #' @param theme Optional theme identified by string or number.
 #'   See **Details** for options.
 #' @param ... additional arguments
@@ -34,30 +35,32 @@
 #'   category = "sales"
 #' )
 wb_workbook <- function(
-  creator          = NULL,
-  title            = NULL,
-  subject          = NULL,
-  category         = NULL,
-  datetime_created = Sys.time(),
-  theme            = NULL,
-  keywords         = NULL,
-  comments         = NULL,
-  manager          = NULL,
-  company          = NULL,
+  creator           = NULL,
+  title             = NULL,
+  subject           = NULL,
+  category          = NULL,
+  datetime_created  = Sys.time(),
+  datetime_modified = NULL,
+  theme             = NULL,
+  keywords          = NULL,
+  comments          = NULL,
+  manager           = NULL,
+  company           = NULL,
   ...
 ) {
   wbWorkbook$new(
-    creator          = creator,
-    title            = title,
-    subject          = subject,
-    category         = category,
-    datetime_created = datetime_created,
-    theme            = theme,
-    keywords         = keywords,
-    comments         = comments,
-    manager          = manager,
-    company          = company,
-    ...              = ...
+    creator           = creator,
+    title             = title,
+    subject           = subject,
+    category          = category,
+    datetime_created  = datetime_created,
+    datetime_modified = datetime_modified,
+    theme             = theme,
+    keywords          = keywords,
+    comments          = comments,
+    manager           = manager,
+    company           = company,
+    ...               = ...
   )
 }
 
@@ -287,7 +290,8 @@ wb_add_data <- function(
 #'   add_data_table(
 #'     x = as.data.frame(USPersonalExpenditure),
 #'     row_names = TRUE,
-#'     total_row = c(text = "Total", "none", "sum", "sum", "sum", "SUM")
+#'     total_row = c(text = "Total", "none", "sum", "sum", "sum", "SUM"),
+#'     stringsAsFactors = FALSE
 #'   )
 #' @export
 wb_add_data_table <- function(
@@ -525,7 +529,8 @@ wb_add_pivot_table <- function(
 #' df <- data.frame(
 #'   AirPassengers = c(AirPassengers),
 #'   time = seq(from = as.Date("1949-01-01"), to = as.Date("1960-12-01"), by = "month"),
-#'   letters = letters[1:4]
+#'   letters = letters[1:4],
+#'   stringsAsFactors = FALSE
 #' )
 #'
 #' # create workbook
@@ -900,6 +905,7 @@ wb_copy_cells <- function(
 #' @param sheet A name or index of a worksheet
 #' @param dims worksheet cells
 #' @param solve logical if intersecting merges should be solved
+#' @param direction direction in which to split the cell merging. Allows "row" or "col"
 #' @param ... additional arguments
 #'
 #' @examples
@@ -931,9 +937,9 @@ wb_copy_cells <- function(
 #' @family workbook wrappers
 #' @family worksheet content functions
 #' @export
-wb_merge_cells <- function(wb, sheet = current_sheet(), dims = NULL, solve = FALSE, ...) {
+wb_merge_cells <- function(wb, sheet = current_sheet(), dims = NULL, solve = FALSE, direction = NULL, ...) {
   assert_workbook(wb)
-  wb$clone(deep = TRUE)$merge_cells(sheet = sheet, dims = dims, solve = solve, ... = ...)
+  wb$clone(deep = TRUE)$merge_cells(sheet = sheet, dims = dims, solve = solve, direction = direction, ... = ...)
 }
 
 #' @export
@@ -1663,8 +1669,25 @@ wb_set_base_colours <- wb_set_base_colors
 wb_get_base_colours <- wb_get_base_colors
 
 
-#' Set the workbook position, size and filter
-#'
+#' Get and Set the workbook position, size and filter
+#' @name wb_set_bookview
+#' @return A data frame with the bookview properties
+#' @export
+wb_get_bookview <- function(wb) {
+  assert_workbook(wb)
+  wb$get_bookview()
+}
+
+#' @name wb_set_bookview
+#' @param view You can remove views using index positions. This will only remove the view wont apply modifications.
+#' @return The Workbook object
+#' @export
+wb_remove_bookview <- function(wb, view = NULL) {
+  assert_workbook(wb)
+  wb$clone()$remove_bookview(view = view)
+}
+
+#' @rdname wb_set_bookview
 #' @param wb A [wbWorkbook] object
 #' @param active_tab activeTab
 #' @param auto_filter_date_grouping autoFilterDateGrouping
@@ -1679,8 +1702,29 @@ wb_get_base_colours <- wb_get_base_colors
 #' @param window_width windowWidth
 #' @param x_window xWindow
 #' @param y_window yWindow
+#' @param view Which view to modify. Default is `1` (the first view).
 #' @param ... additional arguments
 #' @return The Workbook object
+#' @examples
+#'  wb <- wb_workbook() %>% wb_add_worksheet()
+#'
+#'  # set the first and second bookview (horizontal split)
+#'  wb <- wb %>%
+#'    wb_set_bookview(
+#'      window_height = 17600, window_width = 15120,
+#'      x_window = 15120, y_window = 760) %>%
+#'    wb_set_bookview(
+#'      window_height = 17600, window_width = 15040,
+#'      x_window = 0, y_window = 760, view = 2
+#'    )
+#'
+#'  wb %>% wb_get_bookview()
+#'
+#'  # remove the first view
+#'  wb %>% wb_remove_bookview(view = 1) %>% wb_get_bookview()
+#'
+#'  # keep only the first view
+#'  wb %>% wb_remove_bookview(view = -1) %>% wb_get_bookview()
 #' @export
 wb_set_bookview <- function(
     wb,
@@ -1697,6 +1741,7 @@ wb_set_bookview <- function(
     window_width              = NULL,
     x_window                  = NULL,
     y_window                  = NULL,
+    view                      = 1L,
     ...
 ) {
   assert_workbook(wb)
@@ -1714,6 +1759,7 @@ wb_set_bookview <- function(
     window_width              = window_width,
     x_window                  = x_window,
     y_window                  = y_window,
+    view                      = view,
     ...                       = ...
   )
 }
@@ -1783,6 +1829,29 @@ wb_set_bookview <- function(
 #'   first_header = c("FIRST ONLY L", NA, "FIRST ONLY R"),
 #'   first_footer = c("FIRST ONLY L", NA, "FIRST ONLY R")
 #' )
+#'
+#' # ---- Updating the header ----
+#' ## Variant a
+#' ## this will keep the odd and even header / footer from the original header /
+#' ## footerkeep the first header / footer and will set the first page header /
+#' ## footer and will use the original header / footer for the missing element
+#' wb$set_header_footer(
+#'   header = NA,
+#'   footer = NA,
+#'   even_header = NA,
+#'   even_footer = NA,
+#'   first_header = c("FIRST ONLY L", NA, "FIRST ONLY R"),
+#'   first_footer = c("FIRST ONLY L", NA, "FIRST ONLY R")
+#' )
+#'
+#' ## Variant b
+#' ## this will keep the first header / footer only and will use the missing
+#' ## element from the original header / footer
+#' wb$set_header_footer(
+#'   first_header = c("FIRST ONLY L", NA, "FIRST ONLY R"),
+#'   first_footer = c("FIRST ONLY L", NA, "FIRST ONLY R")
+#' )
+#'
 wb_set_header_footer <- function(
     wb,
     sheet              = current_sheet(),
@@ -2629,11 +2698,15 @@ wb_remove_tables <- function(wb, sheet = current_sheet(), table, remove_data = T
 #'
 #' Group a selection of rows or cols
 #'
-#' @details If row was previously hidden, it will now be shown.
+#' @details If row was previously hidden, it will now be shown. Columns can be
+#' added using A1 notion, so `cols = 2:3` is similar to `cols = "B:C"`. It is
+#' possible to add nested groups, so `cols = list("3" = list(1:2, 3:4)` is also
+#' possible. Depending on the selected summary column either left or right will
+#' be selected for grouping, this can be changed in `wb_set_page_setup()`.
 #'
 #' @param wb A `wbWorkbook` object
 #' @param sheet A name or index of a worksheet
-#' @param rows,cols Indices of rows and columns to group
+#' @param rows,cols Indices or for columns also characters of rows and columns to group
 #' @param collapsed If `TRUE` the grouped columns are collapsed
 #' @param levels levels
 #' @family workbook wrappers
@@ -2767,7 +2840,7 @@ wb_get_properties <- function(wb) {
 
 #' @rdname properties-wb
 #' @export
-wb_set_properties <- function(wb, creator = NULL, title = NULL, subject = NULL, category = NULL, datetime_created = Sys.time(), modifier = NULL, keywords = NULL, comments = NULL, manager = NULL, company = NULL, custom = NULL) {
+wb_set_properties <- function(wb, creator = NULL, title = NULL, subject = NULL, category = NULL, datetime_created = NULL, datetime_modified = NULL, modifier = NULL, keywords = NULL, comments = NULL, manager = NULL, company = NULL, custom = NULL) {
   assert_workbook(wb)
   wb$clone()$set_properties(
     creator           = creator,
@@ -2775,6 +2848,7 @@ wb_set_properties <- function(wb, creator = NULL, title = NULL, subject = NULL, 
     subject           = subject,
     category          = category,
     datetime_created  = datetime_created,
+    datetime_modified = datetime_modified,
     modifier          = modifier,
     keywords          = keywords,
     comments          = comments,
@@ -3487,7 +3561,7 @@ wb_add_numfmt <- function(
 #' @param dims the cell range
 #' @param ext_lst extension list something like `<extLst>...</extLst>`
 #' @param hidden logical cell is hidden
-#' @param horizontal align content horizontal ('left', 'center', 'right')
+#' @param horizontal align content horizontal ('general', 'left', 'center', 'right', 'fill', 'justify', 'centerContinuous', 'distributed')
 #' @param indent logical indent content
 #' @param justify_last_line logical justify last line
 #' @param locked logical cell is locked
@@ -3497,7 +3571,7 @@ wb_add_numfmt <- function(
 #' @param relative_indent relative indentation
 #' @param shrink_to_fit logical shrink to fit
 #' @param text_rotation degrees of text rotation
-#' @param vertical vertical alignment of content ('top', 'center', 'bottom')
+#' @param vertical vertical alignment of content ('top', 'center', 'bottom', 'justify', 'distributed')
 #' @param wrap_text wrap text in cell
 ## alignments
 #' @param apply_alignment logical apply alignment

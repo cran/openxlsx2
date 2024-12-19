@@ -100,6 +100,28 @@ inner_update <- function(
                    "f", "f_t", "f_ref", "f_ca", "f_si", "is", "typ")
 
   sel <- match(x$r, cc$r)
+
+  # to avoid bricking the worksheet, we make sure that we do not overwrite the
+  # reference cell of a shared formula. To be on the save side, we replace all
+  # values with the formula. If the entire cc is replaced with x, we can skip.
+  if (length(sf <- cc$f_si[sel & cc$f_t[sel] == "shared" & cc$f_ref[sel] != ""]) && !all(cc$r %in% x$r)) {
+
+    # collect all the shared formulas that we have to convert
+    sel_fsi <- cc$f_si %in% unique(sf)
+
+    cc_shared <- cc[sel_fsi, , drop = FALSE]
+
+    cc <- shared_as_fml(cc, cc_shared)
+
+    msg <- paste0(
+      "A shared formula reference cell was overwritten. To protect the",
+      " spreadsheet formulas, the impacted cells were converted from shared",
+      " formulas to normal formulas."
+    )
+    warning(msg, call. = FALSE)
+
+  }
+
   cc[sel, replacement] <- x[replacement]
 
   # avoid missings in cc
@@ -187,6 +209,7 @@ update_cell <- function(x, wb, sheet, cell, colNames = FALSE,
 #' @param dims worksheet dimensions
 #' @param enforce enforce dims
 #' @param shared shared formula
+#' @param sep the separator string used in collapse
 #' @details
 #' The string `"_openxlsx_NA"` is reserved for `openxlsx2`. If the data frame
 #' contains this string, the output will be broken.
@@ -211,19 +234,20 @@ write_data2 <- function(
     wb,
     sheet,
     data,
-    name = NULL,
-    colNames = TRUE,
-    rowNames = FALSE,
-    startRow = 1,
-    startCol = 1,
-    applyCellStyle = TRUE,
+    name            = NULL,
+    colNames        = TRUE,
+    rowNames        = FALSE,
+    startRow        = 1,
+    startCol        = 1,
+    applyCellStyle  = TRUE,
     removeCellStyle = FALSE,
-    na.strings = na_strings(),
-    data_table = FALSE,
-    inline_strings = TRUE,
-    dims = NULL,
-    enforce = FALSE,
-    shared  = FALSE
+    na.strings      = na_strings(),
+    data_table      = FALSE,
+    inline_strings  = TRUE,
+    dims            = NULL,
+    enforce         = FALSE,
+    shared          = FALSE,
+    sep             = ", "
 ) {
 
   dim_sep <- ";"
@@ -242,6 +266,17 @@ write_data2 <- function(
   if (any(is_factor)) {
     fcts <- names(dc[is_factor])
     data[fcts] <- lapply(data[fcts], to_string)
+  }
+
+  # convert list to character
+  is_list <- dc == openxlsx2_celltype[["list"]]
+
+  if (any(is_list)) {
+    lsts <- names(dc[is_list])
+    data[lsts] <- lapply(data[lsts], function(col) {
+      vapply(col, FUN = stringi::stri_join, collapse = sep, FUN.VALUE = NA_character_)
+    })
+    dc[is_list] <- openxlsx2_celltype[["character"]]
   }
 
   # remove xml encoding and reapply it afterwards. until v0.3 encoding was not enforced.
@@ -264,7 +299,7 @@ write_data2 <- function(
   }
 
   hconvert_date1904 <- grepl('date1904="1"|date1904="true"',
-                             stri_join(unlist(wb$workbook), collapse = ""),
+                             stringi::stri_join(unlist(wb$workbook), collapse = ""),
                              ignore.case = TRUE)
 
   # TODO need to tell excel that we have a date, apply some kind of numFmt
@@ -272,21 +307,21 @@ write_data2 <- function(
 
   # backward compatible
   if (!inherits(data, "data.frame") || inherits(data, "matrix")) {
-    data <- as.data.frame(data)
+    data <- as.data.frame(data, stringsAsFactors = FALSE)
     colNames <- FALSE
   }
 
   if (inherits(data, "data.frame") || inherits(data, "matrix")) {
     is_data_frame <- TRUE
 
-    if (is.data.frame(data)) data <- as.data.frame(data)
+    if (is.data.frame(data)) data <- as.data.frame(data, stringsAsFactors = FALSE)
 
     sel <- !dc %in% c(4, 5, 10)
     data[sel] <- lapply(data[sel], as.character)
 
     # add rownames
     if (rowNames) {
-      data <- cbind("_rowNames_" = rownames(data), data)
+      data <- cbind("_rowNames_" = rownames(data), data, stringsAsFactors = FALSE)
       dc <- c(c("_rowNames_" = openxlsx2_celltype[["character"]]), dc)
     }
 
@@ -314,7 +349,7 @@ write_data2 <- function(
 
   # create a data frame
   if (!is_data_frame) {
-    data <- as.data.frame(t(data))
+    data <- as.data.frame(t(data), stringsAsFactors = FALSE)
   }
 
   # TODO fits_in_dims does not handle "A1,B2" and instead converts it to the
@@ -326,7 +361,7 @@ write_data2 <- function(
   if (!is.null(attr(data, "f_ref"))) {
     ref <- attr(data, "f_ref")
   } else {
-    ref <- rep("0", ncol(data))
+    ref <- NULL
   }
 
   if (!is.null(attr(data, "c_cm"))) {
@@ -444,7 +479,7 @@ write_data2 <- function(
     ColNames       = colNames,
     start_col      = startCol,
     start_row      = startRow,
-    ref            = ref,
+    refed          = ref,
     string_nums    = string_nums,
     na_null        = na_null,
     na_missing     = na_missing,
@@ -902,7 +937,7 @@ write_data_table <- function(
         class(x[is_hyperlink]) <- c("character", "hyperlink")
       } else {
         # workaround for tibbles that break with the class assignment below
-        if (inherits(x, "tbl_df")) x <- as.data.frame(x)
+        if (inherits(x, "tbl_df")) x <- as.data.frame(x, stringsAsFactors = FALSE)
         # check should be in create_hyperlink and that apply should not be required either
         if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
           x[is_hyperlink] <- apply(
@@ -958,13 +993,13 @@ write_data_table <- function(
 
     ## write autoFilter, can only have a single filter per worksheet
     if (withFilter) { # TODO: replace ref calculation with wb_dims()
-      coords <- data.frame("x" = c(startRow, startRow + nRow + colNames - 1L), "y" = c(startCol, startCol + nCol - 1L))
-      ref <- stri_join(get_cell_refs(coords), collapse = ":")
+      coords <- data.frame("x" = c(startRow, startRow + nRow + colNames - 1L), "y" = c(startCol, startCol + nCol - 1L), stringsAsFactors = FALSE)
+      ref <- stringi::stri_join(get_cell_refs(coords), collapse = ":")
 
       wb$worksheets[[sheet]]$autoFilter <- sprintf('<autoFilter ref="%s"/>', ref)
 
       l   <- int2col(unlist(coords[, 2]))
-      dfn <- sprintf("'%s'!%s", wb$get_sheet_names(escape = TRUE)[sheet], stri_join("$", l, "$", coords[, 1], collapse = ":"))
+      dfn <- sprintf("'%s'!%s", wb$get_sheet_names(escape = TRUE)[sheet], stringi::stri_join("$", l, "$", coords[, 1], collapse = ":"))
 
       dn  <- sprintf('<definedName name="_xlnm._FilterDatabase" localSheetId="%s" hidden="1">%s</definedName>', sheet - 1L, dfn)
 
@@ -1023,7 +1058,8 @@ write_data_table <- function(
     inline_strings  = inline_strings,
     dims            = if (enforce) odims else dims,
     enforce         = enforce,
-    shared          = shared
+    shared          = shared,
+    sep             = sep
   )
 
   ### Beg: Only in datatable ---------------------------------------------------
@@ -1074,7 +1110,8 @@ write_data_table <- function(
         data_table      = data_table,
         inline_strings  = inline_strings,
         dims            = NULL,
-        enforce         = FALSE
+        enforce         = FALSE,
+        sep             = sep
       )
     }
 
@@ -1094,7 +1131,7 @@ write_data_table <- function(
 
     ## If zero rows, append an empty row (prevent XML from corrupting)
     if (nrow(x) == 0) {
-      x <- rbind(as.data.frame(x), matrix("", nrow = 1, ncol = nCol, dimnames = list(character(), colnames(x))))
+      x <- rbind(as.data.frame(x, stringsAsFactors = FALSE), matrix("", nrow = 1, ncol = nCol, dimnames = list(character(), colnames(x))))
       names(x) <- colNames
     }
 
@@ -1203,6 +1240,8 @@ do_write_formula <- function(
     x <- unlist(x)
 
   assert_class(x, "character")
+
+  x <- replace_waiver(x, wb = wb)
 
   # detect array formulas
   if (any(substr(x, 1, 1) == "{")) {

@@ -79,6 +79,21 @@ test_that("set_col_widths informs when inconsistent lengths are supplied", {
   expect_warning(wb$set_col_widths(cols = c("X", "Y", "Z"), hidden = c(1, 0)), "compatible length")
 })
 
+test_that("merged cells are excluded from col width `auto` calculation", {
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = "the `cars` dataset", dims = "A1")$
+    merge_cells(dims = "A1:B1")$
+    add_data(x = head(cars), dims = "A2")$
+    set_col_widths(cols = "A:B", width = "auto")
+
+  exp <- c(
+    "<col min=\"1\" max=\"1\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"5.711\"/>",
+    "<col min=\"2\" max=\"2\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"4.711\"/>"
+  )
+  got <- wb$worksheets[[1]]$cols_attr
+  expect_equal(exp, got)
+})
+
 test_that("option maxWidth works", {
 
   op <- options("openxlsx2.maxWidth" = 6)
@@ -1214,8 +1229,8 @@ test_that("adding mips section works", {
   expect_equal(fmips, wb$get_mips())
 
 
-  wb <- wb_workbook() |>
-    wb_add_worksheet() |>
+  wb <- wb_workbook() %>%
+    wb_add_worksheet() %>%
     wb_set_properties(
       custom = list(
         Software    = "openxlsx2",
@@ -1248,4 +1263,47 @@ test_that("handling mips in docMetadata works", {
 
   wb <- wb_load(tmp)
   expect_equal(xml, wb$docMetadata)
+})
+
+test_that("using and removing secondary bookviews works", {
+  wb <- wb_workbook() %>% wb_add_worksheet()
+
+  # set the first and second bookview (horizontal split)
+  wb <- wb %>%
+    wb_set_bookview(window_height = 17600, window_width = 15120, x_window = 15120, y_window = 760) %>%
+    wb_set_bookview(window_height = 17600, window_width = 15040, x_window = 0, y_window = 760, view = 2)
+
+  exp <- structure(
+    list(windowHeight = c("17600", "17600"), windowWidth = c("15120", "15040"),
+         xWindow = c("15120", "0"), yWindow = c("760", "760")),
+    row.names = c(NA, 2L), class = "data.frame")
+  got <- wb %>% wb_get_bookview()
+  expect_equal(exp, got)
+
+  # remove the first view
+  exp <- structure(
+    list(windowHeight = c("17600"), windowWidth = c("15040"),
+         xWindow = c("0"), yWindow = c("760")),
+    row.names = c(NA, 1L), class = "data.frame")
+  got <- wb %>% wb_remove_bookview(view = 1) %>% wb_get_bookview()
+  expect_equal(exp, got)
+
+  # keep only the first view
+  exp <- structure(
+    list(windowHeight = c("17600"), windowWidth = c("15120"),
+         xWindow = c("15120"), yWindow = c("760")),
+    row.names = c(NA, 1L), class = "data.frame")
+  got <- wb %>% wb_remove_bookview(view = -1) %>% wb_get_bookview()
+  expect_equal(exp, got)
+
+  wb <- wb_workbook() %>% wb_add_worksheet()
+  exp <- structure(list(), row.names = c(NA, 1L), names = character(0), class = "data.frame")
+  got <- wb %>% wb_remove_bookview(view = 1) %>% wb_get_bookview()
+  expect_equal(exp, got)
+
+  expect_error(
+    wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_set_bookview(view = 3),
+    "There is more than one workbook view missing. Available: 1. Requested: 3"
+  )
+
 })

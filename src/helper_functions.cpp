@@ -23,12 +23,12 @@ bool to_long(std::string path) {
 SEXP openxlsx2_type(SEXP x) {
 
   const SEXP names = Rf_getAttrib(x, R_NamesSymbol);
-  auto ncol = Rf_length(x);
+  R_xlen_t ncol = Rf_length(x);
 
   Rcpp::IntegerVector type(ncol);
   if (!Rf_isNull(names)) type.attr("names") = names;
 
-  for (auto i = 0; i < ncol; ++i) {
+  for (R_xlen_t i = 0; i < ncol; ++i) {
 
     // check if dim != NULL
     SEXP z;
@@ -73,33 +73,37 @@ SEXP openxlsx2_type(SEXP x) {
     case INTSXP:
     case REALSXP: {
       if (Rf_inherits(z, "Date")) {
-      type[i] = short_date;
-    } else if (Rf_inherits(z, "POSIXct")) {
-      type[i] = long_date;
-    } else if (Rf_inherits(z, "accounting")) {
-      type[i] = accounting;
-    } else if (Rf_inherits(z, "percentage")) {
-      type[i] = percentage;
-    } else if (Rf_inherits(z, "scientific")) {
-      type[i] = scientific;
-    } else if (Rf_inherits(z, "comma")) {
-      type[i] = comma;
-    } else if (Rf_inherits(z, "factor") || !Rf_isNull(Rf_getAttrib(z, Rf_install("labels")))) {
-      type[i] = factor;
-    } else if (Rf_inherits(z, "hms")) {
-      type[i] = hms_time;
-    } else if (Rf_inherits(z, "currency")) {
-      type[i] = currency;
-    } else {
-      if (Rf_isNull(Rclass)) {
-        type[i] = numeric; // numeric and integer
+        type[i] = short_date;
+      } else if (Rf_inherits(z, "POSIXct")) {
+        type[i] = long_date;
+      } else if (Rf_inherits(z, "accounting")) {
+        type[i] = accounting;
+      } else if (Rf_inherits(z, "percentage")) {
+        type[i] = percentage;
+      } else if (Rf_inherits(z, "scientific")) {
+        type[i] = scientific;
+      } else if (Rf_inherits(z, "comma")) {
+        type[i] = comma;
+      } else if (Rf_inherits(z, "factor") || !Rf_isNull(Rf_getAttrib(z, Rf_install("labels")))) {
+        type[i] = factor;
+      } else if (Rf_inherits(z, "hms")) {
+        type[i] = hms_time;
+      } else if (Rf_inherits(z, "currency")) {
+        type[i] = currency;
       } else {
-        type[i] = factor; // probably some custom class
+        if (Rf_isNull(Rclass)) {
+          type[i] = numeric; // numeric and integer
+        } else {
+          type[i] = factor; // probably some custom class
+        }
       }
+      break;
     }
-    break;
 
-    }
+    case VECSXP:
+      type[i] = list;
+      break;
+
 
     // whatever is not covered from above
     default: {
@@ -119,15 +123,13 @@ SEXP openxlsx2_type(SEXP x) {
 Rcpp::IntegerVector col_to_int(Rcpp::CharacterVector x) {
 
   // This function converts the Excel column letter to an integer
-
-  std::vector<std::string> r = Rcpp::as<std::vector<std::string> >(x);
-  size_t n = r.size();
+  R_xlen_t n = static_cast<R_xlen_t>(x.size());
 
   std::string a;
   Rcpp::IntegerVector colNums(n);
 
-  for (size_t i = 0; i < n; i++) {
-    a = r[i];
+  for (R_xlen_t i = 0; i < n; i++) {
+    a = x[i];
 
     // check if the value is digit only, if yes, add it and continue the loop
     // at the top. This avoids slow:
@@ -156,11 +158,11 @@ std::string ox_int_to_col(int32_t cell) {
 // [[Rcpp::export]]
 SEXP rbindlist(Rcpp::List x) {
 
-  size_t nn = x.size();
+  R_xlen_t nn = static_cast<R_xlen_t>(x.size());
   std::vector<std::string> all_names;
 
   // get unique names and create set
-  for (size_t i = 0; i < nn; ++i) {
+  for (R_xlen_t i = 0; i < nn; ++i) {
     if (Rf_isNull(x[i])) continue;
     std::vector<std::string> name_i = Rcpp::as<Rcpp::CharacterVector>(x[i]).attr("names");
     std::unique_copy(name_i.begin(), name_i.end(), std::back_inserter(all_names));
@@ -170,16 +172,16 @@ SEXP rbindlist(Rcpp::List x) {
   std::set<std::string> unique_names(std::make_move_iterator(all_names.begin()),
                                      std::make_move_iterator(all_names.end()));
 
-  auto kk = unique_names.size();
+  R_xlen_t kk = static_cast<R_xlen_t>(unique_names.size());
 
   // 1. create the list
   Rcpp::List df(kk);
-  for (size_t i = 0; i < kk; ++i)
+  for (R_xlen_t i = 0; i < kk; ++i)
   {
     SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(Rcpp::no_init(nn)));
   }
 
-  for (size_t i = 0; i < nn; ++i) {
+  for (R_xlen_t i = 0; i < nn; ++i) {
     if (Rf_isNull(x[i])) continue;
 
     std::vector<std::string> values = Rcpp::as<std::vector<std::string>>(x[i]);
@@ -228,7 +230,7 @@ Rcpp::CharacterVector needed_cells(const std::string& range) {
 
   // Extract column and row numbers from start and end cells
   uint32_t startRow, endRow;
-  uint32_t startCol = 0, endCol = 0;
+  int32_t startCol = 0, endCol = 0;
 
   startCol = cell_to_colint(startCell);
   endCol   = cell_to_colint(endCell);
@@ -237,7 +239,7 @@ Rcpp::CharacterVector needed_cells(const std::string& range) {
   endRow   = cell_to_rowint(endCell);
 
   // Generate spreadsheet cell references
-  for (uint32_t col = startCol; col <= endCol; ++col) {
+  for (int32_t col = startCol; col <= endCol; ++col) {
     for (uint32_t row = startRow; row <= endRow; ++row) {
       std::string cell = int_to_col(col);
       cell += std::to_string(row);
@@ -253,15 +255,15 @@ Rcpp::CharacterVector needed_cells(const std::string& range) {
 SEXP dims_to_df(Rcpp::IntegerVector rows, Rcpp::CharacterVector cols, Rcpp::Nullable<Rcpp::CharacterVector> filled, bool fill,
                 Rcpp::Nullable<Rcpp::IntegerVector> fcols) {
 
-  size_t kk = cols.size();
-  size_t nn = rows.size();
+  R_xlen_t kk = static_cast<R_xlen_t>(cols.size());
+  R_xlen_t nn = static_cast<R_xlen_t>(rows.size());
 
   bool has_fcols  = fcols.isNotNull();
   bool has_filled = filled.isNotNull();
 
   // 1. create the list
   Rcpp::List df(kk);
-  for (size_t i = 0; i < kk; ++i)
+  for (R_xlen_t i = 0; i < kk; ++i)
   {
     if (fill)
       SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(Rcpp::no_init(nn)));
@@ -276,10 +278,10 @@ SEXP dims_to_df(Rcpp::IntegerVector rows, Rcpp::CharacterVector cols, Rcpp::Null
       std::unordered_set<std::string> flls(flld.begin(), flld.end());
 
       // with has_filled we always have to run this loop
-      for (size_t i = 0; i < kk; ++i) {
+      for (R_xlen_t i = 0; i < kk; ++i) {
         Rcpp::CharacterVector cvec = Rcpp::as<Rcpp::CharacterVector>(df[i]);
         std::string coli = Rcpp::as<std::string>(cols[i]);
-        for (size_t j = 0; j < nn; ++j) {
+        for (R_xlen_t j = 0; j < nn; ++j) {
           std::string cell = coli + std::to_string(rows[j]);
           if (has_cell(cell, flls))
             cvec[j] = cell;
@@ -293,12 +295,12 @@ SEXP dims_to_df(Rcpp::IntegerVector rows, Rcpp::CharacterVector cols, Rcpp::Null
         fcls = Rcpp::as<std::vector<size_t>>(fcols.get());
       }
 
-      for (size_t i = 0; i < kk; ++i) {
+      for (R_xlen_t i = 0; i < kk; ++i) {
         if (has_fcols && std::find(fcls.begin(), fcls.end(), i) == fcls.end())
           continue;
         Rcpp::CharacterVector cvec = Rcpp::as<Rcpp::CharacterVector>(df[i]);
         std::string coli = Rcpp::as<std::string>(cols[i]);
-        for (size_t j = 0; j < nn; ++j) {
+        for (R_xlen_t j = 0; j < nn; ++j) {
           cvec[j] = coli + std::to_string(rows[j]);
         }
       }
@@ -318,23 +320,22 @@ SEXP dims_to_df(Rcpp::IntegerVector rows, Rcpp::CharacterVector cols, Rcpp::Null
 // [[Rcpp::export]]
 void long_to_wide(Rcpp::DataFrame z, Rcpp::DataFrame tt, Rcpp::DataFrame zz) {
 
-  size_t n = zz.nrow();
-  size_t z_cols = z.cols(), z_rows = z.rows();
-  size_t col = 0, row = 0;
+  R_xlen_t n = static_cast<R_xlen_t>(zz.nrow());
+  R_xlen_t col = 0, row = 0;
 
   Rcpp::IntegerVector rows = zz["rows"];
   Rcpp::IntegerVector cols = zz["cols"];
   Rcpp::CharacterVector vals = zz["val"];
   Rcpp::CharacterVector typs = zz["typ"];
 
-  for (size_t i = 0; i < n; ++i) {
+  for (R_xlen_t i = 0; i < n; ++i) {
     col = cols[i];
     row = rows[i];
 
     // need to check for missing values
-    if ((col <= z_cols) && (row <= z_rows)) {
-      Rcpp::as<Rcpp::CharacterVector>(z[col])[row] = vals[i];
-      Rcpp::as<Rcpp::CharacterVector>(tt[col])[row] = typs[i];
+    if (row != NA_INTEGER && col != NA_INTEGER) {
+      SET_STRING_ELT(Rcpp::as<Rcpp::CharacterVector>(z[col]), row, STRING_ELT(vals, i));
+      SET_STRING_ELT(Rcpp::as<Rcpp::CharacterVector>(tt[col]), row, STRING_ELT(typs, i));
     }
   }
 }
@@ -359,7 +360,7 @@ void wide_to_long(
     bool ColNames,
     int32_t start_col,
     int32_t start_row,
-    std::vector<std::string> ref,
+    Rcpp::Nullable<Rcpp::CharacterVector> refed,
     int32_t string_nums,
     bool na_null,
     bool na_missing,
@@ -369,14 +370,24 @@ void wide_to_long(
     std::vector<std::string> dims
 ) {
 
-  int64_t n = z.nrow();
-  int32_t m = z.ncol();
-  bool has_dims = dims.size() == static_cast<size_t>(n * m);
+  R_xlen_t n = static_cast<R_xlen_t>(z.nrow());
+  R_xlen_t m = static_cast<R_xlen_t>(z.ncol());
+  bool has_dims = static_cast<R_xlen_t>(dims.size()) == (n * m);
 
-  std::vector<std::string> srows(n);
-  for (int64_t j = 0; j < n; ++j) {
-    srows[j] = std::to_string((int64_t)start_row + j);
+  std::vector<std::string> srows(static_cast<size_t>(n));
+  for (size_t j = 0; j < static_cast<size_t>(n); ++j) {
+    srows[j] = std::to_string(static_cast<size_t>(start_row) + j);
   }
+
+  std::vector<std::string> scols(static_cast<size_t>(m));
+  for (size_t i = 0; i < static_cast<size_t>(m); ++i) {
+    scols[i] = int_to_col(static_cast<size_t>(start_col) + i);
+  }
+
+  bool has_refs  = refed.isNotNull();
+
+  std::vector<std::string> ref;
+  if (has_refs) ref = Rcpp::as<std::vector<std::string>>(refed.get());
 
   int32_t in_string_nums = string_nums;
 
@@ -399,30 +410,43 @@ void wide_to_long(
 
   R_xlen_t idx = 0;
 
-  for (int32_t i = 0; i < m; ++i) {
+  SEXP blank_sexp      = Rf_mkChar("");
+  SEXP array_sexp      = Rf_mkChar("array");
+  SEXP inlineStr_sexp  = Rf_mkChar("inlineStr");
+  SEXP bool_sexp       = Rf_mkChar("b");
+  SEXP expr_sexp       = Rf_mkChar("e");
+  SEXP sharedStr_sexp  = Rf_mkChar("s");
+  SEXP string_sexp     = Rf_mkChar("str");
+
+  SEXP na_sexp         = Rf_mkChar("#N/A");
+  SEXP num_sexp        = Rf_mkChar("#NUM!");
+  SEXP value_sexp      = Rf_mkChar("#VALUE!");
+  SEXP na_strings_sexp = Rf_mkChar(na_strings.c_str());
+
+
+  for (R_xlen_t i = 0; i < m; ++i) {
 
     Rcpp::CharacterVector cvec = Rcpp::as<Rcpp::CharacterVector>(z[i]);
-    std::string col = int_to_col(start_col + i);
-    int8_t vtyp_i = static_cast<int8_t>(vtyps[i]);
+    const std::string& col = scols[static_cast<size_t>(i)];
+    int8_t vtyp_i = static_cast<int8_t>(vtyps[static_cast<size_t>(i)]);
 
-    for (int64_t j = 0; j < n; ++j, ++idx) {
+    for (R_xlen_t j = 0; j < n; ++j, ++idx) {
 
       checkInterrupt(idx);
 
       // if colname is provided, the first row is always a character
       int8_t vtyp = (ColNames && j == 0) ? character : vtyp_i;
-      const std::string& vals = Rcpp::as<std::string>(cvec[j]);
-      std::string row = srows[j];
+      SEXP vals_sexp = STRING_ELT(cvec, j);
+      const char* vals = CHAR(vals_sexp);
+
+      const std::string& row = srows[static_cast<size_t>(j)];
 
       R_xlen_t pos = (j * m) + i;
 
       // there should be no unicode character in ref_str
       std::string ref_str = "";
       if (vtyp == array_formula || vtyp == cm_formula) {
-        ref_str = ref[i];
-        if (ref_str == "0") {
-          ref_str = col + row;
-        }
+        ref_str = has_refs ? ref[static_cast<size_t>(i)] : col + row;
       }
 
       // factors can be numeric or string or both. tables require the
@@ -433,8 +457,6 @@ void wide_to_long(
       else
         string_nums = in_string_nums;
 
-      // create struct
-      celltyp cell;
       switch(vtyp)
       {
 
@@ -447,106 +469,108 @@ void wide_to_long(
       case comma:
       case hms_time:
       case numeric:
-        cell.v   = vals;
+        // v
+        SET_STRING_ELT(zz_v, pos, vals_sexp);
         break;
       case logical:
-        cell.v   = vals;
-        cell.c_t = "b";
+        // v and c_t = "b"
+        SET_STRING_ELT(zz_v,   pos, vals_sexp);
+        SET_STRING_ELT(zz_c_t, pos, bool_sexp);
         break;
       case factor:
       case character:
 
         // test if string can be written as number
         if (string_nums && is_double(vals)) {
-          cell.v   = vals;
+          // v
+          SET_STRING_ELT(zz_v, pos, vals_sexp);
           vtyp     = (string_nums == 1) ? string_num : numeric;
         } else {
           // check if we write sst or inlineStr
           if (inline_strings) {
-              cell.c_t = "inlineStr";
-              cell.is  = txt_to_is(vals, 0, 1, 1);
+              // is and c_t = "inlineStr"
+              SET_STRING_ELT(zz_c_t, pos, inlineStr_sexp);
+              SET_STRING_ELT(zz_is,  pos, Rf_mkChar(txt_to_is(vals, 0, 1, 1).c_str()));
             } else {
-              cell.c_t = "s";
-              cell.v   = txt_to_si(vals, 0, 1, 1);
+              // v and c_t = "s"
+              SET_STRING_ELT(zz_c_t, pos, sharedStr_sexp);
+              SET_STRING_ELT(zz_v,   pos, Rf_mkChar(txt_to_si(vals, 0, 1, 1).c_str()));
           }
         }
         break;
       case hyperlink:
       case formula:
-        cell.c_t = "str";
-        cell.f   = vals;
+        // f and c_t = "str";
+        SET_STRING_ELT(zz_c_t, pos, string_sexp);
+        SET_STRING_ELT(zz_f,   pos, vals_sexp);
         break;
       case array_formula:
-        cell.f     = vals;
-        cell.f_t   = "array";
-        cell.f_ref = ref_str;
+        // f, f_t = "array", and f_ref
+        SET_STRING_ELT(zz_f,     pos, vals_sexp);
+        SET_STRING_ELT(zz_f_t,   pos, array_sexp);
+        SET_STRING_ELT(zz_f_ref, pos, Rf_mkChar(ref_str.c_str()));
         break;
       case cm_formula:
-        cell.c_cm  = c_cm;
-        cell.f     = vals;
-        cell.f_t   = "array";
-        cell.f_ref = ref_str;
+        // c_cm, f, f_t = "array", and f_ref
+        SET_STRING_ELT(zz_c_cm,  pos, Rf_mkChar(c_cm.c_str()));
+        SET_STRING_ELT(zz_f,     pos, vals_sexp);
+        SET_STRING_ELT(zz_f_t,   pos, array_sexp);
+        SET_STRING_ELT(zz_f_ref, pos, Rf_mkChar(ref_str.c_str()));
         break;
       }
 
-
-      if (
-          cell.is == "<is><t>_openxlsx_NA</t></is>" ||
-            cell.v == "<si><t>_openxlsx_NA</t></si>" ||
-            cell.v == "NA"
-      ) {
+      if (vals_sexp == NA_STRING || strcmp(vals, "_openxlsx_NA") == 0) {
 
         if (na_missing) {
-          cell.v   = "#N/A";
-          cell.c_t = "e";
-          cell.is.clear();
+          // v = "#N/A"
+          SET_STRING_ELT(zz_v,   pos, na_sexp);
+          SET_STRING_ELT(zz_c_t, pos, expr_sexp);
+          // is = "" - required only if inline_strings
+          // and vtyp = character || vtyp = factor
+          SET_STRING_ELT(zz_is,  pos, blank_sexp);
         } else  {
-          cell.v.clear();
           if (na_null) {
-            cell.c_t.clear();
-            cell.is.clear();
+            // all three v, c_t, and is = "" - there should be nothing in this row
+            SET_STRING_ELT(zz_v,   pos, blank_sexp);
+            SET_STRING_ELT(zz_c_t, pos, blank_sexp);
+            SET_STRING_ELT(zz_is,  pos, blank_sexp);
           } else {
-            cell.c_t = inline_strings  ? "inlineStr" : "s";
-            cell.is  = inline_strings  ? na_strings  : "";
-            cell.v   = !inline_strings ? na_strings  : "";
+            // c_t = "inlineStr" or "s"
+            SET_STRING_ELT(zz_c_t, pos, inline_strings  ? inlineStr_sexp  : sharedStr_sexp);
+            // for inlineStr is = na_strings else ""
+            SET_STRING_ELT(zz_is,  pos, inline_strings  ? na_strings_sexp : blank_sexp);
+            // otherwise v = na_strings else ""
+            SET_STRING_ELT(zz_v,   pos, !inline_strings ? na_strings_sexp : blank_sexp);
           }
         }
 
+      } else if (strcmp(vals, "NaN") == 0) {
+        // v = "#VALUE!"
+        SET_STRING_ELT(zz_v,   pos, value_sexp);
+        SET_STRING_ELT(zz_c_t, pos, expr_sexp);
+      } else if (strcmp(vals, "-Inf") == 0 || strcmp(vals, "Inf") == 0) {
+        // v = "#NUM!"
+        SET_STRING_ELT(zz_v,   pos, num_sexp);
+        SET_STRING_ELT(zz_c_t, pos, expr_sexp);
       }
 
-      if (cell.v == "NaN") {
-        cell.v   = "#VALUE!";
-        cell.c_t = "e";
-      }
+      // typ = std::to_string(vtyp)
+      SET_STRING_ELT(zz_typ, pos, Rf_mkChar(std::to_string(vtyp).c_str()));
 
-      if (cell.v == "-Inf" || cell.v == "Inf") {
-        cell.v   = "#NUM!";
-        cell.c_t = "e";
-      }
-
-      cell.typ = std::to_string(vtyp);
-      cell.r   = has_dims ? dims[idx] : col + row;
+      std::string cell_r = has_dims ? dims[static_cast<size_t>(idx)] : col + row;
+      SET_STRING_ELT(zz_r, pos, Rf_mkChar(cell_r.c_str()));
 
       if (has_dims) {
-        zz_row_r[pos] = rm_colnum(cell.r);
-        zz_c_r[pos]   = rm_rownum(cell.r);
+        // row_r = rm_colnum(r) and c_r = rm_rownum(r)
+        SET_STRING_ELT(zz_row_r, pos, Rf_mkChar(rm_colnum(cell_r).c_str()));
+        SET_STRING_ELT(zz_c_r, pos, Rf_mkChar(rm_rownum(cell_r).c_str()));
       } else {
-        zz_row_r[pos] = row;
-        zz_c_r[pos]   = col;
+        // row_r = row and c_r = col
+        SET_STRING_ELT(zz_row_r, pos, Rf_mkChar(row.c_str()));
+        SET_STRING_ELT(zz_c_r, pos, Rf_mkChar(col.c_str()));
       }
-
-      if (!cell.v.empty())     zz_v[pos]     = cell.v;
-      if (!cell.c_cm.empty())  zz_c_cm[pos]  = cell.c_cm;
-      if (!cell.c_t.empty())   zz_c_t[pos]   = cell.c_t;
-      if (!cell.is.empty())    zz_is[pos]    = cell.is;
-      if (!cell.f.empty())     zz_f[pos]     = cell.f;
-      if (!cell.f_t.empty())   zz_f_t[pos]   = cell.f_t;
-      if (!cell.f_ref.empty()) zz_f_ref[pos] = cell.f_ref;
-      if (!cell.typ.empty())   zz_typ[pos]   = cell.typ;
-      if (!cell.r.empty())     zz_r[pos]     = cell.r;
-
-    }
-  }
+    } // n
+  } // m
 }
 
 // simple helper function to create a data frame of type character
@@ -556,19 +580,15 @@ void wide_to_long(
 // [[Rcpp::export]]
 Rcpp::DataFrame create_char_dataframe(Rcpp::CharacterVector colnames, R_xlen_t n) {
 
-  size_t kk = colnames.size();
+  R_xlen_t kk = static_cast<R_xlen_t>(colnames.size());
 
   // 1. create the list
   Rcpp::List df(kk);
-  for (size_t i = 0; i < kk; ++i)
-  {
+  for (R_xlen_t i = 0; i < kk; ++i) {
     SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(Rcpp::no_init(n)));
   }
 
-  Rcpp::IntegerVector rvec(n);
-  for (int32_t i = 0; i < n; ++i) {
-    rvec[i] = i + 1L;
-  }
+  Rcpp::IntegerVector rvec = Rcpp::IntegerVector::create(NA_INTEGER, n);
 
   // 3. Create a data.frame
   df.attr("row.names") = rvec;
@@ -590,21 +610,21 @@ Rcpp::DataFrame read_xml2df(XPtrXML xml, std::string vec_name, std::vector<std::
   std::vector<std::string> all_names(total_length);
 
   std::copy(nam_attrs.begin(), nam_attrs.end(), all_names.begin());
-  std::copy(nam_chlds.begin(), nam_chlds.end(), all_names.begin() + nam_attrs.size());
+  std::copy(nam_chlds.begin(), nam_chlds.end(), all_names.begin() + static_cast<int32_t>(nam_attrs.size()));
 
   std::set<std::string> nams(std::make_move_iterator(all_names.begin()),
                              std::make_move_iterator(all_names.end()));
 
 
-  size_t nn = std::distance(xml->begin(), xml->end());
-  size_t kk = nams.size();
-  unsigned int pugi_format_flags = pugi::format_raw | pugi::format_no_escapes;
+  R_xlen_t nn = std::distance(xml->begin(), xml->end());
+  R_xlen_t kk = static_cast<R_xlen_t>(nams.size());
+  uint32_t pugi_format_flags = pugi::format_raw | pugi::format_no_escapes;
 
   Rcpp::CharacterVector rvec(nn);
 
   // 1. create the list
   Rcpp::List df(kk);
-  for (size_t i = 0; i < kk; ++i)
+  for (R_xlen_t i = 0; i < kk; ++i)
   {
     SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(Rcpp::no_init(nn)));
   }
@@ -663,37 +683,35 @@ Rcpp::DataFrame read_xml2df(XPtrXML xml, std::string vec_name, std::vector<std::
 // [[Rcpp::export]]
 Rcpp::CharacterVector write_df2xml(Rcpp::DataFrame df, std::string vec_name, std::vector<std::string> vec_attrs, std::vector<std::string> vec_chlds) {
 
-  auto n = df.nrow();
+  int64_t n = df.nrow();
   Rcpp::CharacterVector z(n);
-  unsigned int pugi_parse_flags = pugi::parse_cdata | pugi::parse_wconv_attribute | pugi::parse_ws_pcdata | pugi::parse_eol;
-  unsigned int pugi_format_flags = pugi::format_raw | pugi::format_no_escapes;
+  uint32_t pugi_parse_flags = pugi::parse_cdata | pugi::parse_wconv_attribute | pugi::parse_ws_pcdata | pugi::parse_eol;
+  uint32_t pugi_format_flags = pugi::format_raw | pugi::format_no_escapes;
 
   // openxml 2.8.1
   std::vector<std::string>  attrnams = df.names();
   std::set<std::string> nam_attrs(vec_attrs.begin(), vec_attrs.end());
   std::set<std::string> nam_chlds(vec_chlds.begin(), vec_chlds.end());
 
-  Rcpp::IntegerVector mtc1, mtc2, idx1, idx2;
-
-  for (auto i = 0; i < n; ++i) {
+  for (int64_t i = 0; i < n; ++i) {
     pugi::xml_document doc;
     pugi::xml_node xml_node = doc.append_child(vec_name.c_str());
 
     for (auto j = 0; j < df.ncol(); ++j) {
 
-      std::string attr_j = attrnams[j];
+      std::string attr_j = attrnams[static_cast<size_t>(j)];
 
       // mimic which
       auto res1 = nam_attrs.find(attr_j);
       auto mtc1 = std::distance(nam_attrs.begin(), res1);
 
-      std::vector<int> idx1(mtc1 + 1);
+      std::vector<int32_t> idx1(static_cast<size_t>(mtc1) + 1);
       std::iota(idx1.begin(), idx1.end(), 0);
 
       auto res2 = nam_chlds.find(attr_j);
       auto mtc2 = std::distance(nam_chlds.begin(), res2);
 
-      std::vector<int> idx2(mtc2 + 1);
+      std::vector<int32_t> idx2(static_cast<size_t>(mtc2) + 1);
       std::iota(idx2.begin(), idx2.end(), 0);
 
       // check if name is already known
@@ -705,7 +723,7 @@ Rcpp::CharacterVector write_df2xml(Rcpp::DataFrame df, std::string vec_name, std
         if (cv_s[0] != "") {
           // Rf_PrintValue(cv_s);
           const std::string val_strl = Rcpp::as<std::string>(cv_s);
-          xml_node.append_attribute(attrnams[j].c_str()) = val_strl.c_str();
+          xml_node.append_attribute(attr_j.c_str()) = val_strl.c_str();
         }
       }
 
