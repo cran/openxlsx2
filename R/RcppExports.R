@@ -16,8 +16,8 @@ col_to_int <- function(x) {
     .Call(`_openxlsx2_col_to_int`, x)
 }
 
-ox_int_to_col <- function(cell) {
-    .Call(`_openxlsx2_ox_int_to_col`, cell)
+ox_int_to_col <- function(x) {
+    .Call(`_openxlsx2_ox_int_to_col`, x)
 }
 
 rbindlist <- function(x) {
@@ -75,12 +75,8 @@ loadvals <- function(sheet_data, doc) {
     invisible(.Call(`_openxlsx2_loadvals`, sheet_data, doc))
 }
 
-readXMLPtr <- function(path, isfile, escapes, declaration, whitespace, empty_tags, skip_control) {
-    .Call(`_openxlsx2_readXMLPtr`, path, isfile, escapes, declaration, whitespace, empty_tags, skip_control)
-}
-
-readXML <- function(path, isfile, escapes, declaration, whitespace, empty_tags, skip_control) {
-    .Call(`_openxlsx2_readXML`, path, isfile, escapes, declaration, whitespace, empty_tags, skip_control)
+readXML <- function(path, isfile, escapes, declaration, whitespace, empty_tags, skip_control, pointer) {
+    .Call(`_openxlsx2_readXML`, path, isfile, escapes, declaration, whitespace, empty_tags, skip_control, pointer)
 }
 
 is_xml <- function(str) {

@@ -186,7 +186,7 @@ test_that("dims_to_dataframe", {
   got <- dims_to_dataframe("A1;A2,C1;C2", fill = TRUE, empty_rm = TRUE)
   expect_equal(exp, got)
 
-  exp <- list(c("A", "B"), "1")
+  exp <- list(col = c("A", "B"), row = "1")
   got <- dims_to_rowcol("A1;B1")
   expect_equal(exp, got)
 
@@ -543,7 +543,7 @@ test_that("creating a formula matrix works", {
     shared = TRUE
   )
 
-  exp <- c(210, 16)
+  exp <- c(210, 9)
   got <- dim(wb$worksheets[[1]]$sheet_data$cc)
   expect_equal(exp, got)
 
@@ -564,7 +564,7 @@ test_that("writing formula dataframes works", {
     dims   = wb_dims(x = df, from_row = 13, col_names = FALSE)
   )
 
-  exp <- c(210, 16)
+  exp <- c(210, 9)
   got <- dim(wb$worksheets[[1]]$sheet_data$cc)
   expect_equal(exp, got)
 

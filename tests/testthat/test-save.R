@@ -263,17 +263,10 @@ test_that("write cells without data", {
       c_r = c("B", "C", "B", "C"),
       c_s = c("", "", "", ""),
       c_t = c("", "", "", ""),
-      c_cm = c("", "", "", ""),
-      c_ph = c("", "", "", ""),
-      c_vm = c("", "", "", ""),
       v = c("", "", "", ""),
       f = c("", "", "", ""),
-      f_t = c("", "", "", ""),
-      f_ref = c("", "", "", ""),
-      f_ca = c("", "", "", ""),
-      f_si = c("", "", "", ""),
-      is = c("", "", "", ""),
-      typ = c("3", "3", "3", "3")
+      f_attr = c("", "", "", ""),
+      is = c("", "", "", "")
     ),
     row.names = c(NA, 4L),
     class = "data.frame")
@@ -413,4 +406,46 @@ test_that("write_xlsx works with colour", {
   got <- wb$worksheets[[1]]$sheetPr
   expect_equal(exp, got)
 
+})
+
+test_that("write_xlsx with base font settings", {
+  tmp <- temp_xlsx()
+  df <- data.frame(a = 1:5, b = letters[1:5])
+
+  # Test with font size
+  expect_silent(write_xlsx(df, tmp, font_size = 14))
+
+  # Test with font color
+  expect_silent(write_xlsx(df, tmp, font_color = wb_color(theme = "2")))
+
+  # Test with font name
+  expect_silent(write_xlsx(df, tmp, font_name = "Arial"))
+
+  # Test with all font parameters
+  expect_silent(write_xlsx(df, tmp,
+    font_size = 12,
+    font_color = wb_color(theme = "1"),
+    font_name = "Calibri"
+  ))
+
+  # Load and verify font settings
+  wb <- write_xlsx(df, tmp,
+    font_size = 16,
+    font_color = wb_color(auto = TRUE),
+    font_name = "Times New Roman"
+  )
+  font <- wb_get_base_font(wb)
+  expect_equal(font$size$val, "16")
+  expect_equal(font$name$val, "Times New Roman")
+  expect_equal(font$color$auto, "1")
+})
+
+test_that("glue is supported", {
+  x <- structure("foo", class = c("glue", "character"))
+
+  wb <- wb_workbook() %>%
+    wb_add_worksheet() %>%
+    wb_add_data(x = x)
+
+  expect_equal("foo", wb_to_df(wb, col_names = FALSE)$A)
 })

@@ -26,7 +26,8 @@ incl_graph_in_pkgdown("img/worksheet_styling.jpg")
 ## -----------------------------------------------------------------------------
 # add some dummy data
 set.seed(123)
-mat <- matrix(rnorm(28 * 28, mean = 44444, sd = 555), ncol = 28)
+random_numbers <- 44444 + seq(-555, 555, length.out = 28 * 28)
+mat <- matrix(random_numbers, ncol = 28)
 colnames(mat) <- make.names(seq_len(ncol(mat)))
 border_col <- wb_color(theme = 1)
 border_sty <- "thin"
@@ -69,7 +70,8 @@ wb <- wb_workbook() %>% wb_add_worksheet("test")
 
 # add some dummy data to the worksheet
 set.seed(123)
-mat <- matrix(rnorm(28 * 28, mean = 44444, sd = 555), ncol = 28)
+random_numbers <- 44444 + seq(-555, 555, length.out = 28 * 28)
+mat <- matrix(random_numbers, ncol = 28)
 colnames(mat) <- make.names(seq_len(ncol(mat)))
 wb$add_data(x = mat, col_names = TRUE)
 
@@ -248,7 +250,7 @@ wb$add_worksheet("S4", grid_lines = FALSE)$add_data(x = mtcars)
 wb$add_border("S4", dims = "A2:K33")
 # wb_open(wb)
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Tiny table with minimal styling"-----
 knitr::include_graphics("img/styled_table.jpg")
 
 ## -----------------------------------------------------------------------------

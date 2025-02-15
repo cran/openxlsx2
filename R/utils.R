@@ -111,11 +111,11 @@ as_xml_attr <- function(x) {
   }
 
   if (inherits(x, "character")) {
-    return(x)
+    x
   } else {
     op <- options(OutDec = ".")
     on.exit(options(op), add = TRUE)
-    return(as.character(x))
+    as.character(x)
   }
 }
 
@@ -167,7 +167,7 @@ random_string <- function(n = 1, length = 16, pattern = "[A-Za-z0-9]", keep_seed
 #' @param single argument indicating if [rowcol_to_dims()] returns a single cell dimension
 #' @returns
 #'   * A `dims` string for `_to_dim` i.e  "A1:A1"
-#'   * A list of rows and columns for `to_rowcol`
+#'   * A named list of rows and columns for `to_rowcol`
 #' @examples
 #' dims_to_rowcol("A1:J10")
 #' wb_dims(1:10, 1:10)
@@ -223,7 +223,7 @@ dims_to_rowcol <- function(x, as_integer = FALSE) {
     rows_out <- unique(c(rows_out, rows))
   }
 
-  list(cols_out, rows_out)
+  list(col = cols_out, row = rows_out)
 }
 
 #' @rdname dims_helper
@@ -505,7 +505,7 @@ determine_select_valid <- function(args, select = NULL) {
 #'
 #' 1. provide the full grid with `wb_dims(x = mtcars)`
 #' 2. provide the data grid `wb_dims(x = mtcars, select = "data")`
-#' 3. provide the `dims` of column names `wb_dims(x = mtcars, select = "col_names)`
+#' 3. provide the `dims` of column names `wb_dims(x = mtcars, select = "col_names")`
 #' 4. provide the `dims` of row names  `wb_dims(x = mtcars, row_names = TRUE, select = "row_names")`
 #' 5. provide the `dims` of a row span `wb_dims(x = mtcars, rows = 1:10)` selects
 #'    the first 10 data rows of `mtcars` (ignoring column names)
@@ -754,8 +754,8 @@ wb_dims <- function(..., select = NULL) {
     }
     # transform to
     from_row_and_col <- dims_to_rowcol(args$from_dims, as_integer = TRUE)
-    fcol <- from_row_and_col[[1]]
-    frow <- from_row_and_col[[2]]
+    fcol <- from_row_and_col[["col"]]
+    frow <- from_row_and_col[["row"]]
   } else {
     fcol <- args$from_col %||% 1L
     frow <- args$from_row %||% 1L
@@ -1080,6 +1080,7 @@ un_list <- function(x) {
 #' @param charset integer value from the table below
 #' @param outline TRUE or FALSE
 #' @param vert_align baseline, superscript, or subscript
+#' @param ... additional arguments
 #' @examples
 #' fmt_txt("bar", underline = TRUE)
 #' @export
@@ -1094,8 +1095,11 @@ fmt_txt <- function(
     font      = NULL,
     charset   = NULL,
     outline   = NULL,
-    vert_align = NULL
+    vert_align = NULL,
+    ...
 ) {
+
+  standardize(...)
 
   xml_b     <- NULL
   xml_i     <- NULL
@@ -1193,7 +1197,6 @@ fmt_txt <- function(
 #' @method as.character fmt_txt
 # FIXME review the `fmt_txt.Rd`
 # #' @param x an openxlsx2 fmt_txt string
-#' @param ... unused
 #' @examples
 #' as.character(fmt_txt(2))
 #' @export
@@ -1205,7 +1208,6 @@ as.character.fmt_txt <- function(x, ...) {
 #' @method print fmt_txt
 # FIXME review the `fmt_txt.Rd`
 # #' @param x an openxlsx2 fmt_txt string
-#' @param ... additional arguments for default print
 #' @export
 print.fmt_txt <- function(x, ...) {
   message("fmt_txt string: ")
@@ -1362,6 +1364,12 @@ ave2 <- function(x, y, FUN) {
   g <- as.factor(y)
   split(x, g) <- lapply(split(x, g), FUN)
   x
+}
+
+# file_ext function to avoid a depencency on tools. if we ever rely on tools,
+# this can be replaced by tools::file_ext
+file_ext2 <- function(filepath) {
+  sub(".*\\.", "", basename2(filepath))
 }
 
 if (getRversion() < "4.0.0") {

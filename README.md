@@ -1,11 +1,11 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# openxlsx2
+# openxlsx2 <img src="man/figures/logo.png" align="right" height="139" />
 
 <!-- badges: start -->
 
-[![R-CMD-check](https://github.com/JanMarvin/openxlsx2/workflows/R-CMD-check/badge.svg)](https://github.com/JanMarvin/openxlsx2/actions)
+[![R-CMD-check](https://github.com/JanMarvin/openxlsx2/actions/workflows/check-standard.yaml/badge.svg)](https://github.com/JanMarvin/openxlsx2/actions/workflows/check-standard.yaml)
 [![codecov](https://codecov.io/gh/JanMarvin/openxlsx2/branch/main/graph/badge.svg?token=HEZ7rXcZNq)](https://app.codecov.io/gh/JanMarvin/openxlsx2)
 [![r-universe](https://janmarvin.r-universe.dev/badges/openxlsx2)](https://janmarvin.r-universe.dev/openxlsx2)
 [![CRAN
@@ -166,4 +166,4 @@ This package is licensed under the MIT license and is based on
 [`openxlsx`](https://github.com/ycphs/openxlsx) (by Alexander Walker and
 Philipp Schauberger; COPYRIGHT 2014-2022) and
 [`pugixml`](https://github.com/zeux/pugixml) (by Arseny Kapoulkine;
-COPYRIGHT 2006-2023). Both released under the MIT license.
+COPYRIGHT 2006-2025). Both released under the MIT license.

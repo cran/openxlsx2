@@ -52,7 +52,7 @@ wb <- wb_workbook()$add_worksheet()$
 
 ## -----------------------------------------------------------------------------
 # we expect to find this in D1:E1
-coef(lm(head(cars)))
+# coef(lm(head(cars)))
 wb <- wb_workbook()$add_worksheet()$
   add_data(x = head(cars))$
   add_formula(x = "LINEST(A2:A7, B2:B7, TRUE)", dims = "D2:E2", array = TRUE)

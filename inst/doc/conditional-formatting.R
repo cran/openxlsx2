@@ -13,7 +13,7 @@ wb <- wb_workbook()
 wb$add_dxfs_style(name = "negStyle", font_color = wb_color(hex = "FF9C0006"), bg_fill = wb_color(hex = "FFFFC7CE"))
 wb$add_dxfs_style(name = "posStyle", font_color = wb_color(hex = "FF006100"), bg_fill = wb_color(hex = "FFC6EFCE"))
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Basic conditional formatting"--------
 knitr::include_graphics("img/cf_cells.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -33,7 +33,7 @@ wb$add_conditional_formatting(
   style = "posStyle"
 )
 
-## ----echo = FALSE, warning = FALSE--------------------------------------------
+## ----echo = FALSE, warning = FALSE, fig.cap="Moving row conditional formatting"----
 knitr::include_graphics("img/cf_moving_row.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -53,7 +53,7 @@ wb$add_conditional_formatting(
   style = "posStyle"
 )
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Moving column conditional formatting"----
 knitr::include_graphics("img/cf_moving_col.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -73,7 +73,7 @@ wb$add_conditional_formatting(
   style = "posStyle"
 )
 
-## ----echo = FALSE, warning = FALSE--------------------------------------------
+## ----echo = FALSE, warning = FALSE, fig.cap="Dependent conditional formatting"----
 knitr::include_graphics("img/cf_dependent_on.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -108,7 +108,7 @@ wb$add_conditional_formatting(
   style = "posStyle"
 )
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Duplicated conditional formatting"----
 knitr::include_graphics("img/cf_duplicates.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -120,7 +120,7 @@ wb$add_conditional_formatting(
   type = "duplicatedValues"
 )
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Contains text conditional formatting"----
 knitr::include_graphics("img/cf_contains_text.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -134,7 +134,7 @@ wb$add_conditional_formatting(
   rule = "A"
 )
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Not contains text conditional formatting"----
 knitr::include_graphics("img/cf_contains_no_text.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -150,7 +150,7 @@ wb$add_conditional_formatting(
   rule = "A"
 )
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Begins with conditional formatting"----
 knitr::include_graphics("img/cf_begins_with.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -164,7 +164,7 @@ wb$add_conditional_formatting(
   rule = "A"
 )
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Ends with conditional formatting"----
 knitr::include_graphics("img/cf_ends_with.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -178,7 +178,7 @@ wb$add_conditional_formatting(
   rule = "A"
 )
 
-## ----echo=FALSE, warning=FALSE, out.width="100%", fig.cap="Yep, that is a color scale image."----
+## ----echo=FALSE, warning=FALSE, out.width="100%", fig.cap="Colorscale conditional formatting (_Yep, that is a color scale image_)"----
 knitr::include_graphics("img/cf_color_scale.jpg")
 
 ## ----eval=FALSE---------------------------------------------------------------
@@ -201,7 +201,7 @@ knitr::include_graphics("img/cf_color_scale.jpg")
 # wb$set_col_widths("colorScale", cols = seq_along(df), widths = 1.07)
 # wb$set_row_heights("colorScale", rows = seq_len(nrow(df)), heights = 7.5)
 
-## ----echo=FALSE, warning=FALSE, out.width="100%"------------------------------
+## ----echo=FALSE, warning=FALSE, out.width="100%", fig.cap="Databar conditional formatting"----
 knitr::include_graphics("img/cf_databar.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -273,7 +273,7 @@ wb <- wb_add_conditional_formatting(
   params = list(showValue = TRUE, gradient = FALSE)
 )
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Between conditional formatting"------
 knitr::include_graphics("img/cf_between.jpg")
 
 ## -----------------------------------------------------------------------------
@@ -287,11 +287,11 @@ wb$add_conditional_formatting(
 )
 wb$add_worksheet("topN")
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Top n conditional formatting"--------
 knitr::include_graphics("img/cf_top_n.jpg")
 
 ## -----------------------------------------------------------------------------
-wb$add_data("topN", data.frame(x = 1:10, y = rnorm(10)))
+wb$add_data("topN", data.frame(x = 1:10, y = sample(1:100, 10)))
 
 ## -----------------------------------------------------------------------------
 wb$add_conditional_formatting(
@@ -312,11 +312,11 @@ wb$add_conditional_formatting(
 )
 wb$add_worksheet("bottomN")
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Bottom n conditional formatting"-----
 knitr::include_graphics("img/cf_bottom_n.jpg")
 
 ## -----------------------------------------------------------------------------
-wb$add_data("bottomN", data.frame(x = 1:10, y = rnorm(10)))
+wb$add_data("bottomN", data.frame(x = 1:10, y = sample(1:100, 10)))
 
 ## -----------------------------------------------------------------------------
 wb$add_conditional_formatting(
@@ -338,7 +338,7 @@ wb$add_conditional_formatting(
 )
 wb$add_worksheet("logical operators")
 
-## ----echo=FALSE, warning=FALSE------------------------------------------------
+## ----echo=FALSE, warning=FALSE, fig.cap="Logical operators conditional formatting"----
 knitr::include_graphics("img/cf_logical_operators.jpg")
 
 ## -----------------------------------------------------------------------------

@@ -216,11 +216,15 @@ wb_load <- function(
   ## feature property bag
   featureProperty   <- grep_xml("featurePropertyBag.xml$")
 
+  cleanup_dir <- function(data_only) {
+    grep_xml("media|vmlDrawing|customXml|embeddings|activeX|vbaProject", ignore.case = TRUE, invert = TRUE)
+  }
+
   ## remove all EXCEPT media and charts
-  on.exit(
+  if (!data_only) on.exit(
     unlink(
-      # TODO: this removes all files, the folders remain. grep instead grep_xml?
-      grep_xml("media|vmlDrawing|customXml|embeddings|activeX|vbaProject", ignore.case = TRUE, invert = TRUE),
+      # TODO: this removes all files, the folders remain
+      cleanup_dir(data_only),
       recursive = TRUE, force = TRUE
     ),
     add = TRUE
@@ -1072,7 +1076,7 @@ wb_load <- function(
       } else {
         xml <- character()
       }
-      return(xml)
+      xml
     })
 
     wb$worksheets_rels <- xml
@@ -1429,7 +1433,7 @@ wb_load <- function(
     if (length(activeX)) {
 
       wb$activeX <- activeX
-      ax_sel <- tools::file_ext(activeX) == "xml"
+      ax_sel <- file_ext2(activeX) == "xml"
       ax_fls <- basename2(activeX[ax_sel])
 
       wb$append("Content_Types", '<Default Extension="bin" ContentType="application/vnd.ms-office.activeX"/>')
@@ -1533,6 +1537,36 @@ wb_load <- function(
   # references as custom xml node in the workbook. Now we have to create the
   # correct sheet references and replace our replacement with it.
   if (!data_only && length(workbookBIN)) {
+
+    # we need to update the order of customSheetView children. Incorrect orders
+    # causes spreadsheet software to be unable to load and recover the file.
+    for (sheet in seq_along(wb$worksheets)) {
+      if (length(wb$worksheets[[sheet]]$customSheetViews) == 0) next
+
+      cvs <- xml_node(wb$worksheets[[sheet]]$customSheetViews, "customSheetViews", "customSheetView")
+
+       # chart sheets have a reduced custom view
+      exp_attr <- c(
+        "guid", "scale", "colorId", "showPageBreaks", "showFormulas",
+        "showGridLines", "showRowCol", "outlineSymbols", "zeroValues",
+        "fitToPage", "printArea", "filter", "showAutoFilter", "hiddenRows",
+        "hiddenColumns", "state", "filterUnique", "view", "showRuler",
+        "topLeftCell", "zoomToFit"
+      )
+      exp_nams <- c(
+        "pane", "selection", "rowBreaks", "colBreaks", "pageMargins",
+        "printOptions", "pageSetup", "headerFooter", "autoFilter", "extLst"
+      )
+      cv <- read_xml2df(read_xml(cvs), "customSheetView", vec_attrs = exp_attr, vec_chlds = exp_nams)
+
+      # headerFooter cause issues. they are (a) not added to the correct node
+      # and (b) brick the entire XML structure
+      cv$headerFooter <- ""
+
+      cvs <- write_df2xml(cv[c(exp_attr, exp_nams)], "customSheetView", vec_attrs = exp_attr, vec_chlds = exp_nams)
+
+      wb$worksheets[[sheet]]$customSheetViews <- xml_node_create("customSheetViews", xml_children = cvs)
+    }
 
     if (length(wb$workbook$xti)) {
       # create data frame containing sheet names for Xti entries
@@ -1753,6 +1787,12 @@ wb_load <- function(
           }
         }
       }
+    }
+
+    # remove defined names without value. these are not valid and are probably
+    # remnants of xti
+    if (length(dfn_nms <- wb$workbook$definedNames)) {
+      wb$workbook$definedNames <- dfn_nms[xml_value(dfn_nms, "definedName") != ""]
     }
 
     # create valid rich text strings in shared strings table

@@ -9,7 +9,7 @@ test_that("openxlsx2_types", {
   expect_equal(openxlsx2_celltype[["factor"]], openxlsx2_type(as.factor(1)))
 
   # even complex numbers
-  z <- complex(real = stats::rnorm(1), imaginary = stats::rnorm(1))
+  z <- complex(real = 0.9156691, imaginary = -0.5533739)
   expect_equal(openxlsx2_celltype[["character"]], openxlsx2_type(z))
 
   # wb_add_data_table() example: data frame with various types
@@ -486,4 +486,32 @@ test_that("waiver works in hyperlink", {
   exp <- '=HYPERLINK(\"#\'Sheet3\'!B1\")'
   got <- unique(unname(unlist(wb$to_df(show_formula = TRUE, col_names = FALSE))))
   expect_equal(exp, got)
+})
+
+test_that("create_shape() works", {
+
+  ## heart
+  txt <- fmt_txt("openxlsx2 is the \n", bold = TRUE, size = 15) +
+    fmt_txt("best", underline = TRUE, bold = TRUE, size = 15) +
+    fmt_txt("\n!", bold = TRUE, size = 15)
+
+  heart <- create_shape(
+    shape = "heart", text = txt, text_align = "center",
+    fill_colour = wb_color("pink"), text_colour = wb_color("theme" = 1))
+
+  ## ribbon
+  txt <- fmt_txt("\nthe ") +
+    fmt_txt("very", underline = TRUE, font = "Courier", color = wb_color("gold")) +
+    fmt_txt(" best")
+
+  ribbon <- create_shape(shape = "ribbon", text = txt, text_align = "center")
+
+  wb <- wb_workbook()$add_worksheet(grid_lines = FALSE)$
+    add_drawing(dims = "B2:E11", xml = heart)$
+    add_drawing(dims = "B12:E14", xml = ribbon)
+
+  expect_equal(1L, length(wb$drawings))
+
+  expect_silent(create_shape(text = "foo", rotation = 20, fill_transparency = 50))
+
 })

@@ -1,16 +1,14 @@
 test_that("write_formula", {
 
   set.seed(123)
-  df <- data.frame(C = rnorm(10), D = rnorm(10))
+  df <- data.frame(C = sample(1:100, 10), D = sample(1:100, 10))
 
   # array formula for a single cell
   exp <- structure(
     list(r = "E2", row_r = "2", c_r = "E", c_s = "",
-         c_t = "", c_cm = "",
-         c_ph = "", c_vm = "",
+         c_t = "",
          v = "", f = "SUM(C2:C11*D2:D11)",
-         f_t = "array", f_ref = "E2",
-         f_ca = "", f_si = "",
+         f_attr = "t=\"array\" ref=\"E2\"",
          is = "", typ = "11"),
     row.names = 23L, class = "data.frame")
 
@@ -24,7 +22,7 @@ test_that("write_formula", {
 
   cc <- wb$worksheets[[1]]$sheet_data$cc
   got <- cc[cc$row_r == "2" & cc$c_r == "E", ]
-  expect_equal(exp[1:16], got[1:16])
+  expect_equal(exp[1:9], got[1:9])
 
 
   rownames(exp) <- 1L
@@ -38,7 +36,7 @@ test_that("write_formula", {
 
   cc <- wb$worksheets[[1]]$sheet_data$cc
   got <- cc[cc$row_r == "2" & cc$c_r == "E", ]
-  expect_equal(exp[1:11], got[1:11])
+  expect_equal(exp[1:9], got[1:9])
 
 })
 
@@ -122,7 +120,7 @@ test_that("update_cells", {
 
 
   set.seed(123)
-  df <- data.frame(C = rnorm(10), D = rnorm(10))
+  df <- data.frame(C = sample(1:100, 10), D = sample(1:100, 10))
 
   wb <- wb_workbook()$
     add_worksheet("df")$
@@ -139,9 +137,9 @@ test_that("update_cells", {
   exp <- structure(
     list(c_t = c("", "str", "str"),
          f = c("SUM(C2:C11*D2:D11)", "C3 + D3", "=HYPERLINK(\"https://www.google.com\")"),
-         f_t = c("array", "", "")),
+         f_attr = c("t=\"array\" ref=\"E2\"", "", "")),
     row.names = c("23", "110", "111"), class = "data.frame")
-  got <- wb$worksheets[[1]]$sheet_data$cc[c(5, 8, 11), c("c_t", "f", "f_t")]
+  got <- wb$worksheets[[1]]$sheet_data$cc[c(5, 8, 11), c("c_t", "f", "f_attr")]
   expect_equal(exp, got)
 
   ### write logical
@@ -227,17 +225,10 @@ test_that("update cell(s)", {
                         c_r = c("B", "C", "D", "E", "F", "G"),
                         c_s = c("1", "1", "1", "1", "1", "1"),
                         c_t = c("", "", "", "", "", ""),
-                        c_cm = c("", "", "", "", "", ""),
-                        c_ph = c("", "", "", "", "", ""),
-                        c_vm = c("", "", "", "", "", ""),
                         v = c("", "", "", "", "", ""),
                         f = c("", "", "", "", "", ""),
-                        f_t = c("", "", "", "", "", ""),
-                        f_ref = c("", "", "", "", "", ""),
-                        f_ca = c("", "", "", "", "", ""),
-                        f_si = c("", "", "", "", "", ""),
-                        is = c("", "", "", "", "", ""),
-                        typ = c("4", "4", "4", "4", "4", "4")),
+                        f_attr = c("", "", "", "", "", ""),
+                        is = c("", "", "", "", "", "")),
                    row.names = 1:6,
                    class = "data.frame")
   got <- head(wb$worksheets[[1]]$sheet_data$cc)
@@ -335,10 +326,6 @@ test_that("write character numerics with a correct cell style", {
   got <- wb$styles_mgr$styles$cellXfs[2]
   expect_equal(got, NA_character_)
 
-  exp <- c("4", "4", "4", "4", "4")
-  got <- wb$worksheets[[1]]$sheet_data$cc$typ
-  expect_equal(exp, got)
-
   ## string numerics correctly flagged
   options("openxlsx2.string_nums" = 1)
 
@@ -359,18 +346,6 @@ test_that("write character numerics with a correct cell style", {
   got <- wb$styles_mgr$styles$cellXfs[2]
   expect_equal(exp, got)
 
-  exp <- c("4", "13", "4", "4", "13")
-  got <- wb$worksheets[[1]]$sheet_data$cc$typ
-  expect_equal(exp, got)
-
-  exp <- c("13", "2", "4")
-  got <- wb$worksheets[[2]]$sheet_data$cc$typ
-  expect_equal(exp, got)
-
-  exp <- c("2", "13", "2", "13")
-  got <- wb$worksheets[[3]]$sheet_data$cc$typ
-  expect_equal(exp, got)
-
   ## write string numerics as numerics (on the fly conversion)
   options("openxlsx2.string_nums" = 2)
 
@@ -381,9 +356,6 @@ test_that("write character numerics with a correct cell style", {
   got <- wb$styles_mgr$styles$cellXfs[2]
   expect_equal(got, NA_character_)
 
-  exp <- c("4", "2", "4", "4", "2")
-  got <- wb$worksheets[[1]]$sheet_data$cc$typ
-  expect_equal(exp, got)
 })
 
 test_that("writing as shared string works", {
@@ -1060,7 +1032,7 @@ test_that("comma option works", {
   op <- options("openxlsx2.commaFormat" = "#.0")
   on.exit(options(op), add = TRUE)
 
-  dat <- data.frame(x = 1:10 + rnorm(1:10))
+  dat <- data.frame(x = seq(0, 10, length.out = 10))
   class(dat$x) <- c("comma", class(dat$x))
 
   wb <- wb_workbook()$add_worksheet()$add_data(x = dat)

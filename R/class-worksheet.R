@@ -522,8 +522,8 @@ wbWorksheet <- R6::R6Class(
 
       ddims <- dims_to_rowcol(dims)
 
-      rows <- ddims[[2]]
-      cols <- ddims[[1]]
+      rows <- ddims[["row"]]
+      cols <- ddims[["col"]]
 
       rows <- range(as.integer(rows))
       cols <- range(col2int(cols))
@@ -634,14 +634,14 @@ wbWorksheet <- R6::R6Class(
 
       if (numbers)
         cc[sel & cc$c_t %in% c("b", "e", "n", ""),
-          c("c_t", "v", "f", "f_t", "f_ref", "f_ca", "f_si", "is")] <- ""
+          c("c_t", "v", "f", "f_attr", "is")] <- ""
 
       if (characters)
         cc[sel & cc$c_t %in% c("inlineStr", "s", "str"),
-          c("c_t", "c_ph", "v", "f", "f_t", "f_ref", "f_ca", "f_si", "is")] <- ""
+          names(cc) %in% c("c_t", "c_ph", "v", "f", "f_attr", "is")] <- ""
 
       if (styles)
-        cc[sel, c("c_s", "c_cm", "c_vm")] <- ""
+        cc[sel, names(cc) %in% c("c_s", "c_cm", "c_vm")] <- ""
 
       self$sheet_data$cc <- cc
 

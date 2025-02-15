@@ -424,13 +424,11 @@ to.</p>
 <span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
 <p>Similar a the coefficients of a linear regression</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># we expect to find this in D1:E1</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">coef</span>(<span class="fu">lm</span>(<span class="fu">head</span>(cars)))</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co">#&gt; (Intercept)        dist </span></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt;   5.2692308   0.1153846</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="fu">head</span>(cars))<span class="sc">$</span></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;LINEST(A2:A7, B2:B7, TRUE)&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;D2:E2&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="co"># coef(lm(head(cars)))</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="fu">add_data</span>(<span class="at">x =</span> <span class="fu">head</span>(cars))<span class="sc">$</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="fu">add_formula</span>(<span class="at">x =</span> <span class="st">&quot;LINEST(A2:A7, B2:B7, TRUE)&quot;</span>, <span class="at">dims =</span> <span class="st">&quot;D2:E2&quot;</span>, <span class="at">array =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co"># wb$open()</span></span></code></pre></div>
 </div>
 <div id="cells-metadata-cm-formulas" class="section level1">
 <h1>cells metadata (cm) formulas</h1>

@@ -163,3 +163,40 @@ test_that("shared formulas are detected correctly", {
   )
 
 })
+
+test_that("loading custom sheet view in xlsb files works", {
+
+  skip_online_checks()
+
+  fl <- testfile_path("custom_sheet_view.xlsb")
+
+  wb <- wb_load(fl)
+
+  exp <- "<customSheetViews><customSheetView guid=\"{101E93B2-5AEC-EA4B-A037-FE6837BBF571}\" view=\"pageLayout\"><selection pane=\"topLeft\" activeCell=\"E23\" sqref=\"E23\"/><pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/><printOptions gridLines=\"1\"/><pageSetup copies=\"1\" firstPageNumber=\"1\" fitToHeight=\"1\" fitToWidth=\"1\" horizontalDpi=\"300\" paperSize=\"9\" scale=\"100\" verticalDpi=\"300\"/></customSheetView><customSheetView guid=\"{29911425-4959-8744-A301-8A3516CFBBC5}\" view=\"pageLayout\"><selection pane=\"topLeft\" activeCell=\"A1\" sqref=\"A1\"/><pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/><printOptions gridLines=\"1\"/><pageSetup copies=\"1\" firstPageNumber=\"1\" fitToHeight=\"1\" fitToWidth=\"1\" horizontalDpi=\"300\" paperSize=\"9\" scale=\"100\" verticalDpi=\"300\"/></customSheetView><customSheetView guid=\"{E70FF13A-F852-294B-B121-766AE66F850F}\"><selection pane=\"topLeft\" activeCell=\"A1\" sqref=\"A1\"/><pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/><printOptions gridLines=\"1\"/><pageSetup copies=\"1\" firstPageNumber=\"1\" fitToHeight=\"1\" fitToWidth=\"1\" horizontalDpi=\"300\" paperSize=\"9\" scale=\"100\" verticalDpi=\"300\"/></customSheetView><customSheetView guid=\"{F233A099-1241-ED48-AE78-14CEAAA87C95}\" hiddenColumns=\"1\"><selection pane=\"topLeft\" activeCell=\"F1\" sqref=\"F1:K1048576\"/><pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/><printOptions gridLines=\"1\"/><pageSetup copies=\"1\" firstPageNumber=\"1\" fitToHeight=\"1\" fitToWidth=\"1\" horizontalDpi=\"300\" paperSize=\"9\" scale=\"100\" verticalDpi=\"300\"/></customSheetView><customSheetView guid=\"{16591214-8D55-8A47-82DC-2F7E1C7FCAA3}\" filter=\"1\" showAutoFilter=\"1\" hiddenColumns=\"1\"><selection pane=\"topLeft\" activeCell=\"A1\" sqref=\"A1\"/><pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/><printOptions gridLines=\"1\"/><pageSetup copies=\"1\" firstPageNumber=\"1\" fitToHeight=\"1\" fitToWidth=\"1\" horizontalDpi=\"300\" paperSize=\"9\" scale=\"100\" verticalDpi=\"300\"/><autoFilter ref=\"A1:K33\"><filterColumn colId=\"0\"><customFilters and=\"1\"><customFilter operator=\"greaterThan\" val=\"15\"/></customFilters></filterColumn></autoFilter></customSheetView><customSheetView guid=\"{AB8C9049-5EEE-4D41-AFBB-D05935ABA15C}\" filter=\"1\" showAutoFilter=\"1\" hiddenColumns=\"1\"><selection pane=\"topLeft\" activeCell=\"A1\" sqref=\"A1\"/><pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/><printOptions gridLines=\"1\"/><pageSetup copies=\"1\" firstPageNumber=\"1\" fitToHeight=\"1\" fitToWidth=\"1\" horizontalDpi=\"300\" paperSize=\"9\" scale=\"100\" verticalDpi=\"300\"/><autoFilter ref=\"A1:K33\"><filterColumn colId=\"1\"><filters blank=\"0\"><filter val=\"4\"/></filters></filterColumn></autoFilter></customSheetView></customSheetViews>"
+  got <- wb$worksheets[[1]]$customSheetViews
+  expect_equal(exp, got)
+})
+
+test_that("xlsb formula line breaks are handled", {
+
+  skip_online_checks()
+
+  fl <- testfile_path("line_break.xlsb")
+
+  fml <- "IF(A1 = 1,\"Value \n\"&A1,)"
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = 1)$
+    add_formula(x = fml, dims = "B1")$
+    add_cell_style(dims = "B1", wrap_text = TRUE)$
+    set_row_heights(rows = 1, heights = 30)
+
+  wb2 <- wb_load(fl)
+  exp <- "IF( A1= 1,\"Value \n\"&A1, )"
+  fml2 <- wb2$to_df(show_formula = TRUE, col_names = FALSE)[1, "B"]
+  expect_equal(exp,  fml2)
+
+  fml  <- gsub(" ", "", fml)
+  fml2 <- gsub(" ", "", fml2)
+
+  expect_equal(fml, fml2)
+})

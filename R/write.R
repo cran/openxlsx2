@@ -90,24 +90,21 @@ inner_update <- function(
     na.strings <- NULL
   }
 
-  if (removeCellStyle) {
-    cell_style <- "c_s"
-  } else {
-    cell_style <- NULL
+  replacement <- names(cc)
+  if (!removeCellStyle) {
+    replacement <- replacement[-which(replacement == "c_s")]
   }
-
-  replacement <- c("r", cell_style, "c_t", "c_cm", "c_ph", "c_vm", "v",
-                   "f", "f_t", "f_ref", "f_ca", "f_si", "is", "typ")
 
   sel <- match(x$r, cc$r)
 
   # to avoid bricking the worksheet, we make sure that we do not overwrite the
   # reference cell of a shared formula. To be on the save side, we replace all
   # values with the formula. If the entire cc is replaced with x, we can skip.
-  if (length(sf <- cc$f_si[sel & cc$f_t[sel] == "shared" & cc$f_ref[sel] != ""]) && !all(cc$r %in% x$r)) {
+  ff <- rbindlist(xml_attr(paste0("<f ", cc$f_attr, "/>"), "f"))
+  if (length(sf <- ff$si[sel & ff$t[sel] == "shared" & ff$ref[sel] != ""]) && !all(cc$r %in% x$r)) {
 
     # collect all the shared formulas that we have to convert
-    sel_fsi <- cc$f_si %in% unique(sf)
+    sel_fsi <- ff$si %in% unique(sf)
 
     cc_shared <- cc[sel_fsi, , drop = FALSE]
 
@@ -147,9 +144,10 @@ inner_update <- function(
 initialize_cell <- function(wb, sheet, new_cells) {
 
   sheet_id <- wb$validate_sheet(sheet)
+  nms <- names(wb$worksheets[[sheet_id]]$sheet_data$cc)
 
   # create artificial cc for the missing cells
-  x <- empty_sheet_data_cc(n = length(new_cells))
+  x <- create_char_dataframe(n = length(new_cells), colnames = nms)
   x$r     <- new_cells
   x$row_r <- gsub("[[:upper:]]", "", new_cells)
   x$c_r   <- gsub("[[:digit:]]", "", new_cells)
@@ -408,16 +406,27 @@ write_data2 <- function(
   rows_attr <- vector("list", nrow(rtyp))
 
   # create <rows ...>
-  want_rows <- as.integer(dims_to_rowcol(dims)[[2]])
+  want_rows <- as.integer(dims_to_rowcol(dims)[["row"]])
   rows_attr <- empty_row_attr(n = length(want_rows))
   # number of rows might differ
   if (enforce) rows_attr <- empty_row_attr(n = nrow(rtyp))
 
   rows_attr$r <- rownames(rtyp)
 
-  # original cc data frame
-  cc <- empty_sheet_data_cc(n = nrow(data) * ncol(data))
 
+  string_nums <- getOption("openxlsx2.string_nums", default = 0)
+
+  # original cc data frame
+  has_cm <- if (any(dc == openxlsx2_celltype[["cm_formula"]])) "c_cm" else NULL
+  has_typ <- if (string_nums) "typ" else NULL
+  nms <- c(
+    "r", "row_r", "c_r", "c_s", "c_t", has_cm,
+    "v", "f", "f_attr", "is", has_typ
+  )
+  cc <- create_char_dataframe(
+    colnames = nms,
+    n = nrow(data) * ncol(data)
+  )
 
   sel <- which(dc == openxlsx2_celltype[["logical"]])
   for (i in sel) {
@@ -437,8 +446,6 @@ write_data2 <- function(
       data[sel] <- lapply(data[sel], stringi::stri_encode, from = from_enc, to = "UTF-8")
     }
   }
-
-  string_nums <- getOption("openxlsx2.string_nums", default = 0)
 
   na_missing <- FALSE
   na_null    <- FALSE
@@ -508,7 +515,11 @@ write_data2 <- function(
     ## only the reference cell has a formula
     ## only the reference cell has the formula reference
 
-    uni_si <- unique(wb$worksheets[[sheetno]]$sheet_data$cc$f_si)
+
+    uni_attrs <- unique(wb$worksheets[[sheetno]]$sheet_data$cc$f_attr)
+    f_xml     <- paste0("<f ", uni_attrs, "/>")
+    uni_si    <- unique(rbindlist(xml_attr(f_xml, "f"))$si)
+
     int_si <- as.integer(
       replace(
         uni_si,
@@ -517,13 +528,16 @@ write_data2 <- function(
       )
     )
 
-    cc$f_t              <- "shared"
-    cc[1, "f_ref"]      <- dims
+    int_si <- max(int_si, -1L) + 1L
+
+    cc[["f_attr"]]      <- sprintf("t=\"%s\"", "shared")
+    cc[1, "f_attr"]     <- paste(cc[1, "f_attr"], sprintf("ref=\"%s\"", dims))
+    cc[["f_attr"]]      <- paste(cc[["f_attr"]], sprintf("si=\"%s\"", int_si))
     cc[2:nrow(cc), "f"] <- ""
-    cc$f_si             <- max(int_si) + 1L
   }
 
   if (is.null(wb$worksheets[[sheetno]]$sheet_data$cc)) {
+    # message("write_cell()")
 
     wb$worksheets[[sheetno]]$dimension <- paste0("<dimension ref=\"", dims, "\"/>")
 
@@ -610,6 +624,7 @@ write_data2 <- function(
           quotePrefix = "1",
           numFmtId = "49"
         )
+        cc$typ <- NULL
       }
     }
 
@@ -873,8 +888,8 @@ write_data_table <- function(
   if (!is.null(dims)) {
     dims <- dims_to_rowcol(dims, as_integer = TRUE)
     # if dims = "K1,A1" startCol = "A" and startRow = "1" are selected
-    startCol <- min(dims[[1]])
-    startRow <- min(dims[[2]])
+    startCol <- min(dims[["col"]])
+    startRow <- min(dims[["row"]])
   }
 
   # avoid stoi error with NULL
@@ -968,7 +983,7 @@ write_data_table <- function(
     if (transpose) x <- transpose_df(x)
   }
 
-  if (is.vector(x) || is.factor(x) || inherits(x, "Date") || inherits(x, "POSIXt")) {
+  if (is.vector(x) || is.factor(x) || inherits(x, "Date") || inherits(x, "POSIXt") || inherits(x, "glue")) {
     colNames <- FALSE
   } ## this will go to coerce.default and rowNames will be ignored
 
@@ -1342,7 +1357,7 @@ do_write_formula <- function(
   # transpose match write_data_table
   if (array || enforce) {
     rc <- dims_to_rowcol(dims)
-    if (length(rc[[1]]) > length(rc[[2]])) {
+    if (length(rc[["col"]]) > length(rc[["row"]])) {
       dfx <- transpose_df(dfx)
     }
   }
