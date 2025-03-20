@@ -267,6 +267,17 @@ test_that("test headerFooter", {
 
 })
 
+test_that("linebreaks in header footer work", {
+  tmp <- temp_xlsx()
+  wb <- wb_workbook()$add_worksheet()$
+    set_header_footer(header = c("One\nTwo\nThree", NA, NA))
+  wb$save(tmp)
+
+  wb <- wb_load(tmp)
+  exp <- "One\nTwo\nThree"
+  got <- wb$worksheets[[1]]$headerFooter$oddHeader[1]
+  expect_equal(exp, got)
+})
 
 test_that("load workbook with chartsheet", {
 
@@ -506,5 +517,22 @@ test_that("file with [trash] folder works", {
 
   fl <- testfile_path("trash_folder.xlsx")
   expect_silent(wb <- wb_load(fl))
+
+})
+
+test_that("openxlsx2 until release 1.13 used a float for baseColWidth", {
+
+  tmp <- temp_xlsx()
+  was <- "<sheetFormatPr baseColWidth=\"8.43\" defaultRowHeight=\"16\" x14ac:dyDescent=\"0.2\"/>"
+  fix <- "<sheetFormatPr baseColWidth=\"8\" defaultRowHeight=\"16\" x14ac:dyDescent=\"0.2\"/>"
+
+  wb <- wb_workbook()$add_worksheet()
+  wb$worksheets[[1]]$sheetFormatPr <- was
+
+  wb$save(tmp)
+
+  wb <- wb_load(tmp)
+  got <- wb$worksheets[[1]]$sheetFormatPr
+  expect_equal(fix, got)
 
 })

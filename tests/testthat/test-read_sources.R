@@ -490,3 +490,15 @@ test_that("loading file with featurePropertyBag works", {
   expect_silent(wb <- wb_load(fl))
   expect_silent(wb$save(tmp))
 })
+
+test_that("blank inlineStr can be treated as na.string", {
+  xlsxFile <- testfile_path("pandas.xlsx")
+  df <- wb_to_df(xlsxFile)
+  expect_true(inherits(df$lspeed, "numeric"))
+})
+
+test_that("blank inlineStr can be treated as na.string", {
+  xlsxFile <- testfile_path("pd_dates.xlsx")
+  df <- wb_to_df(xlsxFile, row_names = TRUE)
+  expect_true(inherits(df$date, "POSIXct"))
+})
