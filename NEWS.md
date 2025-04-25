@@ -1,3 +1,36 @@
+# openxlsx2 1.15
+
+## Maintenance
+
+* Legacy `create_comment()` is now deprecated in favor of `wb_comment()`.
+* Usage of `rows` and `cols` is now deprecated in favor of `wb_dims(rows = ..., cols = ...)`.
+
+## New features
+
+* A normalization function was added for separators in formulas. In English locales, formulas require a comma as argument separator, locales that use the comma a decimal separator, a semicolon is used as argument separator. We added a check to replace semicolons added in formulas, because these were hard to spot and if overlooked could brick the XML worksheet.
+
+## Fixes
+
+* Grouping of rows does no longer require the rows to be initialized in the worksheet. [1303](https://github.com/JanMarvin/openxlsx2/pull/1303)
+* Fix another case where `cc` was unintentionally shorten when applying a `cm` formula. Not sure if the cause for this is in the `cm` formula or in some other place.
+* `write_xlsx()` now handles `table_name` as documented. [1314](https://github.com/JanMarvin/openxlsx2/pull/1314)
+* Writing the character strings `"Inf"`, `"-Inf"`, and `"NaN"` is now possible. [1317](https://github.com/JanMarvin/openxlsx2/pull/1317)
+
+## Internal changes
+
+* Previously, when loading a workbook, the included styles were broken down, with XML styles converted into data frame objects. However, these results were only used to generate a sequence.
+* Similarly, if available, the entire shared strings table was converted to text upon loading. Now, this conversion is postponed until explicitly requested. Both approaches have their advantages: reading shared strings on load is useful when they are extensively shared across worksheets and multiple worksheets are retrieved via `wb_to_df()`, while delaying conversion saves memory and computation time when not required. However, in the latter case, shared strings across multiple worksheets will need to be converted each time they are accessed. The impact of this change should be monitored.
+* `dims_to_dataframe()` was improved to better handle many combined dims like "A1:B1,A3:D4"
+
+## Breaking changes
+
+* Improved performance when reading .xlsx files containing a large number of datetime variables. Datetime columns are now consistently returned as `POSIXct` objects in the UTC timezone. [1331](https://github.com/JanMarvin/openxlsx2/pull/1331)
+    * **Reason:** Standardizing datetime representation to UTC simplifies internal handling and eliminates complexities related to local timezones and Daylight Saving Time during data import, leading to performance benefits.
+    * **Impact:** Previously, datetimes were returned in the system's local timezone (`Sys.timezone()`). Users will now receive datetimes in UTC (same date and time, but different timezone). If local time representation is needed, explicit conversion using functions like `lubridate::force_tz()` is required after reading the data.
+
+
+***************************************************************************
+
 # openxlsx2 1.14
 
 ## New features

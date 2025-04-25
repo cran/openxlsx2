@@ -1542,27 +1542,27 @@ wbWorkbook <- R6::R6Class(
       }
 
       do_write_datatable(
-        wb              = self,
-        x               = x,
-        sheet           = sheet,
-        dims            = dims,
-        startCol        = start_col,
-        startRow        = start_row,
-        colNames        = col_names,
-        rowNames        = row_names,
-        tableStyle      = table_style,
-        tableName       = table_name,
-        withFilter      = with_filter,
-        sep             = sep,
-        firstColumn     = first_column,
-        lastColumn      = last_column,
-        bandedRows      = banded_rows,
-        bandedCols      = banded_cols,
-        applyCellStyle  = apply_cell_style,
-        removeCellStyle = remove_cell_style,
-        na.strings      = na.strings,
-        inline_strings  = inline_strings,
-        total_row       = total_row
+        wb                = self,
+        x                 = x,
+        sheet             = sheet,
+        dims              = dims,
+        start_col         = start_col,
+        start_row         = start_row,
+        col_names         = col_names,
+        row_names         = row_names,
+        table_style       = table_style,
+        table_name        = table_name,
+        with_filter       = with_filter,
+        sep               = sep,
+        first_column      = first_column,
+        last_column       = last_column,
+        banded_rows       = banded_rows,
+        banded_cols       = banded_cols,
+        apply_cell_style  = apply_cell_style,
+        remove_cell_style = remove_cell_style,
+        na.strings        = na.strings,
+        inline_strings    = inline_strings,
+        total_row         = total_row
       )
       invisible(self)
     },
@@ -2543,19 +2543,19 @@ wbWorkbook <- R6::R6Class(
       }
 
       do_write_formula(
-        wb              = self,
-        sheet           = sheet,
-        x               = x,
-        startCol        = start_col,
-        startRow        = start_row,
-        dims            = dims,
-        array           = array,
-        cm              = cm,
-        applyCellStyle  = apply_cell_style,
-        removeCellStyle = remove_cell_style,
-        enforce         = enforce,
-        shared          = shared,
-        name            = name
+        wb                = self,
+        sheet             = sheet,
+        x                 = x,
+        start_col         = start_col,
+        start_row         = start_row,
+        dims              = dims,
+        array             = array,
+        cm                = cm,
+        apply_cell_style  = apply_cell_style,
+        remove_cell_style = remove_cell_style,
+        enforce           = enforce,
+        shared            = shared,
+        name              = name
       )
       invisible(self)
     },
@@ -4923,6 +4923,11 @@ wbWorkbook <- R6::R6Class(
       rows <- rows[ok]
       sheet <- private$get_sheet_index(sheet)
 
+      # check if additional rows are required
+      has_rows <- sort(as.integer(self$worksheets[[sheet]]$sheet_data$row_attr$r))
+      missing_rows <- rows[!rows %in% has_rows]
+      if (length(missing_rows)) private$do_cell_init(sheet, paste0("A", sort(missing_rows)))
+
       # fetch the row_attr data.frame
       row_attr <- self$worksheets[[sheet]]$sheet_data$row_attr
 
@@ -5316,13 +5321,7 @@ wbWorkbook <- R6::R6Class(
       rows <- list(...)[["rows"]]
 
       if (!is.null(rows) && !is.null(cols)) {
-
-        if (length(cols) > 2 && any(diff(cols) != 1))
-          warning("cols > 2, will create range from min to max.")
-
-        if (getOption("openxlsx2.soon_deprecated", default = FALSE))
-          .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
-
+        .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
         dims <- rowcol_to_dims(rows, cols)
       }
 
@@ -5340,13 +5339,7 @@ wbWorkbook <- R6::R6Class(
       rows <- list(...)[["rows"]]
 
       if (!is.null(rows) && !is.null(cols)) {
-
-        if (length(cols) > 2 && any(diff(cols) != 1))
-          warning("cols > 2, will create range from min to max.")
-
-        if (getOption("openxlsx2.soon_deprecated", default = FALSE))
-          .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
-
+        .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
         dims <- rowcol_to_dims(rows, cols)
       }
 
@@ -5520,17 +5513,27 @@ wbWorkbook <- R6::R6Class(
 
       cmts <- list()
       if (length(cmmt) && length(self$comments) <= cmmt) {
-        cmts <- as.data.frame(do.call("rbind", self$comments[[cmmt]]), stringsAsFactors = FALSE)
+        cmts <- do.call(rbind, lapply(self$comments[[cmmt]], function(x) {
+          data.frame(
+            ref = x$ref,
+            author = x$author,
+            comment = paste0(x$comment, collapse = " "),
+            stringsAsFactors = FALSE
+          )
+        }))
+
         if (!is.null(dims)) cmts <- cmts[cmts$ref %in% dims, ]
         # print(cmts)
         cmts <- cmts[c("ref", "author", "comment")]
-        if (nrow(cmts)) {
+        if (NROW(cmts)) {
           cmts$comment <- as_fmt_txt(cmts$comment)
           cmts$cmmt_id <- cmmt
+        } else {
+          return(NULL)
         }
       }
 
-      invisible(cmts)
+      cmts
     },
 
     #' @description Remove comment
@@ -5781,19 +5784,16 @@ wbWorkbook <- R6::R6Class(
       rows <- list(...)[["rows"]]
 
       if (!is.null(rows) && !is.null(cols)) {
-
-        if (length(cols) > 2 && any(diff(cols) != 1))
-          warning("cols > 2, will create range from min to max.")
-
-        if (getOption("openxlsx2.soon_deprecated", default = FALSE))
-          .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
-
+        .Deprecated(old = "cols/rows", new = "dims", package = "openxlsx2")
         dims <- rowcol_to_dims(rows, cols)
       }
 
       ddims <- dims_to_rowcol(dims, as_integer = TRUE)
       rows <- ddims[["row"]]
       cols <- ddims[["col"]]
+
+      if (length(cols) > 2 && any(diff(cols) != 1))
+        warning("cols > 2, will create range from min to max.")
 
       if (!is.null(style)) assert_class(style, "character")
       assert_class(type, "character")
@@ -5824,7 +5824,7 @@ wbWorkbook <- R6::R6Class(
                "containsErrors", "notContainsErrors", "containsBlanks", "notContainsBlanks")
       if (is.null(style) && type %in% sel) {
         smp <- random_string()
-        style <- create_dxfs_style(font_color = wb_color(hex = "FF9C0006"), bgFill = wb_color(hex = "FFFFC7CE"))
+        style <- create_dxfs_style(font_color = wb_color(hex = "FF9C0006"), bg_fill = wb_color(hex = "FFFFC7CE"))
         self$styles_mgr$add(style, smp)
         dxfId <- self$styles_mgr$get_dxf_id(smp)
       }
@@ -8609,9 +8609,9 @@ wbWorkbook <- R6::R6Class(
         dim <- cc[cc$c_s == style, "r"]
 
         new_fill <- create_fill(
-          gradientFill = gradient_fill,
-          patternType = pattern,
-          fgColor = color
+          gradient_fill = gradient_fill,
+          pattern_type = pattern,
+          fg_color = color
         )
         self$styles_mgr$add(new_fill, new_fill)
 
@@ -8693,7 +8693,7 @@ wbWorkbook <- R6::R6Class(
           strike = strike,
           sz = size,
           u = underline,
-          vertAlign = vert_align
+          vert_align = vert_align
         )
         self$styles_mgr$add(new_font, new_font)
 
@@ -8890,7 +8890,12 @@ wbWorkbook <- R6::R6Class(
         temp <- self
 
       sel <- temp$worksheets[[sheet]]$sheet_data$cc$r %in% wanted_dims
-      temp$worksheets[[sheet]]$sheet_data$cc$c_s[sel]
+
+      sty <- temp$worksheets[[sheet]]$sheet_data$cc[sel, c("r", "c_s")]
+
+      x <- sty$c_s
+      names(x) <- sty$r
+      x
     },
 
     #' @description set sheet style
@@ -9007,12 +9012,12 @@ wbWorkbook <- R6::R6Class(
       title_id  <- ids[["titleId"]]
 
       self$add_cell_style(
-        dims     = dims,
-        borderId = border_id,
-        fillId   = fill_id,
-        fontId   = font_id,
-        numFmtId = numfmt_id,
-        xfId     = title_id
+        dims       = dims,
+        border_id  = border_id,
+        fill_id    = fill_id,
+        font_id    = font_id,
+        num_fmt_id = numfmt_id,
+        xf_id      = title_id
       )
       invisible(self)
     },
@@ -9365,7 +9370,7 @@ wbWorkbook <- R6::R6Class(
 
       for (i in seq_along(self$sheet_names)) {
         xml_attr <- ifelse(i == sheet, TRUE, FALSE)
-        self$worksheets[[i]]$set_sheetview(tabSelected = xml_attr)
+        self$worksheets[[i]]$set_sheetview(tab_selected = xml_attr)
       }
 
       invisible(self)
@@ -10208,7 +10213,7 @@ wbWorkbook <- R6::R6Class(
       }
 
 
-      ## re-assign tabSelected
+      ## re-assign tab_selected
       state <- rep.int("visible", nSheets)
       hidden <- grepl("hidden", self$workbook$sheets)
       state[hidden] <- "hidden"
@@ -10227,7 +10232,7 @@ wbWorkbook <- R6::R6Class(
       # Failsafe: hidden sheet can not be selected.
       if (any(hidden)) {
         for (i in which(hidden)) {
-          self$worksheets[[i]]$set_sheetview(tabSelected = FALSE)
+          self$worksheets[[i]]$set_sheetview(tab_selected = FALSE)
         }
       }
 
@@ -10259,7 +10264,7 @@ wbWorkbook <- R6::R6Class(
           sheet = sheet,
           x = dims_to_dataframe(dims),
           na.strings = NULL,
-          colNames = FALSE,
+          col_names = FALSE,
           dims = dims
         )
 

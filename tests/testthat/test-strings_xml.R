@@ -1,12 +1,5 @@
 test_that("strings_xml", {
 
-  # some sst string
-  si <- "<sst><si><t>foo</t></si><si><r><rPr><b/></rPr><t>bar</t></r></si></sst>"
-  expect_equal(
-    xml_si_to_txt(read_xml(si)),
-    c("foo", "bar")
-  )
-
   txt <- "foo"
   expect_equal(
     txt_to_si(txt, raw = TRUE, skip_control = FALSE),
@@ -141,4 +134,11 @@ test_that("strings_xml", {
   exp <- "<is><t xml:space=\"preserve\"> &lt;r&gt;foo&lt;/r&gt;</t></is>"
   expect_equal(got, exp)
 
+})
+
+test_that("strings are equal", {
+  exp <- sample(LETTERS[1:3], size = 20, replace = TRUE)
+  exp_is <- vapply(exp, txt_to_is, NA_character_, USE.NAMES = FALSE)
+  got <- is_to_txt(exp_is)
+  expect_equal(exp, got)
 })

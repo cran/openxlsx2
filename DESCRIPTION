@@ -1,7 +1,7 @@
 Type: Package
 Package: openxlsx2
 Title: Read, Write and Edit 'xlsx' Files
-Version: 1.14
+Version: 1.15
 Language: en-US
 Authors@R: c(
   person("Jordan Mark", "Barbone", email = "jmbarbone@gmail.com", role = "aut", comment = c(ORCID = "0000-0001-9788-3628")),
@@ -28,7 +28,7 @@ RoxygenNote: 7.3.2
 Config/testthat/edition: 3
 Config/testthat/parallel: true
 NeedsCompilation: yes
-Packaged: 2025-03-20 16:53:02 UTC; janmarvingarbuszus
+Packaged: 2025-04-25 06:30:07 UTC; janmarvingarbuszus
 Author: Jordan Mark Barbone [aut] (<https://orcid.org/0000-0001-9788-3628>),
   Jan Marvin Garbuszus [aut, cre],
   Olivier Roy [ctb],
@@ -36,4 +36,4 @@ Author: Jordan Mark Barbone [aut] (<https://orcid.org/0000-0001-9788-3628>),
   Arseny Kapoulkine [ctb, cph] (Author of included pugixml code)
 Maintainer: Jan Marvin Garbuszus <jan.garbuszus@ruhr-uni-bochum.de>
 Repository: CRAN
-Date/Publication: 2025-03-20 17:50:07 UTC
+Date/Publication: 2025-04-25 07:50:02 UTC

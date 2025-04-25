@@ -1,49 +1,24 @@
 #include <cctype>
 #include "openxlsx2.h"
 
-// converts sharedstrings xml tree to R-Character Vector
-// [[Rcpp::export]]
-SEXP xml_si_to_txt(XPtrXML doc) {
-  auto sst = doc->child("sst");
-  auto n = std::distance(sst.begin(), sst.end());
-
-  Rcpp::CharacterVector res(Rcpp::no_init(n));
-
-  auto i = 0;
-  for (auto si : doc->child("sst").children("si")) {
-    // text to export
-    std::string text = "";
-
-    // has only t node
-    for (auto t : si.children("t")) {
-      text = t.text().get();
-    }
-
-    // has r node with t node
-    // linebreaks and spaces are handled in the nodes
-    for (auto r : si.children("r")) {
-      for (auto t : r.children("t")) {
-        text += t.text().get();
-      }
-    }
-
-    // push everything back
-    res[i] = Rcpp::String(text);
-    ++i;
-  }
-
-  return res;
-}
-
 SEXP xml_to_txt(Rcpp::CharacterVector vec, std::string type) {
   auto n = vec.length();
   Rcpp::CharacterVector res(Rcpp::no_init(n));
+  std::unordered_map<std::string, Rcpp::String> cache;  // Cache Rcpp::String directly
 
   for (auto i = 0; i < n; ++i) {
     std::string tmp = Rcpp::as<std::string>(vec[i]);
 
-    if (tmp.compare("") == 0) {
+    // Check if we have already processed this XML string
+    auto it = cache.find(tmp);
+    if (it != cache.end()) {
+      res[i] = it->second;  // Direct assignment from cache
+      continue;
+    }
+
+    if (tmp.empty()) {
       res[i] = "";
+      cache[tmp] = Rcpp::String("");  // Cache the Rcpp::String directly
       continue;
     }
 
@@ -54,15 +29,12 @@ SEXP xml_to_txt(Rcpp::CharacterVector vec, std::string type) {
       Rcpp::stop(type.c_str(), " xml import unsuccessful");
     }
 
+    std::string text;
     for (auto is : doc.children(type.c_str())) {
-      // text to export
-      std::string text = "";
-
       // has only t node
       for (auto t : is.children("t")) {
         text = t.text().get();
       }
-
       // has r node with t node
       // phoneticPr (Phonetic Properties)
       // r (Rich Text Run)
@@ -75,10 +47,12 @@ SEXP xml_to_txt(Rcpp::CharacterVector vec, std::string type) {
           text += t.text().get();
         }
       }
-
-      // push everything back
-      res[i] = Rcpp::String(text);
     }
+
+    // Store result in cache
+    Rcpp::String rcpp_text = Rcpp::String(text);
+    cache[tmp] = rcpp_text;
+    res[i] = rcpp_text;
   }
 
   return res;

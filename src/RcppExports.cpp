@@ -11,6 +11,19 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// date_to_unix
+Rcpp::CharacterVector date_to_unix(Rcpp::CharacterVector x, std::string origin, bool datetime);
+RcppExport SEXP _openxlsx2_date_to_unix(SEXP xSEXP, SEXP originSEXP, SEXP datetimeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::CharacterVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< std::string >::type origin(originSEXP);
+    Rcpp::traits::input_parameter< bool >::type datetime(datetimeSEXP);
+    rcpp_result_gen = Rcpp::wrap(date_to_unix(x, origin, datetime));
+    return rcpp_result_gen;
+END_RCPP
+}
 // to_long
 bool to_long(std::string path);
 RcppExport SEXP _openxlsx2_to_long(SEXP pathSEXP) {
@@ -78,13 +91,38 @@ BEGIN_RCPP
 END_RCPP
 }
 // needed_cells
-Rcpp::CharacterVector needed_cells(const std::string& range);
-RcppExport SEXP _openxlsx2_needed_cells(SEXP rangeSEXP) {
+std::vector<std::string> needed_cells(const std::string& range, bool all);
+RcppExport SEXP _openxlsx2_needed_cells(SEXP rangeSEXP, SEXP allSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const std::string& >::type range(rangeSEXP);
-    rcpp_result_gen = Rcpp::wrap(needed_cells(range));
+    Rcpp::traits::input_parameter< bool >::type all(allSEXP);
+    rcpp_result_gen = Rcpp::wrap(needed_cells(range, all));
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_dims
+SEXP get_dims(Rcpp::CharacterVector dims, bool check);
+RcppExport SEXP _openxlsx2_get_dims(SEXP dimsSEXP, SEXP checkSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::CharacterVector >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< bool >::type check(checkSEXP);
+    rcpp_result_gen = Rcpp::wrap(get_dims(dims, check));
+    return rcpp_result_gen;
+END_RCPP
+}
+// dims_to_row_col_fill
+SEXP dims_to_row_col_fill(Rcpp::CharacterVector dims, bool fills);
+RcppExport SEXP _openxlsx2_dims_to_row_col_fill(SEXP dimsSEXP, SEXP fillsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::CharacterVector >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< bool >::type fills(fillsSEXP);
+    rcpp_result_gen = Rcpp::wrap(dims_to_row_col_fill(dims, fills));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -583,17 +621,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// xml_si_to_txt
-SEXP xml_si_to_txt(XPtrXML doc);
-RcppExport SEXP _openxlsx2_xml_si_to_txt(SEXP docSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< XPtrXML >::type doc(docSEXP);
-    rcpp_result_gen = Rcpp::wrap(xml_si_to_txt(doc));
-    return rcpp_result_gen;
-END_RCPP
-}
 // is_to_txt
 SEXP is_to_txt(Rcpp::CharacterVector is_vec);
 RcppExport SEXP _openxlsx2_is_to_txt(SEXP is_vecSEXP) {
@@ -984,13 +1011,16 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_openxlsx2_date_to_unix", (DL_FUNC) &_openxlsx2_date_to_unix, 3},
     {"_openxlsx2_to_long", (DL_FUNC) &_openxlsx2_to_long, 1},
     {"_openxlsx2_openxlsx2_type", (DL_FUNC) &_openxlsx2_openxlsx2_type, 1},
     {"_openxlsx2_col_to_int", (DL_FUNC) &_openxlsx2_col_to_int, 1},
     {"_openxlsx2_ox_int_to_col", (DL_FUNC) &_openxlsx2_ox_int_to_col, 1},
     {"_openxlsx2_rbindlist", (DL_FUNC) &_openxlsx2_rbindlist, 1},
     {"_openxlsx2_copy", (DL_FUNC) &_openxlsx2_copy, 1},
-    {"_openxlsx2_needed_cells", (DL_FUNC) &_openxlsx2_needed_cells, 1},
+    {"_openxlsx2_needed_cells", (DL_FUNC) &_openxlsx2_needed_cells, 2},
+    {"_openxlsx2_get_dims", (DL_FUNC) &_openxlsx2_get_dims, 2},
+    {"_openxlsx2_dims_to_row_col_fill", (DL_FUNC) &_openxlsx2_dims_to_row_col_fill, 2},
     {"_openxlsx2_dims_to_df", (DL_FUNC) &_openxlsx2_dims_to_df, 5},
     {"_openxlsx2_long_to_wide", (DL_FUNC) &_openxlsx2_long_to_wide, 3},
     {"_openxlsx2_is_charnum", (DL_FUNC) &_openxlsx2_is_charnum, 1},
@@ -1028,7 +1058,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_openxlsx2_xml_remove_child1", (DL_FUNC) &_openxlsx2_xml_remove_child1, 4},
     {"_openxlsx2_xml_remove_child2", (DL_FUNC) &_openxlsx2_xml_remove_child2, 5},
     {"_openxlsx2_xml_remove_child3", (DL_FUNC) &_openxlsx2_xml_remove_child3, 6},
-    {"_openxlsx2_xml_si_to_txt", (DL_FUNC) &_openxlsx2_xml_si_to_txt, 1},
     {"_openxlsx2_is_to_txt", (DL_FUNC) &_openxlsx2_is_to_txt, 1},
     {"_openxlsx2_si_to_txt", (DL_FUNC) &_openxlsx2_si_to_txt, 1},
     {"_openxlsx2_txt_to_is", (DL_FUNC) &_openxlsx2_txt_to_is, 4},

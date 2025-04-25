@@ -681,18 +681,42 @@ write_workbook.xml.rels <- function(x, rm_sheet = NULL) {
   df_to_xml("Relationship", df_col = wxr[c("Id", "Type", "Target", "TargetMode")])
 }
 
-#' convert objects with attribute labels into strings
-#' @param x an object to convert
+#' Convert objects with attribute labels into strings. This allows special
+#' type of labelled vectors, that assign labels to Inf/-Inf/NaN.
+#' @param x a labelled vector to convert
+#' @returns a character vector
 #' @noRd
 to_string <- function(x) {
   lbls <- attr(x, "labels")
-  chr  <- as.character(x)
-  if (!is.null(lbls) && !is.null(names(lbls))) {
-    lbls <- lbls[match(x, lbls)]
-    sel_l <- which(!is.na(lbls))
-    if (length(sel_l)) chr[sel_l] <- names(lbls[!is.na(lbls)])
+  x_chr <- as.character(x)
+  x_num <- suppressWarnings(as.numeric(x_chr))
+
+  has_labels <- !is.null(lbls) && !is.null(names(lbls))
+  used_label <- logical(length(x))
+
+  if (has_labels) {
+    idx <- match(x, lbls)
+    has_label <- !is.na(idx)
+    used_label <- has_label
+    x_chr[has_label] <- names(lbls)[idx[has_label]]
   }
-  chr
+
+  # It is possible to assign labels to Inf, -Inf, and NaN. We have to
+  # distinguish between a numeric Inf/-Inf/NaN and a label. The label
+  # should be written as character, otherwise as #NUM! or #VALUE!
+  if (any(!used_label)) {
+    ul <- which(!used_label)
+
+    inf_pos <- is.infinite(x_num[ul]) & x_num[ul] > 0
+    inf_neg <- is.infinite(x_num[ul]) & x_num[ul] < 0
+    is_nan  <- is.nan(x_num[ul])
+
+    x_chr[ul[inf_pos]] <- "_openxlsx_Inf"
+    x_chr[ul[inf_neg]] <- "_openxlsx_nInf"
+    x_chr[ul[is_nan]]  <- "_openxlsx_NaN"
+  }
+
+  x_chr
 }
 
 # get the next free relationship id
@@ -1062,10 +1086,7 @@ clone_shared_strings <- function(wb_old, old, wb_new, new) {
   old_len <- length(as.character(wb_new$sharedStrings))
 
   wb_new$sharedStrings <- c(as.character(wb_new$sharedStrings), sst_old)
-  sst  <- xml_node_create("sst", xml_children = wb_new$sharedStrings)
-  text <- xml_si_to_txt(read_xml(sst))
-  attr(wb_new$sharedStrings, "uniqueCount") <- as.character(length(text))
-  attr(wb_new$sharedStrings, "text") <- text
+  attr(wb_new$sharedStrings, "uniqueCount") <- as.character(length(wb_new$sharedStrings))
 
 
   sheet_id <- wb_new$validate_sheet(new)
@@ -1294,10 +1315,15 @@ fits_in_dims <- function(x, dims, startCol, startRow) {
   dims
 }
 
-# transpose single column or row data frames to wide/long. keeps attributes and class
+# transpose single column or row data frames to wide/long. keeps attributes and
+# class.
+# The magic of t(). A Date can be something like a numeric with a
+# format attached. After t(x) it will be a string "yyyy-mm-dd".
+# Therefore unclass first and apply the class afterwards.
 transpose_df <- function(x) {
   attribs <- attr(x, "c_cm")
   classes <- class(x[[1]])
+  x[] <- lapply(x[], unclass)
   x <- as.data.frame(t(x), stringsAsFactors = FALSE)
   for (i in seq_along(x)) {
     class(x[[i]]) <- classes
@@ -1649,7 +1675,22 @@ create_shape <- function(
 
   standardize(...)
 
-  text <- fmt_txt2(text, text_color = text_color, text_transparency)
+  if (!is_xml(text) || inherits(text, "fmt_txt")) {
+    # if not a a14:m node
+    text <- fmt_txt2(text, text_color = text_color, text_transparency)
+    mc_beg <- ""
+    mc_end <- ""
+  } else {
+    # we need some markup compability
+    mc_beg <- c(
+      '<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+      <mc:Choice xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main" Requires="a14">'
+    )
+    mc_end <- c(
+      '</mc:Choice>
+      </mc:AlternateContent>'
+    )
+  }
 
   line_color <- get_color(line_color, line_transparency)
   fill_color <- get_color(fill_color, fill_transparency)
@@ -1663,6 +1704,7 @@ create_shape <- function(
      <xdr:absoluteAnchor>
       <xdr:pos x="0" y="0" />
       <xdr:ext cx="0" cy="0" />
+      %s
       <xdr:sp macro="" textlink="">
        <xdr:nvSpPr>
         <xdr:cNvPr id="%s" name="%s" />
@@ -1709,11 +1751,14 @@ create_shape <- function(
         </a:p>
        </xdr:txBody>
       </xdr:sp>
+      %s
       <xdr:clientData />
      </xdr:absoluteAnchor>
      </xdr:wsDr>',
-    id, name, st_guid(), rotation * 60000, shape,
-    fill_color, line_color, text_align[1], text
+     mc_beg,
+     id, name, st_guid(), rotation * 60000, shape,
+     fill_color, line_color, text_align[1], text,
+     mc_end
   )
 
   read_xml(xml, pointer = FALSE)

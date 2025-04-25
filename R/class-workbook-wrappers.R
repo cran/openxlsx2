@@ -139,7 +139,9 @@ wb_save <- function(wb, file = NULL, overwrite = TRUE, path = NULL, flush = FALS
 #' not get picked up by `read_xlsx()`. This is because only the formula is written
 #' and left to Excel to evaluate the formula when the file is opened in Excel.
 #' The string `"_openxlsx_NA"` is reserved for `openxlsx2`.
-#' If the data frame contains this string, the output will be broken.
+#' If the data frame contains this string, the output will be broken. Similar
+#' factor labels `"_openxlsx_Inf"`, `"_openxlsx_nInf"`, and `"_openxlsx_NaN"`
+#' are reserved.
 #'
 #' Supported classes are data frames, matrices and vectors of various types and
 #' everything that can be converted into a data frame with `as.data.frame()`.
@@ -157,7 +159,14 @@ wb_save <- function(wb, file = NULL, overwrite = TRUE, path = NULL, flush = FALS
 #'
 #' The columns of `x` with class Date/POSIXt, currency, accounting, hyperlink,
 #' percentage are automatically styled as dates, currency, accounting,
-#' hyperlinks, percentages respectively.
+#' hyperlinks, percentages respectively. When writing POSIXt, the users local
+#' timezone should not matter. The openxml standard does not have a timezone
+#' and the conversion from the local timezone should happen internally, so that
+#' date and time are converted, but the timezone is dropped. This conversion
+#' could cause a minor precision loss. The datetime in R and in spreadsheets
+#' might differ by 1 second, caused by floating point precision. When read from
+#' the worksheet, starting with `openxlsx2` release `1.15` the datetime is
+#' returned in `"UTC"`.
 #'
 #' Functions [wb_add_data()] and [wb_add_data_table()] behave quite similar. The
 #' distinction is that the latter creates a table in the worksheet that can be
@@ -2564,7 +2573,7 @@ wb_add_data_validation <- function(
     type           = type,
     operator       = operator,
     value          = value,
-    allowBlank     = allow_blank,
+    allow_blank    = allow_blank,
     show_input_msg = show_input_msg,
     show_error_msg = show_error_msg,
     error_style    = error_style,
@@ -3208,7 +3217,7 @@ wb_add_style <- function(wb, style = NULL, style_name = NULL) {
 #'
 #' # assign style to a1
 #' wb$set_cell_style(dims = "A1", style = numfmt)
-#' @return A Workbook object
+#' @return A named vector with cell style index positions
 #' @export
 wb_get_cell_style <- function(wb, sheet = current_sheet(), dims) {
   assert_workbook(wb)
@@ -3684,7 +3693,7 @@ wb_add_cell_style <- function(
     text_rotation       = text_rotation,
     vertical            = vertical,
     wrap_text           = wrap_text,
-    xfId                = xf_id,
+    xf_id               = xf_id,
     ...                 = ...
   )
 }

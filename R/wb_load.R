@@ -624,10 +624,8 @@ wb_load <- function(
     sst_attr <- xml_attr(sst, "sst")
     uniqueCount <- as.character(sst_attr[[1]]["uniqueCount"])
     vals <- xml_node(sst, "sst", "si")
-    text <- xml_si_to_txt(sst)
 
     attr(vals, "uniqueCount") <- uniqueCount
-    attr(vals, "text") <- text
     wb$sharedStrings <- vals
   }
 
@@ -1358,8 +1356,6 @@ wb_load <- function(
         authorsInds <- as.integer(comments_attr$authorId) + 1
         authors <- authors[authorsInds]
 
-        text <- xml_node(comments, "comment", "text")
-
         comments <- lapply(comments, function(x) {
           text <- xml_node(x, "comment", "text")
           if (all(xml_node_name(x, "comment", "text") == "t")) {
@@ -1662,6 +1658,7 @@ wb_load <- function(
           # want can be zero
           if (ref %in% seq_along(extSheets)) {
 
+            if (want == 0) next
             sheetName <- extSheets[[ref]][[want]]
             if (xti$firstSheet[sel][i] < xti$lastSheet[sel][i]) {
               want <- xti$lastSheet[sel][i]
@@ -1714,7 +1711,7 @@ wb_load <- function(
             }
 
 
-            if (!wb$is_chartsheet[[i]])
+            if (!wb$is_chartsheet[[j]])
               wb$worksheets[[j]]$dataValidations <-
                 stringi::stri_replace_all_fixed(
                   wb$worksheets[[j]]$dataValidations,

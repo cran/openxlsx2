@@ -168,6 +168,19 @@ via \code{\link[=wb_add_formula]{wb_add_formula()}}. This is because only the fo
 to be evaluated when the file is opened in a spreadsheet software.
 Opening, saving and closing the file in a spreadsheet software will resolve
 this.
+
+Before release 1.15, datetime variables (in 'yyyy-mm-dd hh:mm:ss' format)
+were imported using the user's local system timezone (\code{Sys.timezone()}).
+This behavior has been updated. Now, all datetime variables are imported
+with the timezone set to "UTC".
+If automatic date detection and conversion are enabled but the conversion
+is unsuccessful (for instance, in a column containing a mix of data types
+like strings, numbers, and dates) dates might be displayed as a Unix
+timestamp. Usually they are converted to character for character columns.
+If date detection is disabled, dates will show up as a spreadsheet date
+format. To convert these, you can use the functions \code{\link[=convert_date]{convert_date()}},
+\code{\link[=convert_datetime]{convert_datetime()}}, or \code{\link[=convert_hms]{convert_hms()}}. If types are specified, date
+detection is disabled.
 }
 \examples{
 ###########################################################################

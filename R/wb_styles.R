@@ -228,7 +228,7 @@ create_border <- function(
 #' )
 #'
 #' @export
-create_numfmt <- function(numFmtId, formatCode) {
+create_numfmt <- function(numFmtId = 164, formatCode = "#,##0.00") {
 
   # in dates a slash does not indicate a fraction, but can be used to
   # separate year, month, day
@@ -464,6 +464,7 @@ create_fill <- function(
   # if gradient fill is specified we can not have patternFill too. otherwise
   # we end up with a solid black fill
   if (gradient_fill == "") {
+    if (pattern_type == "") pattern_type <- "none"
     valid_pattern <- c("none", "solid", "mediumGray", "darkGray", "lightGray", "darkHorizontal", "darkVertical", "darkDown", "darkUp", "darkGrid", "darkTrellis", "lightHorizontal", "lightVertical", "lightDown", "lightUp", "lightGrid", "lightTrellis", "gray125", "gray0625")
     match.arg_wrapper(pattern_type, valid_pattern, fn_name = "create_fill")
 
@@ -550,9 +551,9 @@ create_fill <- function(
 #'  | "49" | "@"                         |
 #'
 #' @examples
-#' foo_fill <- create_fill(patternType = "lightHorizontal",
-#'                         fgColor = wb_color("blue"),
-#'                         bgColor = wb_color("orange"))
+#' foo_fill <- create_fill(pattern_type = "lightHorizontal",
+#'                         fg_color = wb_color("blue"),
+#'                         bg_color = wb_color("orange"))
 #' foo_font <- create_font(sz = 36, b = TRUE, color = wb_color("yellow"))
 #'
 #' wb <- wb_workbook()
@@ -928,7 +929,7 @@ create_dxfs_style <- function(
     } else {
       pattern_type  <- ""
     }
-    fill <- create_fill(patternType = pattern_type, bgColor = bg_fill, fgColor = fg_color, gradientFill = gradient_fill)
+    fill <- create_fill(pattern_type = pattern_type, bg_color = bg_fill, fg_color = fg_color, gradient_fill = gradient_fill)
   } else {
     fill <- NULL
   }

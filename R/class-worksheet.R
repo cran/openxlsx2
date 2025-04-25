@@ -523,10 +523,13 @@ wbWorksheet <- R6::R6Class(
       ddims <- dims_to_rowcol(dims)
 
       rows <- ddims[["row"]]
-      cols <- ddims[["col"]]
+      cols <- col2int(ddims[["col"]])
+
+      if (length(cols) > 2 && any(diff(cols) != 1))
+        warning("cols > 2, will create range from min to max.")
 
       rows <- range(as.integer(rows))
-      cols <- range(col2int(cols))
+      cols <- range(cols)
 
       sqref <- paste0(int2col(cols), rows)
       sqref <- stringi::stri_join(sqref, collapse = ":", sep = " ")
@@ -582,8 +585,13 @@ wbWorksheet <- R6::R6Class(
     #' @return The `wbWorkbook` object, invisibly
     unmerge_cells = function(rows = NULL, cols = NULL) {
 
+      cols <- col2int(cols)
+
+      if (length(cols) > 2 && any(diff(cols) != 1))
+        warning("cols > 2, will create range from min to max.")
+
       rows <- range(as.integer(rows))
-      cols <- range(col2int(cols))
+      cols <- range(cols)
 
       sqref <- paste0(int2col(cols), rows)
       sqref <- stringi::stri_join(sqref, collapse = ":", sep = " ")
@@ -1038,23 +1046,10 @@ wbWorksheet <- R6::R6Class(
         )
       )
 
-      if (type == "date") {
-        value <- as.integer(value) + origin
-      }
+      date1904 <- ifelse(origin == "1904-01-01", TRUE, FALSE)
 
-      if (type == "time") {
-        t <- format(value[1], "%z")
-        offSet <-
-          suppressWarnings(
-            ifelse(substr(t, 1, 1) == "+", 1L, -1L) * (
-              as.integer(substr(t, 2, 3)) + as.integer(substr(t, 4, 5)) / 60
-            ) / 24
-          )
-        if (is.na(offSet)) {
-          offSet[i] <- 0
-        }
-
-        value <- as.numeric(as.POSIXct(value)) / 86400 + origin + offSet
+      if (type == "date" || type == "time") {
+        value <- conv_to_excel_date(value, date1904 = date1904)
       }
 
       form <- sapply(

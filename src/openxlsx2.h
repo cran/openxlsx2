@@ -88,9 +88,9 @@ static inline std::string rm_colnum(const std::string& str) {
 }
 
 // Function to keep only digits in a string
-inline uint32_t cell_to_rowint(const std::string& str) {
+inline int32_t cell_to_rowint(const std::string& str) {
   std::string result = rm_colnum(str);
-  return static_cast<uint32_t>(std::stoi(result));
+  return std::stoi(result);
 }
 
 static inline std::string str_toupper(std::string s) {
@@ -103,6 +103,20 @@ static inline int32_t cell_to_colint(const std::string& str) {
   std::string result = rm_rownum(str);
   result = str_toupper(result);
   return static_cast<int32_t>(uint_col_to_int(result));
+}
+
+static inline bool is_column_only(const std::string& s) {
+  for (char c : s) {
+    if (!std::isalpha(c)) return false;
+  }
+  return !s.empty();
+}
+
+static inline bool is_row_only(const std::string& s) {
+  for (char c : s) {
+    if (!std::isdigit(c)) return false;
+  }
+  return !s.empty();
 }
 
 static inline bool validate_dims(const std::string& input) {
@@ -168,7 +182,7 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
 
   // Assign and return a dataframe
   if (has_cm && has_ph && has_vm) {
-    return Rcpp::wrap(
+    return
       Rcpp::DataFrame::create(
         Rcpp::Named("r")      = r,
         Rcpp::Named("row_r")  = row_r,
@@ -183,10 +197,9 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
         Rcpp::Named("f_attr") = f_attr,
         Rcpp::Named("is")     = is,
         Rcpp::Named("stringsAsFactors") = false
-      )
-    );
+      );
   } else if (has_cm && has_ph && !has_vm) {
-    return Rcpp::wrap(
+    return
       Rcpp::DataFrame::create(
         Rcpp::Named("r")      = r,
         Rcpp::Named("row_r")  = row_r,
@@ -200,10 +213,9 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
         Rcpp::Named("f_attr") = f_attr,
         Rcpp::Named("is")     = is,
         Rcpp::Named("stringsAsFactors") = false
-      )
-    );
+      );
   } else if (has_cm && !has_ph && has_vm) {
-    return Rcpp::wrap(
+    return
       Rcpp::DataFrame::create(
         Rcpp::Named("r")      = r,
         Rcpp::Named("row_r")  = row_r,
@@ -217,10 +229,9 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
         Rcpp::Named("f_attr") = f_attr,
         Rcpp::Named("is")     = is,
         Rcpp::Named("stringsAsFactors") = false
-      )
-    );
+      );
   } else if (!has_cm && has_ph && has_vm) {
-    return Rcpp::wrap(
+    return
       Rcpp::DataFrame::create(
         Rcpp::Named("r")      = r,
         Rcpp::Named("row_r")  = row_r,
@@ -234,10 +245,9 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
         Rcpp::Named("f_attr") = f_attr,
         Rcpp::Named("is")     = is,
         Rcpp::Named("stringsAsFactors") = false
-      )
-    );
+      );
   } else if (has_cm && !has_ph && !has_vm) {
-    return Rcpp::wrap(
+    return
       Rcpp::DataFrame::create(
         Rcpp::Named("r")      = r,
         Rcpp::Named("row_r")  = row_r,
@@ -250,10 +260,9 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
         Rcpp::Named("f_attr") = f_attr,
         Rcpp::Named("is")     = is,
         Rcpp::Named("stringsAsFactors") = false
-      )
-    );
+      );
   } else if (!has_cm && has_ph && !has_vm) {
-    return Rcpp::wrap(
+    return
       Rcpp::DataFrame::create(
         Rcpp::Named("r")      = r,
         Rcpp::Named("row_r")  = row_r,
@@ -266,10 +275,9 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
         Rcpp::Named("f_attr") = f_attr,
         Rcpp::Named("is")     = is,
         Rcpp::Named("stringsAsFactors") = false
-      )
-    );
+      );
   } else if (!has_cm && !has_ph && has_vm) {
-    return Rcpp::wrap(
+    return
       Rcpp::DataFrame::create(
         Rcpp::Named("r")      = r,
         Rcpp::Named("row_r")  = row_r,
@@ -282,10 +290,9 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
         Rcpp::Named("f_attr") = f_attr,
         Rcpp::Named("is")     = is,
         Rcpp::Named("stringsAsFactors") = false
-      )
-    );
+      );
   } else {
-    return Rcpp::wrap(
+    return
       Rcpp::DataFrame::create(
         Rcpp::Named("r")      = r,
         Rcpp::Named("row_r")  = row_r,
@@ -297,8 +304,7 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
         Rcpp::Named("f_attr") = f_attr,
         Rcpp::Named("is")     = is,
         Rcpp::Named("stringsAsFactors") = false
-      )
-    );
+      );
   }
 
 }

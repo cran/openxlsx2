@@ -55,8 +55,8 @@ test_that("setting ref works", {
   m2 <- matrix(7:12, nrow = 2)
 
   wb <- wb_workbook()$add_worksheet()$
-    add_data(x = m1, startCol = 1)$
-    add_data(x = m2, startCol = 4)$
+    add_data(x = m1, start_col = 1)$
+    add_data(x = m2, start_col = 4)$
     add_formula(dims = "H1:J3", x = "MMULT(A2:B4, D2:F3)", array = TRUE)
 
   cc <- wb$worksheets[[1]]$sheet_data$cc
@@ -85,6 +85,8 @@ test_that("formual escaping works", {
     add_formula(dims = "A3", x = "SUM('A&B'!A1)", array = TRUE)
 
   expect_warning(wb$add_formula(dims = "A4", x = "SUM('A&B'!A1)", cm = TRUE))
+
+  expect_silent(wb$save(temp_xlsx()))
 
   exp <- c("'A&amp;B'!A1", "'A&amp;B'!A1", "'A&amp;B'!A1", "SUM('A&amp;B'!A1)", "SUM('A&amp;B'!A1)")
   got <- wb$worksheets[[2]]$sheet_data$cc$f
@@ -243,4 +245,88 @@ test_that("writing cm formulas and writing to sheets with cm formulas works", {
 
   expect_silent(wb$add_data(x = 1))
 
+})
+
+test_that("formula with names work as documented", {
+
+  v1 <- rep("https://CRAN.R-project.org/", 4)
+  names(v1) <- paste0("Hyperlink", 1:4) # Optional: names will be used as display text
+  class(v1) <- "hyperlink"
+
+  v2 <- rep("https://CRAN.R-project.org/", 4)
+  class(v2) <- "hyperlink"
+
+  wb <- wb_workbook()$add_worksheet()
+  wb$add_data(x = v1, dims = "A1")
+  wb$add_data(x = v2, dims = "B1")
+
+
+  exp <- data.frame(
+    A = c(
+      "=HYPERLINK(\"https://CRAN.R-project.org/\", \"Hyperlink1\")",
+      "=HYPERLINK(\"https://CRAN.R-project.org/\", \"Hyperlink2\")",
+      "=HYPERLINK(\"https://CRAN.R-project.org/\", \"Hyperlink3\")",
+      "=HYPERLINK(\"https://CRAN.R-project.org/\", \"Hyperlink4\")"
+    ),
+    B = c(
+      "=HYPERLINK(\"https://CRAN.R-project.org/\")",
+      "=HYPERLINK(\"https://CRAN.R-project.org/\")",
+      "=HYPERLINK(\"https://CRAN.R-project.org/\")",
+      "=HYPERLINK(\"https://CRAN.R-project.org/\")"
+    )
+  )
+  class(exp$A) <- c("character", "formula")
+  class(exp$B) <- c("character", "formula")
+  got <- wb$to_df(show_formula = TRUE, col_names = FALSE)
+  expect_equal(exp, got)
+
+})
+
+test_that("normalizing spreadsheet formulas works", {
+  fml <- c(
+    'SUM(A1;B1; C1)',
+    'SUM(A1,B1,C1)',
+    '"Hello;
+  World" & 1',
+    'TEXT(TODAY(),"MM/DD/YY")',
+    'IF((SUM(A1,B1) & "a;b")<>"",(SUM(A1,B1) & "a;b");"")',
+    '',
+    '  SUM(A1;B1;C1)  '
+  )
+
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = matrix(1:9, 3, 3), col_names = FALSE)$
+    add_formula(x = fml, dims = "D2")
+
+  exp <- structure(
+    c("SUM(A1,B1, C1)",
+      "SUM(A1,B1,C1)",
+      "\"Hello;\n  World\" & 1",
+      "TEXT(TODAY(),\"MM/DD/YY\")",
+      "IF((SUM(A1,B1) & \"a;b\")<>\"\",(SUM(A1,B1) & \"a;b\"),\"\")",
+      NA,
+      "  SUM(A1,B1,C1)  "
+    ),
+    class = c("character", "formula")
+  )
+  got <- wb$to_df(show_formula = TRUE, col_names = FALSE, start_row = 2, cols = "D")$D
+  expect_equal(exp, got)
+})
+
+test_that("cm works more like array", {
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = cars)$
+    add_data(dims = "D1", x = "Unique Values of Speed")
+
+  expect_warning(
+    wb$add_formula(
+      dims = wb_dims(x = unique(cars$speed), from_dims = "D2"),
+      x = paste0("_xlfn.UNIQUE(", wb_dims(x = cars, cols = "speed"), ")"),
+      cm = TRUE
+    ),
+    "modifications with cm formulas are experimental"
+  )
+
+  got <- table(wb$worksheets[[1]]$sheet_data$cc$f)[["_xlfn.UNIQUE(A2:A51)"]]
+  expect_equal(1L, got)
 })

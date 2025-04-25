@@ -100,8 +100,12 @@ inner_update <- function(
   replacement <- c("r", "row_r", "c_r", "c_s", "c_t", has_cm, has_ph, has_vm,
                    "v", "f", "f_attr", "is")
 
-  if (!removeCellStyle) {
-    replacement <- replacement[-which(replacement == "c_s")]
+  if (removeCellStyle) {
+    # use c_s from cc
+    replacementX  <- replacement
+  } else {
+    # use c_s from x
+    replacementX  <- replacement[-which(replacement == "c_s")]
   }
 
   sel <- match(x$r, cc$r)
@@ -140,7 +144,8 @@ inner_update <- function(
     cc <- cc[replacement]
   }
 
-  cc[sel, replacement] <- x[replacement]
+  # c_s is either used from X or from cc
+  cc[sel, replacementX] <- x[replacementX]
 
   # avoid missings in cc
   if (anyNA(cc))
@@ -173,7 +178,7 @@ initialize_cell <- function(wb, sheet, new_cells) {
   x$row_r <- gsub("[[:upper:]]", "", new_cells)
   x$c_r   <- gsub("[[:digit:]]", "", new_cells)
 
-  rows <- x$row_r
+  rows <- unique(x$row_r)
   cells_needed <- new_cells
 
   inner_update(wb, sheet_id, x, rows, cells_needed)
@@ -312,6 +317,9 @@ write_data2 <- function(
       data[fmls],
       function(val) {
         val <- replaceXMLEntities(val)
+        # replace localized separators ";" used e.g. in German formulas must be ","
+        # otherwise the semicolon will interfere with the XML formulas
+        val <- gsub('(;)(?=(?:[^"\']*(["\'])[^"\']*\\2)*[^"\']*$)', ',', val, perl = TRUE)
         vapply(val, function(x) xml_value(xml_node_create("fml", x, escapes = TRUE), "fml"), "")
       }
     )
@@ -641,9 +649,9 @@ write_data2 <- function(
         wb$add_cell_style(
           sheet = sheetno,
           dims = dim_sel,
-          applyNumberFormat = "1",
-          quotePrefix = "1",
-          numFmtId = "49"
+          apply_number_format = "1",
+          quote_prefix = "1",
+          num_fmt_id = "49"
         )
         cc$typ <- NULL
       }
@@ -968,7 +976,11 @@ write_data_table <- function(
       if (is.null(dim(x))) {
         colNames <- FALSE
         if (!any(grepl("=([\\s]*?)HYPERLINK\\(", x[is_hyperlink], perl = TRUE))) {
-          x[is_hyperlink] <- create_hyperlink(text = x[is_hyperlink])
+          if (length(names(x))) {
+            x[is_hyperlink] <- create_hyperlink(text = names(x[is_hyperlink]), file = x[is_hyperlink])
+          } else {
+            x[is_hyperlink] <- create_hyperlink(text = x[is_hyperlink])
+          }
         }
         class(x[is_hyperlink]) <- c("character", "hyperlink")
       } else {
@@ -1004,7 +1016,7 @@ write_data_table <- function(
     if (transpose) x <- transpose_df(x)
   }
 
-  if (is.vector(x) || is.factor(x) || inherits(x, "Date") || inherits(x, "POSIXt") || inherits(x, "character")) {
+  if (is.vector(x) || is.factor(x) || inherits(x, "Date") || inherits(x, "POSIXt") || inherits(x, "difftime") || inherits(x, "character")) {
     colNames <- FALSE
   } ## this will go to coerce.default and rowNames will be ignored
 
@@ -1298,7 +1310,7 @@ do_write_formula <- function(
     dims <- wb_dims(start_row, start_col)
   }
 
-  if (array || enforce) {
+  if ((array || cm) || enforce) {
     dfx <- data.frame("X" = x, stringsAsFactors = FALSE)
   } else {
     # if dims a single cell and x > dfx, increase dfx
@@ -1376,7 +1388,7 @@ do_write_formula <- function(
   }
 
   # transpose match write_data_table
-  if (array || enforce) {
+  if ((array || cm) || enforce) {
     rc <- dims_to_rowcol(dims)
     if (length(rc[["col"]]) > length(rc[["row"]])) {
       dfx <- transpose_df(dfx)

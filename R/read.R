@@ -1,3 +1,46 @@
+# Internal function to convert data frame from character to whatever is required
+convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_character = FALSE) {
+  sel <- !is.na(names(types))
+
+  if (any(sel)) {
+    nums <- names(which(types[sel] == 1))
+    dtes <- names(which(types[sel] == 2))
+    poxs <- names(which(types[sel] == 3))
+    logs <- names(which(types[sel] == 4))
+    difs <- names(which(types[sel] == 5))
+    fmls <- names(which(types[sel] == 6))
+    # convert "#NUM!" to "NaN" -- then converts to NaN
+    # maybe consider this an option to instead return NA?
+
+    if (as_character) {
+      date_conv_c     <- function(...) as.character(date_conv(...))
+      datetime_conv_c <- function(...) as.character(datetime_conv(...))
+      hms_conv_c      <- function(...) as.character(hms_conv(...))
+
+      if (length(nums)) z[nums] <- lapply(z[nums], function(i) as.character(as.numeric(replace(i, i == "#NUM!", "NaN"))))
+      if (length(dtes)) z[dtes] <- lapply(z[dtes], date_conv_c)
+      if (length(poxs)) z[poxs] <- lapply(z[poxs], datetime_conv_c)
+      if (length(logs)) z[logs] <- lapply(z[logs], function(i) as.character(as.logical(i)))
+      if (length(difs)) z[difs] <- lapply(z[difs], hms_conv_c)
+    } else {
+      if (length(nums)) z[nums] <- lapply(z[nums], function(i) as.numeric(replace(i, i == "#NUM!", "NaN")))
+      if (length(dtes)) z[dtes] <- lapply(z[dtes], date_conv)
+      if (length(poxs)) z[poxs] <- lapply(z[poxs], datetime_conv)
+      if (length(logs)) z[logs] <- lapply(z[logs], as.logical)
+      if (length(difs)) z[difs] <- lapply(z[difs], hms_conv)
+    }
+
+    for (i in seq_along(z)) { # convert df to class formula
+      if (names(z)[i] %in% fmls) class(z[[i]]) <- c(class(z[[i]]), "formula")
+    }
+
+  } else {
+    warning("could not convert. All missing in row used for variable names")
+  }
+
+  z
+}
+
 # `wb_to_df()` ----------------------------------------
 #' Create a data frame from a Workbook
 #'
@@ -33,6 +76,19 @@
 #' to be evaluated when the file is opened in a spreadsheet software.
 #' Opening, saving and closing the file in a spreadsheet software will resolve
 #' this.
+#'
+#' Before release 1.15, datetime variables (in 'yyyy-mm-dd hh:mm:ss' format)
+#' were imported using the user's local system timezone (`Sys.timezone()`).
+#' This behavior has been updated. Now, all datetime variables are imported
+#' with the timezone set to "UTC".
+#' If automatic date detection and conversion are enabled but the conversion
+#' is unsuccessful (for instance, in a column containing a mix of data types
+#' like strings, numbers, and dates) dates might be displayed as a Unix
+#' timestamp. Usually they are converted to character for character columns.
+#' If date detection is disabled, dates will show up as a spreadsheet date
+#' format. To convert these, you can use the functions [convert_date()],
+#' [convert_datetime()], or [convert_hms()]. If types are specified, date
+#' detection is disabled.
 #'
 #' @seealso [wb_get_named_regions()]
 #'
@@ -250,7 +306,7 @@ wb_to_df <- function(
 
   row_attr  <- wb$worksheets[[sheet]]$sheet_data$row_attr
   cc  <- wb$worksheets[[sheet]]$sheet_data$cc
-  sst <- attr(wb$sharedStrings, "text")
+  sst <- wb$sharedStrings
 
   rnams <- row_attr$r
   rnams <- rnams[rnams %in% unique(cc$row_r)] # avoid blank row interference
@@ -368,7 +424,7 @@ wb_to_df <- function(
   # test is sst
   if (any(cc_tab %in% c("s"))) {
     sel <- cc$c_t %in% c("s")
-    cc$val[sel] <- sst[as.numeric(cc$v[sel]) + 1]
+    cc$val[sel] <- si_to_txt(sst[as.numeric(cc$v[sel]) + 1])
     cc$typ[sel] <- "s"
   }
 
@@ -403,30 +459,40 @@ wb_to_df <- function(
 
     # if a cell is t="s" the content is a sst and not da date
     if (detect_dates && missing(types)) {
-      cc$is_string <- FALSE
-      if (!is.null(cc$c_t))
-        cc$is_string <- cc$c_t %in% c("s", "str", "b", "inlineStr")
+      uccs <- unique(cc$c_s)
+      ucct <- unique(cc$c_t)
 
-      if (any(sel <- cc$c_s %in% xlsx_date_style)) {
-        sel <- sel & !cc$is_string & cc$v != ""
-        cc$val[sel] <- suppressWarnings(as.character(convert_date(cc$v[sel], origin = origin)))
+      cc$is_string <- FALSE
+      strings <-  c("s", "str", "b", "inlineStr")
+      if (!is.null(cc$c_t) && any(ucct %in% strings))
+        cc$is_string <- cc$c_t %in% strings
+
+      if (any(uccs %in% xlsx_date_style)) {
+        sel <- cc$c_s %in% xlsx_date_style & !cc$is_string & cc$v != ""
+        if (convert)
+          cc$val[sel] <- date_to_unix(cc$v[sel], origin = origin)
+        else
+          cc$val[sel] <- as.character(convert_date(cc$v[sel], origin = origin))
         cc$typ[sel]  <- "d"
       }
 
-      if (any(sel <- cc$c_s %in% xlsx_hms_style)) {
-        sel <- sel & !cc$is_string & cc$v != ""
-        if (isNamespaceLoaded("hms")) {
+      if (any(uccs %in% xlsx_hms_style)) {
+        sel <- cc$c_s %in% xlsx_hms_style & !cc$is_string & cc$v != ""
+        if (convert) {
           # if hms is loaded, we have to avoid applying convert_hms() twice
           cc$val[sel] <- cc$v[sel]
         } else {
-          cc$val[sel] <- suppressWarnings(as.character(convert_hms(cc$v[sel])))
+          cc$val[sel] <- as.character(convert_hms(cc$v[sel]))
         }
         cc$typ[sel]  <- "h"
       }
 
-      if (any(sel <- cc$c_s %in% xlsx_posix_style)) {
-        sel <- sel & !cc$is_string & cc$v != ""
-        cc$val[sel] <- suppressWarnings(as.character(convert_datetime(cc$v[sel], origin = origin)))
+      if (any(uccs %in% xlsx_posix_style)) {
+        sel <- cc$c_s %in% xlsx_posix_style & !cc$is_string & cc$v != ""
+        if (convert)
+          cc$val[sel] <- date_to_unix(cc$v[sel], origin = origin, datetime = TRUE)
+        else
+          cc$val[sel] <- as.character(convert_datetime(cc$v[sel], origin = origin))
         cc$typ[sel]  <- "p"
       }
     }
@@ -582,39 +648,34 @@ wb_to_df <- function(
   xlsx_cols_names <- colnames(z)
   names(xlsx_cols_names) <- xlsx_cols_names
 
-  # if colNames, then change tt too
+
+  date_conv     <- function(x) as.Date(.POSIXct(as.double(x), "UTC"), tz = "UTC", origin = "1970-01-01")
+  datetime_conv <- function(x) .POSIXct(as.double(x), "UTC")
+  hms_conv      <- convert_hms
+
+  # if colNames, then change tt too. rownames will be converted later. If column name row
+  # is in z/tt, the column name guessing will fail below
   if (col_names) {
     # select first row as colnames, but do not yet assign. it might contain
     # missing values and if assigned, convert below might break with unambiguous
     # names.
+
     nams <- names(xlsx_cols_names)
-    xlsx_cols_names  <- z[1, ]
+    if (convert)
+      xlsx_cols_names <- convert_df(z[1, , drop = FALSE], guess_col_type(tt[1, , drop = FALSE]), date_conv, datetime_conv, hms_conv, as_character = TRUE)
+    else
+      xlsx_cols_names <- z[1, , drop = FALSE]
     names(xlsx_cols_names) <- nams
 
     z  <- z[-1, , drop = FALSE]
     tt <- tt[-1, , drop = FALSE]
   }
 
-  if (row_names) {
-    rownames(z)  <- z[, 1]
-    rownames(tt) <- z[, 1]
-    xlsx_cols_names <- xlsx_cols_names[-1]
-
-    z  <- z[, -1, drop = FALSE]
-    tt <- tt[, -1, drop = FALSE]
-  }
-
   # # faster guess_col_type alternative? to avoid tt
   # types <- ftable(cc$row_r ~ cc$c_r ~ cc$typ)
 
-  date_conv     <- NULL
-  datetime_conv <- NULL
-  hms_conv      <- convert_hms
-
   if (missing(types)) {
     types <- guess_col_type(tt)
-    date_conv     <- as.Date
-    datetime_conv <- as.POSIXct
   } else {
     # TODO check if guessing only if !all() is possible
     if (any(xlsx_cols_names %in% names(types))) {
@@ -645,36 +706,54 @@ wb_to_df <- function(
       stop("no variable from `types` found in data")
     }
 
-    date_conv     <- convert_date
-    datetime_conv <- convert_datetime
+    # avoid multiple conversion
+    date_conv     <- function(x) convert_date(x, origin = origin)
+    datetime_conv <- function(x) convert_datetime(x, origin = origin)
   }
 
   # could make it optional or explicit
   if (convert) {
-    sel <- !is.na(names(types))
+    z <- convert_df(z, types, date_conv, datetime_conv, hms_conv)
 
-    if (any(sel)) {
-      nums <- names(which(types[sel] == 1))
-      dtes <- names(which(types[sel] == 2))
-      poxs <- names(which(types[sel] == 3))
-      logs <- names(which(types[sel] == 4))
-      difs <- names(which(types[sel] == 5))
-      fmls <- names(which(types[sel] == 6))
-      # convert "#NUM!" to "NaN" -- then converts to NaN
-      # maybe consider this an option to instead return NA?
-      if (length(nums)) z[nums] <- lapply(z[nums], function(i) as.numeric(replace(i, i == "#NUM!", "NaN")))
-      if (length(dtes)) z[dtes] <- lapply(z[dtes], date_conv, origin = origin)
-      if (length(poxs)) z[poxs] <- lapply(z[poxs], datetime_conv, origin = origin)
-      if (length(logs)) z[logs] <- lapply(z[logs], as.logical)
-      if (isNamespaceLoaded("hms")) z[difs] <- lapply(z[difs], hms_conv)
+    ## this reduces the difference to releases < 1.15. If in mixed columns
+    ## conversion to date fails and a character frame is returned, we return
+    ## a character instead of the unix time stamp as character.
+    if (detect_dates) {
+      date_conv_c     <- function(...) as.character(date_conv(...))
+      datetime_conv_c <- function(...) as.character(datetime_conv(...))
+      hms_conv_c      <- function(...) as.character(hms_conv(...))
 
-      for (i in seq_along(z)) { # convert df to class formula
-        if (names(z)[i] %in% fmls) class(z[[i]]) <- c(class(z[[i]]), "formula")
+      sel <- !is.na(names(types))
+      # update only if types is character
+      chrs <- names(which(types[sel] == 0))
+
+      for (chr in chrs) {
+        sel <- tt[[chr]] == "d" & !is.na(z[[chr]])
+        if (length(sel)) {
+          z[[chr]][sel] <- vapply(z[[chr]][sel], date_conv_c, NA_character_)
+        }
+
+        sel <- tt[[chr]] == "p" & !is.na(z[[chr]])
+        if (length(sel)) {
+          z[[chr]][sel] <- vapply(z[[chr]][sel], datetime_conv_c, NA_character_)
+        }
+
+        sel <- tt[[chr]] == "h" & !is.na(z[[chr]])
+        if (length(sel)) {
+          z[[chr]][sel] <- vapply(z[[chr]][sel], hms_conv_c, NA_character_)
+        }
       }
-
-    } else {
-      warning("could not convert. All missing in row used for variable names")
     }
+  }
+
+  # column names were picked earlier
+  if (row_names) {
+    rownames(z)  <- z[, 1]
+    rownames(tt) <- z[, 1]
+    xlsx_cols_names <- xlsx_cols_names[-1]
+
+    z  <- z[, -1, drop = FALSE]
+    tt <- tt[, -1, drop = FALSE]
   }
 
   if (col_names) {

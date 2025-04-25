@@ -15,7 +15,7 @@ test_that("write_formula", {
   # write data add array formula later
   wb <- wb_workbook()
   wb <- wb_add_worksheet(wb, "df")
-  wb$add_data(x = df, startCol = "C")
+  wb$add_data(x = df, start_col = "C")
   wb$add_formula(start_col = "E", start_row = 2,
                x = "SUM(C2:C11*D2:D11)",
                array = TRUE)
@@ -136,7 +136,7 @@ test_that("update_cells", {
 
   exp <- structure(
     list(c_t = c("", "str", "str"),
-         f = c("SUM(C2:C11*D2:D11)", "C3 + D3", "=HYPERLINK(\"https://www.google.com\")"),
+         f = c("SUM(C2:C11*D2:D11)", "C3 + D3", "=HYPERLINK(\"https://www.google.com\", \"google\")"),
          f_attr = c("t=\"array\" ref=\"E2\"", "", "")),
     row.names = c("23", "110", "111"), class = "data.frame")
   got <- wb$worksheets[[1]]$sheet_data$cc[c(5, 8, 11), c("c_t", "f", "f_attr")]
@@ -219,7 +219,7 @@ test_that("update cell(s)", {
     add_worksheet()$
     add_fill(dims = "B2:G8", color = wb_colour("yellow"))$
     add_data(dims = "C3", x = Sys.Date())$
-    add_data(dims = "E4", x = Sys.Date(), removeCellStyle = TRUE)
+    add_data(dims = "E4", x = Sys.Date(), remove_cell_style = TRUE)
   exp <- structure(list(r = c("B2", "C2", "D2", "E2", "F2", "G2"),
                         row_r = c("2", "2", "2", "2", "2", "2"),
                         c_r = c("B", "C", "D", "E", "F", "G"),
@@ -489,14 +489,14 @@ test_that("writing slicers works", {
     )$
     add_slicer(x = df, sheet = current_sheet(), slicer = "vs", pivot_table = "mtcars")$
     add_slicer(x = df, dims = "B18:D24", sheet = current_sheet(), slicer = "drat", pivot_table = "mtcars",
-               params = list(columnCount = 5))$
+               params = list(column_count = 5))$
     # second pivot
     add_pivot_table(
       df, dims = "G3", sheet = current_sheet(), slicer = varname, rows = "gear", cols = "carb", data = "mpg",
       pivot_table = "mtcars2"
     )$
     add_slicer(x = df, dims = "G12:I16", slicer = "vs", pivot_table = "mtcars2",
-               params = list(sortOrder = "descending", caption = "Wow!"))
+               params = list(sort_order = "descending", caption = "Wow!"))
 
   ### Sheet 3
   wb$
@@ -1487,4 +1487,36 @@ test_that("writing without pugixml works", {
   expect_silent(wb$save(file = temp, flush = TRUE))
   expect_silent(wb <- wb_load(temp))
 
+})
+
+test_that("writing Inf, -Inf and NaN works", {
+  x <- c("Inf", "-Inf", "NaN")
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = x)
+  got <- wb$to_df(col_names = FALSE)$A
+  expect_equal(x, got)
+
+  # labelled vector with Inf, -Inf, and NaN
+  lbl <- c("INF", "-INF", "NAN")
+  df <- structure(
+    list(ff = structure(c(Inf, -Inf, NaN),
+                        labels = c(INF = Inf, `-INF` = -Inf, NAN = NaN),
+                        class = c("haven_labelled", "double"))
+         ), class = "data.frame", row.names = c(NA, -3L))
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = df, col_names = FALSE)
+  got <- wb$to_df(col_names = FALSE)$A
+  expect_equal(lbl, got)
+
+  # And Something confusing
+  lbl <- c("INF", "#NUM!", "NaN")
+  df <- structure(
+    list(ff = structure(c(Inf, -Inf, NaN),
+                        labels = c(INF = Inf, `NaN` = NaN),
+                        class = c("haven_labelled", "double"))
+         ), class = "data.frame", row.names = c(NA, -3L))
+  wb <- wb_workbook()$add_worksheet()$
+    add_data(x = df, col_names = FALSE)
+  got <- wb$to_df(col_names = FALSE)$A
+  expect_equal(lbl, got)
 })
