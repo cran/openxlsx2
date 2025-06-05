@@ -169,7 +169,7 @@ inner_update <- function(
 #' @noRd
 initialize_cell <- function(wb, sheet, new_cells) {
 
-  sheet_id <- wb$validate_sheet(sheet)
+  sheet_id <- wb$.__enclos_env__$private$get_sheet_index(sheet)
   nms <- names(wb$worksheets[[sheet_id]]$sheet_data$cc)
 
   # create artificial cc for the missing cells
@@ -204,7 +204,7 @@ update_cell <- function(x, wb, sheet, cell, colNames = FALSE,
   if (missing(na.strings))
     na.strings <- substitute()
 
-  sheet_id <- wb$validate_sheet(sheet)
+  sheet_id <- wb$.__enclos_env__$private$get_sheet_index(sheet)
 
   dims <- dims_to_dataframe(cell, fill = TRUE)
   rows <- rownames(dims)
@@ -371,7 +371,7 @@ write_data2 <- function(
     }
   }
 
-  sheetno <- wb_validate_sheet(wb, sheet)
+  sheetno <- wb$.__enclos_env__$private$get_sheet_index(sheet)
   # message("sheet no: ", sheetno)
 
   # create a data frame
@@ -400,30 +400,8 @@ write_data2 <- function(
 
   # TODO writing defined name should handle global and local: localSheetId
   # this requires access to wb$workbook.
-  # TODO The check for existing names is in write_data()
-  # TODO use wb$add_named_region()
   if (!is.null(name) && !any(grepl(dim_sep, dims))) {
-
-    ## named region
-    ex_names <- regmatches(wb$workbook$definedNames, regexpr('(?<=name=")[^"]+', wb$workbook$definedNames, perl = TRUE))
-    ex_names <- replaceXMLEntities(ex_names)
-
-    if (name %in% ex_names) {
-      stop(sprintf("Named region with name '%s' already exists!", name))
-    } else if (grepl("^[A-Z]{1,3}[0-9]+$", name)) {
-      stop("name cannot look like a cell reference.")
-    }
-
-    sheet_name <- wb$get_sheet_names(escape = TRUE)[[sheetno]]
-    if (grepl("[^A-Za-z0-9]", sheet_name)) sheet_name <- shQuote(sheet_name, "sh")
-
-    sheet_dim <- paste0(sheet_name, "!", dims)
-
-    def_name <- xml_node_create("definedName",
-                                xml_children = sheet_dim,
-                                xml_attributes = c(name = name))
-
-    wb$workbook$definedNames <- c(wb$workbook$definedNames, def_name)
+    wb$add_named_region(sheet = sheet, dims = dims, name = name)
   }
 
   # from here on only wb$worksheets is required

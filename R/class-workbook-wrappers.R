@@ -2257,14 +2257,6 @@ wb_set_grid_lines <- function(wb, sheet = current_sheet(), show = FALSE, print =
   wb$clone()$set_grid_lines(sheet = sheet, show = show, print = print)
 }
 
-#' @rdname wb_set_grid_lines
-#' @export
-wb_grid_lines <- function(wb, sheet = current_sheet(), show = FALSE, print = show) {
-  assert_workbook(wb)
-  .Deprecated(old = "wb_grid_lines", new = "wb_set_grid_lines", package = "openxlsx2")
-  wb$clone()$set_grid_lines(sheet = sheet, show = show, print = print)
-}
-
 # TODO hide gridlines?
 
 # worksheet order ---------------------------------------------------------
@@ -3260,6 +3252,7 @@ wb_set_cell_style_across <- function(wb, sheet = current_sheet(), style, cols = 
 #' @param left_border,right_border,top_border,bottom_border,inner_hgrid,inner_vgrid
 #'   the border style, if `NULL` no border is drawn.
 #'   See [create_border()] for possible border styles
+#' @param update Logical. Defaults to FALSE. If TRUE, and the border style includes NULL entries, existing borders may be updated with new ones. When overlapping cells (e.g., squares intersect), existing borders will be preserved where possible.
 #' @param ... additional arguments
 #' @seealso [create_border()]
 #' @examples
@@ -3308,6 +3301,11 @@ wb_set_cell_style_across <- function(wb, sheet = current_sheet(), style, cols = 
 #' wb$add_worksheet("S1")$add_data("S1", mtcars)
 #' wb$add_border(1, dims = "A2:K33", inner_vgrid = "thin",
 #'  inner_vcolor = wb_color(hex = "FF808080"))
+#'
+#' wb$add_worksheet()$
+#'   add_border(dims = "B2:D4", bottom_border = "thick", left_border = "thick",
+#'     right_border = "thick", top_border = "thick")$
+#'   add_border(dims = "C3:E5", update = TRUE)
 #' @family styles
 #' @export
 wb_add_border <- function(
@@ -3326,6 +3324,7 @@ wb_add_border <- function(
     inner_hcolor   = NULL,
     inner_vgrid    = NULL,
     inner_vcolor   = NULL,
+    update         = FALSE,
     ...
 ) {
   assert_workbook(wb)
@@ -3344,6 +3343,7 @@ wb_add_border <- function(
     inner_hcolor  = inner_hcolor,
     inner_vgrid   = inner_vgrid,
     inner_vcolor  = inner_vcolor,
+    update        = update,
     ...           = ...
   )
 
@@ -3437,6 +3437,7 @@ wb_add_fill <- function(
 #' @param shadow Logical, whether the font should have a shadow.
 #' @param extend Logical, whether the font should be extended.
 #' @param vert_align Character, the vertical alignment of the font. Valid values are "baseline", "superscript", "subscript".
+#' @param update Logical/Character if logical, all elements are assumed to be selected, whereas if character, only matching elements are updated. This will not alter strings styled with [fmt_txt()].
 #' @param ... ...
 #' @examples
 #'  wb <- wb_workbook() %>% wb_add_worksheet("S1") %>% wb_add_data("S1", mtcars)
@@ -3444,6 +3445,9 @@ wb_add_fill <- function(
 #' # With chaining
 #'  wb <- wb_workbook()$add_worksheet("S1")$add_data("S1", mtcars)
 #'  wb$add_font("S1", "A1:K1", name = "Arial", color = wb_color(theme = "4"))
+#'
+#' # Update the font color
+#'  wb$add_font("S1", "A1:K1", color = wb_color("orange"), update = c("color"))
 #' @return A `wbWorkbook`, invisibly
 #' @family styles
 #' @export
@@ -3467,6 +3471,7 @@ wb_add_font <- function(
       scheme     = "",
       shadow     = "",
       vert_align = "",
+      update     = FALSE,
       ...
 ) {
   assert_workbook(wb)
@@ -3489,6 +3494,7 @@ wb_add_font <- function(
     scheme     = scheme,
     shadow     = shadow,
     vert_align = vert_align,
+    update     = update,
     ...        = ...
   )
 }
@@ -3706,10 +3712,25 @@ wb_add_cell_style <- function(
 #' @param wb A `wbWorkbook` object
 #' @param sheet A worksheet
 #' @param dims A cell range
-#' @param name The named style name.
+#' @param name The named style name. Builtin styles are `Normal`, `Bad`, `Good`, `Neutral`, `Calculation`, `Check Cell`, `Explanatory Text`,  `Input`, `Linked Cell`, `Note`, `Output`, `Warning Text`, `Heading 1`, `Heading 2`, `Heading 3`, `Heading 4`, `Title`, `Total`, `$x% - Accent$y` (for x in 20, 40, 60 and y in 1:6), `Accent$y` (for y in 1:6), `Comma`, `Comma [0]`, `Currency`, `Currency [0]`, `Per cent`
 #' @family styles
 #' @param font_name,font_size optional else the default of the theme
 #' @return The `wbWorkbook`, invisibly
+#' @examples
+#' wb <- wb_workbook()$add_worksheet()
+#' name <- "Normal"
+#' dims <- "A1"
+#' wb$add_data(dims = dims, x = name)
+#'
+#' name <- "Bad"
+#' dims <- "B1"
+#' wb$add_named_style(dims = dims, name = name)
+#' wb$add_data(dims = dims, x = name)
+#'
+#' name <- "Good"
+#' dims <- "C1"
+#' wb$add_named_style(dims = dims, name = name)
+#' wb$add_data(dims = dims, x = name)
 #' @export
 wb_add_named_style <- function(
     wb,
@@ -4071,6 +4092,7 @@ wb_add_form_control <- function(
 #' @details
 #' Conditional formatting `type` accept different parameters. Unless noted,
 #' unlisted parameters are ignored.
+#' If an expression is pointing to a cell `"A1=1"`, this cell reference is fluid and not fixed like `"$A$1=1"`. It will behave similar to a formula, when `dims` is spanning multiple columns or rows (A1, A2, A3 ... in vertical direction, A1, B1, C1 ... in horizontal direction). If `dims` is a non consecutive range ("A1:B2,D1:F2"), the expression is applied to each range. For the second `dims` range it will be evaluated again as `"A1=1"`.
 #' \describe{
 #'   \item{`expression`}{
 #'     `[style]`\cr A `Style` object\cr\cr

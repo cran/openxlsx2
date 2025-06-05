@@ -106,7 +106,12 @@ col2hex <- function(my.col) {
 #' @param envir parent frame for use in assert
 #' @param msg return message
 #' @noRd
-validate_color <- function(color = NULL, or_null = FALSE, envir = parent.frame(), msg = NULL) {
+validate_color <- function(
+  color = NULL, or_null = FALSE,
+  envir = parent.frame(), msg = NULL,
+  format = c("ARGB", "RGBA")
+) {
+  format <- match.arg(format)
   sx <- as.character(substitute(color, envir))
 
   if (identical(color, "none") && or_null) {
@@ -125,6 +130,13 @@ validate_color <- function(color = NULL, or_null = FALSE, envir = parent.frame()
 
   # remove any # from color strings
   color <- gsub("^#", "", toupper(color))
+
+  # if the format is RGBA (R's default), switch first two with last two characters
+  if (format == "RGBA") {
+    s <- nchar(color) == 8
+    alpha <- substring(color[s], 7, 8)
+    color[s] <- paste0(alpha, substring(color[s], 1, 6))
+  }
 
   ## create a total size of 8 in ARGB format
   color <- stringi::stri_pad_left(str = color, width = 8, pad = "F")
@@ -1077,7 +1089,7 @@ clone_shared_strings <- function(wb_old, old, wb_new, new) {
 
   }
 
-  sheet_id <- wb_old$validate_sheet(old)
+  sheet_id <- wb_old$clone()$.__enclos_env__$private$get_sheet_index(old)
   cc <- wb_old$worksheets[[sheet_id]]$sheet_data$cc
   sst_ids  <- as.integer(cc$v[cc$c_t == "s"]) + 1
   sst_uni  <- sort(unique(sst_ids))
@@ -1089,7 +1101,7 @@ clone_shared_strings <- function(wb_old, old, wb_new, new) {
   attr(wb_new$sharedStrings, "uniqueCount") <- as.character(length(wb_new$sharedStrings))
 
 
-  sheet_id <- wb_new$validate_sheet(new)
+  sheet_id <- wb_new$clone()$.__enclos_env__$private$get_sheet_index(new)
   cc <- wb_new$worksheets[[sheet_id]]$sheet_data$cc
   # order ids and add new offset
   ids <- as.integer(cc$v[cc$c_t == "s"]) + 1L
@@ -1395,13 +1407,13 @@ shared_as_fml <- function(cc, cc_shared) {
   cc_shared$f      <- replace_a1_notation(cc_shared$f, repls)
   cc_shared$cols   <- NULL
   cc_shared$rows   <- NULL
-  cc_shared$f_attr <- ""
+  cc_shared$f_attr <- rep("", nrow(cc_shared))
   cc_shared$f_si   <- NULL
 
   # reduce and assign
   cc_shared <- cc_shared[which(cc_shared$r %in% cc$r), ]
 
-  cc[match(cc_shared$r, cc$r), ] <- cc_shared
+  cc[match(cc_shared$r, cc$r), names(cc_shared)] <- cc_shared
   cc
 }
 

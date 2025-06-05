@@ -153,6 +153,8 @@ Note that the documentation is more complete in each of the wrapper functions.
 worksheet names.}
 
 \item{\code{path}}{path}
+
+\item{\code{namedSheetViews}}{namedSheetViews}
 }
 \if{html}{\out{</div>}}
 }
@@ -3268,6 +3270,7 @@ create borders for cell region
   inner_hcolor = NULL,
   inner_vgrid = NULL,
   inner_vcolor = NULL,
+  update = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -3282,6 +3285,8 @@ create borders for cell region
 \item{\code{bottom_color, left_color, right_color, top_color, inner_hcolor, inner_vcolor}}{a color, either something openxml knows or some RGB color}
 
 \item{\code{left_border, right_border, top_border, bottom_border, inner_hgrid, inner_vgrid}}{the border style, if NULL no border is drawn. See create_border for possible border styles}
+
+\item{\code{update}}{update}
 
 \item{\code{...}}{additional arguments}
 }
@@ -3362,6 +3367,7 @@ provide simple font function
   scheme = "",
   shadow = "",
   vert_align = "",
+  update = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -3402,6 +3408,8 @@ provide simple font function
 \item{\code{shadow}}{shadow}
 
 \item{\code{vert_align}}{vertical alignment}
+
+\item{\code{update}}{update}
 
 \item{\code{...}}{additional arguments}
 }

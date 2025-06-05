@@ -272,6 +272,10 @@ wb_to_df <- function(
     sheet <- wb_validate_sheet(wb, sheet)
   }
 
+  if (is.na(sheet)) {
+    stop("sheet not found. available sheets are: \n", paste0(wb$get_sheet_names(), collapse = ", "))
+  }
+
   # the sheet has no data
   if (is.null(wb$worksheets[[sheet]]$sheet_data$cc) ||
       nrow(wb$worksheets[[sheet]]$sheet_data$cc) == 0) {
@@ -509,12 +513,13 @@ wb_to_df <- function(
 
     if (any(grepl("shared", cc$f_attr))) {
 
-      f_t <- rbindlist(xml_attr(paste0("<f ", cc$f_attr, "/>"), "f"))$t
       # depending on the sheet, this might require updates to many cells
       # TODO reduce this to cells, that are part of `cc`. Currently we
       # might waste time, updating cells that are not visible to the user
       cc_shared <- wb$worksheets[[sheet]]$sheet_data$cc
-      cc_shared <- cc_shared[f_t == "shared", ]
+      cc_shared$shared_fml <- rbindlist(xml_attr(paste0("<f ", cc_shared$f_attr, "/>"), "f"))$t
+      cc_shared <- cc_shared[cc_shared$shared_fml == "shared", ]
+
       cc <- shared_as_fml(cc, cc_shared)
     }
 
@@ -903,7 +908,7 @@ wb_read <- function(
 #' @export
 wb_data <- function(wb, sheet = current_sheet(), dims, ...) {
   assert_workbook(wb)
-  sheetno <- wb_validate_sheet(wb, sheet)
+  sheetno <- wb$clone()$.__enclos_env__$private$get_sheet_index(sheet)
   sheetname <- wb$get_sheet_names(escape = TRUE)[[sheetno]]
 
   if (missing(dims)) {

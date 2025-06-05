@@ -1,5 +1,7 @@
 #' Create dataframe from dimensions
 #'
+#' Non consecutive decreasing dims will return an increasing data frame.
+#'
 #' @param dims Character vector of expected dimension.
 #' @param fill If `TRUE`, fills the dataframe with variables
 #' @param empty_rm Logical if empty columns and rows should be included
@@ -12,6 +14,10 @@ dims_to_dataframe <- function(dims, fill = FALSE, empty_rm = FALSE) {
   # in R 4.4.0 grepl(",", data.frame(x = paste0("K",))) == TRUE
   if (inherits(dims, "data.frame"))
     dims <- unlist(dims)
+
+  if (any(grepl("$", dims))) {
+    dims <- gsub("\\$", "", dims)
+  }
 
   has_dim_sep <- FALSE
   if (any(grepl(";", dims))) {
@@ -331,36 +337,4 @@ style_is_hms <- function(cellXfs, numfmt_date) {
   z <- rownames(cellXfs_df[cellXfs_df$numFmtId %in% numfmt_date, ])
   if (length(z) == 0) z <- NA
   z
-}
-
-
-#' Delete data
-#'
-#' This function is deprecated. Use [wb_clean_sheet()].
-#' @param wb workbook
-#' @param sheet sheet to clean
-#' @param cols numeric column vector
-#' @param rows numeric row vector
-#' @export
-#' @keywords internal
-delete_data <- function(wb, sheet, cols, rows) {
-
-  .Deprecated(old = "delete_data", new = "wb_clean_sheet", package = "openxlsx2")
-
-  sheet_id <- wb_validate_sheet(wb, sheet)
-
-  cc <- wb$worksheets[[sheet_id]]$sheet_data$cc
-
-  if (is.numeric(cols)) {
-    sel <- cc$row_r %in% as.character(as.integer(rows)) & cc$c_r %in% int2col(cols)
-  } else {
-    sel <- cc$row_r %in% as.character(as.integer(rows)) & cc$c_r %in% cols
-  }
-
-  # clean selected entries of cc
-  clean <- names(cc)[!names(cc) %in% c("r", "row_r", "c_r")]
-  cc[sel, clean] <- ""
-
-  wb$worksheets[[sheet_id]]$sheet_data$cc <- cc
-
 }

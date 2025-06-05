@@ -66,9 +66,9 @@ test_that("test add_border()", {
 
   # check borders
   exp <- c("<border><left/><right/><top/><bottom/><diagonal/></border>",
-           "<border><left><color rgb=\"FF000000\"/></left><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>",
-           "<border><right><color rgb=\"FF000000\"/></right><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>",
-           "<border><top><color rgb=\"FF000000\"/></top><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>"
+           "<border><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>",
+           "<border><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>",
+           "<border><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>"
   )
   got <- wb$styles_mgr$styles$borders
 
@@ -772,8 +772,8 @@ test_that("wb_add_dxfs_style() works", {
     )
 
   exp <- c(
-    `A1:A11` = "<cfRule type=\"expression\" dxfId=\"0\" priority=\"2\"><formula>A1&lt;&gt;0</formula></cfRule>",
-    `A1:A11` = "<cfRule type=\"expression\" dxfId=\"1\" priority=\"1\"><formula>A1=0</formula></cfRule>"
+    `A1:A11` = "<cfRule type=\"expression\" dxfId=\"0\" priority=\"1\"><formula>A1&lt;&gt;0</formula></cfRule>",
+    `A1:A11` = "<cfRule type=\"expression\" dxfId=\"1\" priority=\"2\"><formula>A1=0</formula></cfRule>"
   )
   got <- wb$worksheets[[1]]$conditionalFormatting
   expect_equal(exp, got)
@@ -913,4 +913,22 @@ test_that("dims work", {
 
   expect_setequal(wb$worksheets[[1]]$sheet_data$cc$c_s, "1")
 
+})
+
+test_that("update font works", {
+  wb <- wb_workbook() |>
+    wb_add_worksheet() |>
+    wb_add_data(x = letters) |>
+    wb_add_font(dims = wb_dims(x = letters), name = "Calibri", size = 20, update = c("name", "size", "scheme"))
+
+  exp <- "<font><color theme=\"1\"/><family val=\"2\"/><name val=\"Calibri\"/><sz val=\"20\"/></font>"
+  got <- wb$styles_mgr$styles$fonts[2]
+  expect_equal(exp, got)
+
+  # updates only the font color
+  wb$add_font(dims = wb_dims(x = letters), color = wb_color("orange"), update = c("color"))
+
+  exp <- "<font><color rgb=\"FFFFA500\"/><family val=\"2\"/><name val=\"Calibri\"/><sz val=\"20\"/></font>"
+  got <- wb$styles_mgr$styles$fonts[3]
+  expect_equal(exp, got)
 })

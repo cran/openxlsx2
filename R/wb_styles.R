@@ -612,7 +612,7 @@ create_cell_style <- function(
 
   applyFont <- ""
   if (any(font_id != "")) applyFont <- "1"
-  if (is_cell_style_xf && isTRUE(font_id > "1")) applyFont <- "0"
+  if (is_cell_style_xf && isTRUE(font_id == "")) applyFont <- "0"
 
   applyNumberFormat <- ""
   if (any(num_fmt_id != "")) applyNumberFormat <- "1"
@@ -792,7 +792,7 @@ set_cellstyle <- function(
 #'
 #' @export
 styles_on_sheet <- function(wb, sheet) {
-  sheet_id <- wb_validate_sheet(wb, sheet)
+  sheet_id <- wb$clone()$.__enclos_env__$private$get_sheet_index(sheet)
   z <- unique(wb$worksheets[[sheet_id]]$sheet_data$cc$c_s)
   as.numeric(z)
 }
@@ -985,6 +985,36 @@ create_dxfs_style <- function(
     )
   )
 
+}
+
+#' Helper function used to update borders styles
+#' picks a style from a worksheet dimension and adds the required border
+#' @noRd
+update_border <- function(wb, sheet = current_sheet(), dims = "A1", new_border) {
+
+  XFs <- wb$get_cell_style(sheet = sheet, dims = dims)
+  # access the ids in a data frame
+  c_s <- read_xf(read_xml(wb$styles_mgr$styles$cellXfs))[XFs, ]
+
+  ## the current border for the cell
+  get_border <- c_s$borderId
+  borders <- read_border(read_xml(wb$styles_mgr$styles$borders))[get_border, ]
+
+  # While an update was requested, the original cell might have been borderless
+  borders[is.na(borders)] <- ""
+
+  new_border <- read_border(read_xml(new_border))
+
+  ## update the exisisting style
+  sel <- which(new_border != "")
+  borders[, sel] <- new_border[, sel]
+
+  nms <- c(
+    "start", "end", "left", "right", "top", "bottom", "diagonalDown",
+    "diagonalUp", "diagonal", "vertical", "horizontal", "outline"
+  )
+
+  write_border(borders[nms])
 }
 
 ## The functions below are only partially covered, but span over 300+ LOC ##
