@@ -1,3 +1,6 @@
+#ifndef OPENXLSX2_H
+#define OPENXLSX2_H
+
 #include "openxlsx2_types.h"
 
 Rcpp::IntegerVector col_to_int(Rcpp::CharacterVector x);
@@ -13,10 +16,11 @@ inline std::string to_string(Rcpp::Vector<16>::Proxy x) {
   return Rcpp::String(x);
 }
 
-inline void checkInterrupt(R_xlen_t iteration, R_xlen_t frequency = 10000) {
+inline void checkInterrupt(R_xlen_t &iteration, R_xlen_t frequency = 10000) {
   if (iteration % frequency == 0) {
     Rcpp::checkUserInterrupt();
   }
+  ++iteration;
 }
 
 template <typename T>
@@ -35,11 +39,11 @@ static inline std::string int_to_col(T cell) {
 // similar to is.numeric(x)
 // returns true if string can be written as numeric and is not Inf
 // @param x a string input
-static inline bool is_double(std::string x) {
+static inline bool is_double(const char* x) {
   char* endp;
   double res;
 
-  res = R_strtod(x.c_str(), &endp);
+  res = R_strtod(x, &endp);
 
   if (strlen(endp) == 0 && std::isfinite(res)) {
     return 1;
@@ -308,3 +312,5 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
   }
 
 }
+
+#endif

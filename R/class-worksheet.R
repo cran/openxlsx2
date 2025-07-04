@@ -1005,7 +1005,7 @@ wbWorksheet <- R6::R6Class(
       if (l_name == "x14:dataValidations") {
 
         outer <- xml_attr(ext, "ext")
-        inner <- getXMLPtr1con(read_xml(ext))
+        inner <- xml_node(ext, "*", "*")
 
         xdv <- grepl(l_name, inner)
         inner <- xml_attr_mod(
@@ -1056,7 +1056,7 @@ wbWorksheet <- R6::R6Class(
         )
       )
 
-      date1904 <- ifelse(origin == "1904-01-01", TRUE, FALSE)
+      date1904 <- origin == "1904-01-01"
 
       if (type == "date" || type == "time") {
         value <- conv_to_excel_date(value, date1904 = date1904)

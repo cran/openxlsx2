@@ -73,7 +73,8 @@ inner_update <- function(
     cc <- rbind(cc, cc_missing)
 
     # order cc (not really necessary, will be done when saving)
-    cc <- cc[order(as.integer(cc[, "row_r"]), col2int(cc[, "c_r"])), ]
+    sort_key <- as.numeric(cc$row_r) * 16384L + col2int(cc$c_r)
+    cc <- cc[order(sort_key), ]
 
     # update dimensions (only required if new cols and rows are added) ------
     all_rows <- as.numeric(unique(cc$row_r))
@@ -113,32 +114,34 @@ inner_update <- function(
   # to avoid bricking the worksheet, we make sure that we do not overwrite the
   # reference cell of a shared formula. To be on the save side, we replace all
   # values with the formula. If the entire cc is replaced with x, we can skip.
-  ff <- rbindlist(xml_attr(paste0("<f ", cc$f_attr, "/>"), "f"))
-  if (length(sf <- ff$si[sel & ff$t[sel] == "shared" & ff$ref[sel] != ""]) && !all(cc$r %in% x$r)) {
+  if (!all(cc$f_attr == "")) {
+    ff <- rbindlist(xml_attr(paste0("<f ", cc$f_attr, "/>"), "f"))
+    if (length(sf <- ff$si[sel & ff$t[sel] == "shared" & ff$ref[sel] != ""]) && !all(cc$r %in% x$r)) {
 
-    # collect all the shared formulas that we have to convert
-    sel_fsi <- ff$si %in% unique(sf)
+      # collect all the shared formulas that we have to convert
+      sel_fsi <- ff$si %in% unique(sf)
 
-    cc_shared <- cc[sel_fsi, , drop = FALSE]
+      cc_shared <- cc[sel_fsi, , drop = FALSE]
 
-    cc <- shared_as_fml(cc, cc_shared)
+      cc <- shared_as_fml(cc, cc_shared)
 
-    msg <- paste0(
-      "A shared formula reference cell was overwritten. To protect the",
-      " spreadsheet formulas, the impacted cells were converted from shared",
-      " formulas to normal formulas."
-    )
-    warning(msg, call. = FALSE)
+      msg <- paste0(
+        "A shared formula reference cell was overwritten. To protect the",
+        " spreadsheet formulas, the impacted cells were converted from shared",
+        " formulas to normal formulas."
+      )
+      warning(msg, call. = FALSE)
 
+    }
   }
 
   # columns in cc and x can differ make sure that all elements are available
-  if (any(!replacement %in% names(x))) {
+  if (!all(replacement %in% names(x))) {
     mss <- replacement[!replacement %in% names(x)]
     for (ms in mss) x[ms] <- rep("", nrow(x))
     x <- x[replacement]
   }
-  if (any(!replacement %in% names(cc))) {
+  if (!all(replacement %in% names(cc))) {
     mss <- replacement[!replacement %in% names(cc)]
     for (ms in mss) cc[ms] <- rep("", nrow(cc))
     cc <- cc[replacement]
@@ -617,7 +620,7 @@ write_data2 <- function(
     }
 
     if (any(dc == openxlsx2_celltype[["character"]])) {
-      if (any(sel <- cc$typ == openxlsx2_celltype[["string_nums"]])) {
+      if (any(cc$typ == openxlsx2_celltype[["string_nums"]])) {
 
         # # we cannot select every cell like this, because it is terribly slow.
         # dim_sel <- paste0(cc$r[sel], collapse = ";")
@@ -916,7 +919,7 @@ write_data_table <- function(
              " Modify na with na.strings")
       x[1, ] <- NA
     }
-    if (any(duplicated(tolower(colnames(x))))) {
+    if (anyDuplicated(tolower(colnames(x)))) {
       warning("tables cannot have duplicated column names")
       colnames(x) <- fix_pt_names(colnames(x))
     }

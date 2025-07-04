@@ -1,6 +1,12 @@
 # Internal function to convert data frame from character to whatever is required
-convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_character = FALSE) {
+convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_character = FALSE, col_names = FALSE) {
   sel <- !is.na(names(types))
+
+  if (col_names) {
+    # avoid scientific notation in column names
+    op <- default_save_opt()
+    on.exit(options(op), add = TRUE)
+  }
 
   if (any(sel)) {
     nums <- names(which(types[sel] == 1))
@@ -90,7 +96,7 @@ convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_characte
 #' [convert_datetime()], or [convert_hms()]. If types are specified, date
 #' detection is disabled.
 #'
-#' @seealso [wb_get_named_regions()]
+#' @seealso [wb_get_named_regions()], \link[openxlsx2:openxlsx2-package]{openxlsx2}
 #'
 #' @param file An xlsx file, [wbWorkbook] object or URL to xlsx file.
 #' @param sheet Either sheet name or index. When missing the first sheet in the workbook is selected.
@@ -667,7 +673,7 @@ wb_to_df <- function(
 
     nams <- names(xlsx_cols_names)
     if (convert)
-      xlsx_cols_names <- convert_df(z[1, , drop = FALSE], guess_col_type(tt[1, , drop = FALSE]), date_conv, datetime_conv, hms_conv, as_character = TRUE)
+      xlsx_cols_names <- convert_df(z[1, , drop = FALSE], guess_col_type(tt[1, , drop = FALSE]), date_conv, datetime_conv, hms_conv, as_character = TRUE, col_names = TRUE)
     else
       xlsx_cols_names <- z[1, , drop = FALSE]
     names(xlsx_cols_names) <- nams
@@ -695,7 +701,7 @@ wb_to_df <- function(
         types[types == "formula"]   <- 6
       }
 
-      if (any(!names(types) %in% xlsx_cols_names)) {
+      if (!all(names(types) %in% xlsx_cols_names)) {
         warning("variable from `types` not found in data")
         types <- types[names(types) %in% xlsx_cols_names]
       }
@@ -931,7 +937,7 @@ wb_data <- function(wb, sheet = current_sheet(), dims, ...) {
 #' @param drop drop
 #' @rdname wb_data
 #' @export
-"[.wb_data" <- function(x, i, j, drop = ifelse((missing(j) && length(i) > 1) || (!missing(i) && length(j) > 1), FALSE, TRUE)) {
+"[.wb_data" <- function(x, i, j, drop = !((missing(j) && length(i) > 1) || (!missing(i) && length(j) > 1))) {
 
   sheet <- attr(x, "sheet")
   dd    <- attr(x, "dims")

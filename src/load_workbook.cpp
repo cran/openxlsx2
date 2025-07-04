@@ -158,7 +158,15 @@ void loadvals(Rcpp::Environment sheet_data, XPtrXML doc) {
   // character
   Rcpp::DataFrame row_attributes;
 
+  R_xlen_t total_cells_count = 0;
+  for (auto worksheet_row : ws.children("row")) {
+    total_cells_count += std::distance(worksheet_row.children("c").begin(), worksheet_row.children("c").end());
+  }
+
   std::vector<xml_col> xml_cols;
+  if (total_cells_count > 0) {
+    xml_cols.reserve(static_cast<size_t>(total_cells_count));
+  }
 
   // we check against these
   const std::string f_str = "f";
@@ -191,7 +199,6 @@ void loadvals(Rcpp::Environment sheet_data, XPtrXML doc) {
     uint32_t itr_cols = 0;
     for (auto col : worksheet.children("c")) {
       checkInterrupt(idx);
-      ++idx;
 
       // contains all values of a col
       xml_col single_xml_col;
