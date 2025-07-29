@@ -1,3 +1,31 @@
+# openxlsx2 1.18
+
+## New features
+
+* Add `bg_color` argument to `wb_add_fill()` to actually make use of various `pattern` types.
+* Add arguments to create diagonal borders in `wb_add_border()`.
+
+## Fixes
+
+* Support loading and saving workbooks with conditional formatting in pivot tables. [1397](https://github.com/JanMarvin/openxlsx2/pull/1397)
+* Fix a missing `id` attribute in drawings XML code. Older files can fixed with loading and saving again. [1402](https://github.com/JanMarvin/openxlsx2/pull/1402)
+
+## Internal Changes
+
+* The conditional formatting structure was changed to a data frame. This allows handling pivot attributes. [1397](https://github.com/JanMarvin/openxlsx2/pull/1397)
+
+## Breaking changes
+
+* The default value of `start_row` in `wb_to_df()`, `read_xlsx()`, and `wb_read()` has been changed from `1` to `NULL`. Reading with `start_row`/`start_col` will now fill the data frame, even if the actual data starts later.
+```R
+wb <- wb_workbook()$add_worksheet()$add_data(x = head(cars), dims = "D4")
+# previously this would return a data frame of 6 x 2 and now it returns 10 x 5
+wb$to_df(start_col = 1, start_row = 1, col_names = FALSE)
+```
+
+
+***************************************************************************
+
 # openxlsx2 1.17
 
 ## Fixes
@@ -8,6 +36,7 @@
 
 * The provided pugixml functions allow now for a deeper nesting of nodes including wildcards. Previously the nesting was restricted to three levels. This limit has been lifted. [1356](https://github.com/JanMarvin/openxlsx2/pull/1356)
 * Cleanups to `xlsb` and other c++ parts of the code. Avoid a few `to_string()` and `std::string()` casts.
+
 
 ***************************************************************************
 
@@ -27,6 +56,7 @@
 * Fixed a bug in `wb_to_df()` where `show_formula` in combination with shared formulas and specified `dims`, would result in incorrect returns or errors. [1366](https://github.com/JanMarvin/openxlsx2/pull/1366)
 
 ## Breaking changes
+
 * `dims` will now respect the order in which they are sorted. So `"B2:A1"` will no longer equal `"A1:B2"`. [1353](https://github.com/JanMarvin/openxlsx2/pull/1353)
 * Conditional formatting allows now for non consecutive dims such as `"A1:B2,C2:D3"`. This causes a change in previous behavior, where the outer cells of a dimension were used to construct the range to which the conditional formatting was applied. [1347](https://github.com/JanMarvin/openxlsx2/pull/1347)
 * Nulling a color or border style in `wb_add_border()` now automatically nulls the corresponding color/border style. [1343](https://github.com/JanMarvin/openxlsx2/pull/1343)

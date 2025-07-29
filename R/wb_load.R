@@ -196,9 +196,15 @@ wb_load <- function(
   pivotCacheRecords <- grep_xml("pivotCacheRecords[0-9]+.xml$")
 
   # rich data
+  rdarray           <- grep_xml("richData/rdarray.xml")
   rdrichvalue       <- grep_xml("richData/rdrichvalue.xml")
   rdrichvaluestr    <- grep_xml("richData/rdrichvaluestructure.xml")
   rdRichValueTypes  <- grep_xml("richData/rdRichValueTypes.xml")
+  rdValWebImg       <- grep_xml("richData/rdRichValueWebImage.xml")
+  rdValWebImgrels   <- grep_xml("richData/_rels/rdRichValueWebImage.xml.rels")
+  rdpropertybag     <- grep_xml("richData/rdsupportingpropertybag.xml")
+  rdpropertybagStr  <- grep_xml("richData/rdsupportingpropertybagstructure.xml")
+  richStyles        <- grep_xml("richData/richStyles.xml")
   richValueRel      <- grep_xml("richData/richValueRel.xml")
   richValueRelrels  <- grep_xml("richData/_rels/richValueRel.xml.rels")
 
@@ -981,11 +987,17 @@ wb_load <- function(
         # need to expand the names. multiple conditions can be combined in one conditionalFormatting
         cfs <- xml_node(worksheet_xml, "worksheet", "conditionalFormatting")
         if (length(cfs)) {
-          nms <- unlist(xml_attr(cfs, "conditionalFormatting"))
-          cf <- lapply(cfs, function(x) xml_node(x, "conditionalFormatting", "cfRule"))
-          names(cf) <- nms
-          conditionalFormatting <- un_list(cf)
-          wb$worksheets[[i]]$conditionalFormatting <- conditionalFormatting
+
+          nms <- rbindlist(xml_attr(cfs, "conditionalFormatting"))
+          cf <- xml_node(cfs, "conditionalFormatting", "cfRule")
+
+          # our xlsb parser does not support conditional formatting
+          if (!identical(cf, character())) {
+            conditionalFormatting <- data.frame(
+              nms, cf, stringsAsFactors = FALSE
+            )
+            wb$worksheets[[i]]$conditionalFormatting <- conditionalFormatting
+          }
         }
 
       } ## end !data_only
@@ -1270,15 +1282,25 @@ wb_load <- function(
 
       drw_len <- max(as.integer(gsub("\\D+", "", basename(drawingsXML))))
 
-      wb$drawings      <- rep(list(""), drw_len) # vector("list", drw_len)
-      wb$drawings_rels <- rep(list(""), drw_len) # vector("list", drw_len)
+      wb$drawings      <- rep_len(list(""), drw_len) # vector("list", drw_len)
+      wb$drawings_rels <- rep_len(list(""), drw_len) # vector("list", drw_len)
 
 
       for (drw in drawingsXML) {
 
         drw_file <- as.integer(gsub("\\D+", "", basename(drw)))
 
-        wb$drawings[drw_file] <- read_xml(drw, pointer = FALSE)
+        tmp_drw <- read_xml(drw, pointer = FALSE)
+
+        ## fix broken xml missing id attribute - issue #1401
+        faulty_xml <- '<a16:creationId xmlns:a16="http://schemas.microsoft.com/office/drawing/2014/main"/>'
+        fixed_xml <- sprintf('<a16:creationId xmlns:a16="http://schemas.microsoft.com/office/drawing/2014/main" id="%s"/>', st_guid())
+
+        if (grepl(faulty_xml, tmp_drw)) {
+          tmp_drw <- gsub(faulty_xml, fixed_xml, tmp_drw)
+        }
+
+        wb$drawings[drw_file] <- tmp_drw
       }
 
       for (drw_rel in drawingRelsXML) {
@@ -1846,15 +1868,21 @@ wb_load <- function(
   }
 
   ## richData ------------------------------------------------------------------------------------
-  # This is new in openxlsx2 1.6 and probably not yet entire correct
-  if (!data_only && (length(richValueRel) || length(rdrichvalue) || length(rdrichvaluestr) || length(rdRichValueTypes))) {
+  # This is new in openxlsx2 1.6 and extended in 1.18 and probably not yet entire correct
+  if (!data_only && (length(rdarray) || length(richValueRel) || length(rdrichvalue) || length(rdrichvaluestr) || length(rdRichValueTypes) || length(rdValWebImg) || length(rdValWebImgrels) || length(rdpropertybag) || length(rdpropertybagStr) || length(richStyles))) {
 
     rd <- data.frame(
+      rdarray          = "",
       richValueRel     = "",
       richValueRelrels = "",
       rdrichvalue      = "",
       rdrichvaluestr   = "",
       rdRichValueTypes = "",
+      rdValWebImg      = "",
+      rdValWebImgrels  = "",
+      rdpropertybag    = "",
+      rdpropertybagStr = "",
+      richStyles       = "",
       stringsAsFactors = FALSE
     )
 
@@ -1872,6 +1900,18 @@ wb_load <- function(
 
     if (length(richValueRelrels)) {
       rd$richValueRelrels <- read_xml(richValueRelrels, pointer = FALSE)
+    }
+
+    if (length(rdarray)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/rdarray.xml" ContentType="application/vnd.ms-excel.rdarray+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId9" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdArray" Target="richData/rdarray.xml"/>'
+      )
+      rd$rdarray <- read_xml(rdarray, pointer = FALSE)
     }
 
     if (length(rdrichvalue)) {
@@ -1908,6 +1948,58 @@ wb_load <- function(
         '<Relationship Id="rId8" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes" Target="richData/rdRichValueTypes.xml"/>'
       )
       rd$rdRichValueTypes <- read_xml(rdRichValueTypes, pointer = FALSE)
+    }
+
+    if (length(rdValWebImg)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/rdRichValueWebImage.xml" ContentType="application/vnd.ms-excel.rdrichvaluewebimage+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId6" Type="http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage" Target="richData/rdRichValueWebImage.xml"/>'
+      )
+      rd$rdValWebImg <- read_xml(rdValWebImg, pointer = FALSE)
+    }
+
+    if (length(rdValWebImgrels)) {
+      rd$rdValWebImgrels <- read_xml(rdValWebImgrels, pointer = FALSE)
+    }
+
+    if (length(rdpropertybag)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/rdsupportingpropertybag.xml" ContentType="application/vnd.ms-excel.rdsupportingpropertybag+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId6" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag" Target="richData/rdsupportingpropertybag.xml"/>'
+      )
+      rd$rdpropertybag <- read_xml(rdpropertybag, pointer = FALSE)
+    }
+
+    if (length(rdpropertybagStr)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/rdsupportingpropertybagstructure.xml" ContentType="application/vnd.ms-excel.rdsupportingpropertybagstructure+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId6" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure" Target="richData/rdsupportingpropertybagstructure.xml"/>'
+      )
+      rd$rdpropertybagStr <- read_xml(rdpropertybagStr, pointer = FALSE)
+    }
+
+    if (length(richStyles)) {
+      wb$append(
+        "Content_Types",
+        '<Override PartName="/xl/richData/richStyles.xml" ContentType="application/vnd.ms-excel.richstyles+xml"/>'
+      )
+      wb$append(
+        "workbook.xml.rels",
+        '<Relationship Id="rId6" Type="http://schemas.microsoft.com/office/2017/06/relationships/richStyles" Target="richData/richStyles.xml"/>'
+      )
+      rd$richStyles <- read_xml(richStyles, pointer = FALSE)
     }
 
     wb$richData <- rd

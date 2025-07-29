@@ -771,9 +771,13 @@ test_that("wb_add_dxfs_style() works", {
       style = "yay"
     )
 
-  exp <- c(
-    `A1:A11` = "<cfRule type=\"expression\" dxfId=\"0\" priority=\"1\"><formula>A1&lt;&gt;0</formula></cfRule>",
-    `A1:A11` = "<cfRule type=\"expression\" dxfId=\"1\" priority=\"2\"><formula>A1=0</formula></cfRule>"
+  exp <- data.frame(
+    sqref = c("A1:A11", "A1:A11"),
+    cf = c(
+      "<cfRule type=\"expression\" dxfId=\"0\" priority=\"1\"><formula>A1&lt;&gt;0</formula></cfRule>",
+      "<cfRule type=\"expression\" dxfId=\"1\" priority=\"2\"><formula>A1=0</formula></cfRule>"
+    ),
+    stringsAsFactors = FALSE
   )
   got <- wb$worksheets[[1]]$conditionalFormatting
   expect_equal(exp, got)
@@ -931,4 +935,40 @@ test_that("update font works", {
   exp <- "<font><color rgb=\"FFFFA500\"/><family val=\"2\"/><name val=\"Calibri\"/><sz val=\"20\"/></font>"
   got <- wb$styles_mgr$styles$fonts[3]
   expect_equal(exp, got)
+})
+
+test_that("adding bg_color and diagonal borders work", {
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_fill(dims = "B2:D4",
+             color = wb_color("white"),
+             bg_color = wb_color("black"),
+             pattern = "lightUp")$
+    add_border(
+      dims = "B6:D8",
+      diagonal_up = "dashed",
+      diagonal_down = "dashed",
+      diagonal_color = wb_color("red")
+    )
+
+  expect_error(
+    wb$add_worksheet()$
+      add_border(
+      dims = "B6:D8",
+      diagonal_up = "dashed",
+      diagonal_down = "thin",
+      diagonal_color = wb_color("red")
+    ),
+    "there can be only a single diagonal style per cell"
+  )
+
+  exp <- "<border diagonalDown=\"1\" diagonalUp=\"1\"><start><color rgb=\"FFFF0000\"/></start><end><color rgb=\"FFFF0000\"/></end><left style=\"thin\"><color rgb=\"FF000000\"/></left><top style=\"thin\"><color rgb=\"FF000000\"/></top><diagonal style=\"dashed\"><color rgb=\"FFFF0000\"/></diagonal></border>"
+  got <- wb$styles_mgr$styles$borders[2]
+  expect_equal(exp, got)
+
+  exp <- "<fill><patternFill patternType=\"lightUp\"><fgColor rgb=\"FFFFFFFF\"/><bgColor rgb=\"FF000000\"/></patternFill></fill>"
+  got <- wb$styles_mgr$styles$fills[3]
+  expect_equal(exp, got)
+
 })

@@ -2821,7 +2821,7 @@ wbWorkbook <- R6::R6Class(
     #' @return a data frame
     to_df = function(
       sheet,
-      start_row         = 1,
+      start_row         = NULL,
       start_col         = NULL,
       row_names         = FALSE,
       col_names         = TRUE,
@@ -3372,7 +3372,16 @@ wbWorkbook <- R6::R6Class(
 
       if (!is.null(self$richData)) {
         richDataDir <- dir_create(tmpDir, "xl", "richData")
-        if (length(self$richData$richValueRel)) {
+        if (nchar(self$richData$rdarray)) {
+          write_file(
+            body = self$richData$rdarray,
+            fl = file.path(
+              richDataDir,
+              "rdarray.xml"
+            )
+          )
+        }
+        if (nchar(self$richData$richValueRel)) {
           write_file(
             body = self$richData$richValueRel,
             fl = file.path(
@@ -3381,7 +3390,7 @@ wbWorkbook <- R6::R6Class(
             )
           )
         }
-        if (length(self$richData$rdrichvalue)) {
+        if (nchar(self$richData$rdrichvalue)) {
           write_file(
             body = self$richData$rdrichvalue,
             fl = file.path(
@@ -3390,7 +3399,7 @@ wbWorkbook <- R6::R6Class(
             )
           )
         }
-        if (length(self$richData$rdrichvaluestr)) {
+        if (nchar(self$richData$rdrichvaluestr)) {
           write_file(
             body = self$richData$rdrichvaluestr,
             fl = file.path(
@@ -3399,7 +3408,7 @@ wbWorkbook <- R6::R6Class(
             )
           )
         }
-        if (length(self$richData$rdRichValueTypes)) {
+        if (nchar(self$richData$rdRichValueTypes)) {
           write_file(
             body = self$richData$rdRichValueTypes,
             fl = file.path(
@@ -3408,8 +3417,53 @@ wbWorkbook <- R6::R6Class(
             )
           )
         }
-
-        if (length(self$richData$richValueRelrels)) {
+        if (nchar(self$richData$rdValWebImg)) {
+          write_file(
+            body = self$richData$rdValWebImg,
+            fl = file.path(
+              richDataDir,
+              "rdRichValueWebImage.xml"
+            )
+          )
+        }
+        if (nchar(self$richData$rdValWebImgrels)) {
+          richDataRelDir <- dir_create(tmpDir, "xl", "richData", "_rels")
+          write_file(
+            body = self$richData$rdValWebImgrels,
+            fl = file.path(
+              richDataRelDir,
+              "rdRichValueWebImage.xml.rels"
+            )
+          )
+        }
+        if (nchar(self$richData$rdpropertybag)) {
+          write_file(
+            body = self$richData$rdpropertybag,
+            fl = file.path(
+              richDataDir,
+              "rdsupportingpropertybag.xml"
+            )
+          )
+        }
+        if (nchar(self$richData$rdpropertybagStr)) {
+          write_file(
+            body = self$richData$rdpropertybagStr,
+            fl = file.path(
+              richDataDir,
+              "rdsupportingpropertybagstructure.xml"
+            )
+          )
+        }
+        if (nchar(self$richData$richStyles)) {
+          write_file(
+            body = self$richData$richStyles,
+            fl = file.path(
+              richDataDir,
+              "richStyles.xml"
+            )
+          )
+        }
+        if (nchar(self$richData$richValueRelrels)) {
           richDataRelDir <- dir_create(tmpDir, "xl", "richData", "_rels")
           write_file(
             body = self$richData$richValueRelrels,
@@ -6098,15 +6152,23 @@ wbWorkbook <- R6::R6Class(
 
         cf <- self$worksheets[[sheet]]$conditionalFormatting
 
-        if (!is.null(dims)) {
-          if (any(sel <- names(cf) %in% dims)) {
-            self$worksheets[[sheet]]$conditionalFormatting <- cf[!sel]
+        if (is.data.frame(cf)) {
+
+          if (!is.null(dims)) {
+            if (any(sel <- cf$sqref %in% dims)) {
+              cf <- cf[!sel, ]
+            }
+          } else if (first) {
+              cf <- cf[-1, ]
+          } else if (last) {
+              cf <- cf[-nrow(cf), ]
           }
-        } else if (first) {
-            self$worksheets[[sheet]]$conditionalFormatting <- cf[-1]
-        } else if (last) {
-            self$worksheets[[sheet]]$conditionalFormatting <- cf[-length(cf)]
+
+          if (nrow(cf) == 0) cf <- character()
         }
+
+        self$worksheets[[sheet]]$conditionalFormatting <- cf
+
       }
 
       invisible(self)
@@ -7776,47 +7838,51 @@ wbWorkbook <- R6::R6Class(
     #' @param remove_data removes the data as well
     #' @return The `wbWorkbook` object
     remove_tables = function(sheet = current_sheet(), table, remove_data = TRUE) {
-      if (length(table) != 1) {
-        stop("table argument must be length 1")
-      }
 
       ## delete table object and all data in it
       sheet <- private$get_sheet_index(sheet)
 
-      if (!table %in% self$tables$tab_name) {
+      if (missing(table)) {
+        table <- self$tables$tab_name
+      } else  if (!table %in% self$tables$tab_name) {
+        if (length(table) < 1) {
+          stop("table argument must be at least 1")
+        }
         stop(sprintf("table '%s' does not exist.\n
                      Call `wb_get_tables()` to get existing table names", table),
              call. = FALSE)
       }
 
-      ## delete table object (by flagging as deleted)
-      inds <- self$tables$tab_sheet %in% sheet & self$tables$tab_name %in% table
-      table_name_original <- self$tables$tab_name[inds]
-      refs <- self$tables$tab_ref[inds]
+      for (tbl in table) {
+        ## delete table object (by flagging as deleted)
+        inds <- self$tables$tab_sheet %in% sheet & self$tables$tab_name %in% tbl
+        table_name_original <- self$tables$tab_name[inds]
+        refs <- self$tables$tab_ref[inds]
 
-      self$tables$tab_name[inds] <- paste0(table_name_original, "_openxlsx_deleted")
-      self$tables$tab_ref[inds] <- ""
-      self$tables$tab_sheet[inds] <- 0
-      self$tables$tab_xml[inds] <- ""
-      self$tables$tab_act[inds] <- 0
+        self$tables$tab_name[inds] <- paste0(table_name_original, "_openxlsx_deleted")
+        self$tables$tab_ref[inds] <- ""
+        self$tables$tab_sheet[inds] <- 0
+        self$tables$tab_xml[inds] <- ""
+        self$tables$tab_act[inds] <- 0
 
-      ## delete reference from worksheet to table
-      worksheet_table_names <- attr(self$worksheets[[sheet]]$tableParts, "tableName")
-      to_remove <- which(worksheet_table_names == table_name_original)
+        ## delete reference from worksheet to table
+        worksheet_table_names <- attr(self$worksheets[[sheet]]$tableParts, "tableName")
+        to_remove <- which(worksheet_table_names == table_name_original)
 
-      # (1) remove the rId from worksheet_rels
-      rm_tab_rId <- rbindlist(xml_attr(self$worksheets[[sheet]]$tableParts[to_remove], "tablePart"))["r:id"]
-      ws_rels <- self$worksheets_rels[[sheet]]
-      is_rm_table <- grepl(rm_tab_rId, ws_rels)
-      self$worksheets_rels[[sheet]] <- ws_rels[!is_rm_table]
+        # (1) remove the rId from worksheet_rels
+        rm_tab_rId <- rbindlist(xml_attr(self$worksheets[[sheet]]$tableParts[to_remove], "tablePart"))["r:id"]
+        ws_rels <- self$worksheets_rels[[sheet]]
+        is_rm_table <- grepl(rm_tab_rId, ws_rels)
+        self$worksheets_rels[[sheet]] <- ws_rels[!is_rm_table]
 
-      # (2) remove the rId from tableParts
-      self$worksheets[[sheet]]$tableParts <- self$worksheets[[sheet]]$tableParts[-to_remove]
-      attr(self$worksheets[[sheet]]$tableParts, "tableName") <- worksheet_table_names[-to_remove]
+        # (2) remove the rId from tableParts
+        self$worksheets[[sheet]]$tableParts <- self$worksheets[[sheet]]$tableParts[-to_remove]
+        attr(self$worksheets[[sheet]]$tableParts, "tableName") <- worksheet_table_names[-to_remove]
 
-      ## now delete data
-      if (remove_data)
-        self$clean_sheet(sheet = sheet, dims = refs)
+        ## now delete data
+        if (remove_data)
+          self$clean_sheet(sheet = sheet, dims = refs)
+      }
 
       invisible(self)
     },
@@ -8184,23 +8250,27 @@ wbWorkbook <- R6::R6Class(
     #' @param bottom_color,left_color,right_color,top_color,inner_hcolor,inner_vcolor a color, either something openxml knows or some RGB color
     #' @param left_border,right_border,top_border,bottom_border,inner_hgrid,inner_vgrid the border style, if NULL no border is drawn. See create_border for possible border styles
     #' @param update update
+    #' @param diagonal_up,diagonal_down,diagonal_color (optional) arguments for diagonal border lines
     #' @return The `wbWorkbook`, invisibly
     add_border = function(
-      sheet         = current_sheet(),
-      dims          = "A1",
-      bottom_color  = wb_color(hex = "FF000000"),
-      left_color    = wb_color(hex = "FF000000"),
-      right_color   = wb_color(hex = "FF000000"),
-      top_color     = wb_color(hex = "FF000000"),
-      bottom_border = "thin",
-      left_border   = "thin",
-      right_border  = "thin",
-      top_border    = "thin",
-      inner_hgrid   = NULL,
-      inner_hcolor  = NULL,
-      inner_vgrid   = NULL,
-      inner_vcolor  = NULL,
-      update        = FALSE,
+      sheet          = current_sheet(),
+      dims           = "A1",
+      bottom_color   = wb_color(hex = "FF000000"),
+      left_color     = wb_color(hex = "FF000000"),
+      right_color    = wb_color(hex = "FF000000"),
+      top_color      = wb_color(hex = "FF000000"),
+      bottom_border  = "thin",
+      left_border    = "thin",
+      right_border   = "thin",
+      top_border     = "thin",
+      inner_hgrid    = NULL,
+      inner_hcolor   = NULL,
+      inner_vgrid    = NULL,
+      inner_vcolor   = NULL,
+      update         = FALSE,
+      diagonal_up    = NULL,
+      diagonal_down  = NULL,
+      diagonal_color = NULL,
       ...
     ) {
 
@@ -8221,6 +8291,34 @@ wbWorkbook <- R6::R6Class(
       if (is.null(left_border)) left_color <- NULL
       if (is.null(right_border)) right_color <- NULL
       if (is.null(top_border)) top_color <- NULL
+
+      ## creating diagonals is a bit tricky with create_border(), therefore we ease it
+      ## by allowing a slightly different initializiation. diagonal is the style, up/down
+      ## is an XML bool and color is the color.
+      if (!is.null(diagonal_up) && !is.null(diagonal_down)) {
+        diagonal <- unique(c(diagonal_up, diagonal_down))
+        if (length(diagonal) > 1) {
+          stop("there can be only a single diagonal style per cell", call. = FALSE)
+        }
+        diagonal_up     <- TRUE
+        diagonal_down   <- TRUE
+      } else if (!is.null(diagonal_up) && is.null(diagonal_down)) {
+          diagonal      <- diagonal_up
+          diagonal_up   <- TRUE
+          diagonal_down <- ""
+      } else if (!is.null(diagonal_down) && is.null(diagonal_up)) {
+          diagonal      <- diagonal_down
+          diagonal_up   <- ""
+          diagonal_down <- TRUE
+      } else {
+          diagonal      <- NULL
+          diagonal_up   <- ""
+          diagonal_down <- ""
+      }
+
+      if (!is.null(diagonal_color)) {
+        assert_color(diagonal_color)
+      }
 
       df <- dims_to_dataframe(dims, fill = TRUE)
       sheet <- private$get_sheet_index(sheet)
@@ -8257,7 +8355,9 @@ wbWorkbook <- R6::R6Class(
           top = top_border, top_color = top_color,
           bottom = bottom_border, bottom_color = bottom_color,
           left = left_border, left_color = left_color,
-          right = right_border, right_color = right_color
+          right = right_border, right_color = right_color,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         # determine dim
@@ -8283,14 +8383,18 @@ wbWorkbook <- R6::R6Class(
           top = top_border, top_color = top_color,
           bottom = inner_hgrid, bottom_color = inner_hcolor,
           left = left_border, left_color = left_color,
-          right = right_border, right_color = right_color
+          right = right_border, right_color = right_color,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         bottom_single <- create_border(
           top = inner_hgrid, top_color = inner_hcolor,
           bottom = bottom_border, bottom_color = bottom_color,
           left = left_border, left_color = left_color,
-          right = right_border, right_color = right_color
+          right = right_border, right_color = right_color,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         # determine dims
@@ -8326,7 +8430,9 @@ wbWorkbook <- R6::R6Class(
             top = inner_hgrid, top_color = inner_hcolor,
             bottom = inner_hgrid, bottom_color = inner_hcolor,
             left = left_border, left_color = left_color,
-            right = right_border, right_color = right_color
+            right = right_border, right_color = right_color,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
           )
 
           # determine dims
@@ -8354,14 +8460,18 @@ wbWorkbook <- R6::R6Class(
           top = top_border, top_color = top_color,
           bottom = bottom_border, bottom_color = bottom_color,
           left = left_border, left_color = left_color,
-          right = inner_vgrid, right_color = inner_vcolor
+          right = inner_vgrid, right_color = inner_vcolor,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         right_single <- create_border(
           top = top_border, top_color = top_color,
           bottom = bottom_border, bottom_color = bottom_color,
           left = inner_vgrid, left_color = inner_vcolor,
-          right = right_border, right_color = right_color
+          right = right_border, right_color = right_color,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         # determine dims
@@ -8397,7 +8507,9 @@ wbWorkbook <- R6::R6Class(
             top = top_border, top_color = top_color,
             bottom = bottom_border, bottom_color = bottom_color,
             left = inner_vgrid, left_color = inner_vcolor,
-            right = inner_vgrid, right_color = inner_vcolor
+            right = inner_vgrid, right_color = inner_vcolor,
+            diagonal = diagonal, diagonal_down = diagonal_down,
+            diagonal_up = diagonal_up, diagonal_color = diagonal_color
           )
 
           # determine dims
@@ -8426,28 +8538,36 @@ wbWorkbook <- R6::R6Class(
           top = top_border, top_color = top_color,
           bottom = inner_hgrid, bottom_color = inner_hcolor,
           left = left_border, left_color = left_color,
-          right = inner_vgrid, right_color = inner_vcolor
+          right = inner_vgrid, right_color = inner_vcolor,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         top_right <- create_border(
           top = top_border, top_color = top_color,
           bottom = inner_hgrid, bottom_color = inner_hcolor,
           left = inner_vgrid, left_color = inner_vcolor,
-          right = right_border, right_color = right_color
+          right = right_border, right_color = right_color,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         bottom_left <- create_border(
           top = inner_hgrid, top_color = inner_hcolor,
           bottom = bottom_border, bottom_color = bottom_color,
           left = left_border, left_color = left_color,
-          right = inner_vgrid, right_color = inner_vcolor
+          right = inner_vgrid, right_color = inner_vcolor,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         bottom_right <- create_border(
           top = inner_hgrid, top_color = inner_hcolor,
           bottom = bottom_border, bottom_color = bottom_color,
           left = inner_vgrid, left_color = inner_vcolor,
-          right = right_border, right_color = right_color
+          right = right_border, right_color = right_color,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         # determine dims
@@ -8505,14 +8625,18 @@ wbWorkbook <- R6::R6Class(
           top = inner_hgrid, top_color = inner_hcolor,
           bottom = inner_hgrid, bottom_color = inner_hcolor,
           left = left_border, left_color = left_color,
-          right = inner_vgrid, right_color = inner_vcolor
+          right = inner_vgrid, right_color = inner_vcolor,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         middle_right <- create_border(
           top = inner_hgrid, top_color = inner_hcolor,
           bottom = inner_hgrid, bottom_color = inner_hcolor,
           left = inner_vgrid, left_color = inner_vcolor,
-          right = right_border, right_color = right_color
+          right = right_border, right_color = right_color,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         # determine dims
@@ -8552,14 +8676,18 @@ wbWorkbook <- R6::R6Class(
           top = top_border, top_color = top_color,
           bottom = inner_hgrid, bottom_color = inner_hcolor,
           left = inner_vgrid, left_color = inner_vcolor,
-          right = inner_vgrid, right_color = inner_vcolor
+          right = inner_vgrid, right_color = inner_vcolor,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         bottom_center <- create_border(
           top = inner_hgrid, top_color = inner_hcolor,
           bottom = bottom_border, bottom_color = bottom_color,
           left = inner_vgrid, left_color = inner_vcolor,
-          right = inner_vgrid, right_color = inner_vcolor
+          right = inner_vgrid, right_color = inner_vcolor,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         # determine dims
@@ -8598,7 +8726,9 @@ wbWorkbook <- R6::R6Class(
           top = inner_hgrid, top_color = inner_hcolor,
           bottom = inner_hgrid, bottom_color = inner_hcolor,
           left = inner_vgrid, left_color = inner_vcolor,
-          right = inner_vgrid, right_color = inner_vcolor
+          right = inner_vgrid, right_color = inner_vcolor,
+          diagonal = diagonal, diagonal_down = diagonal_down,
+          diagonal_up = diagonal_up, diagonal_color = diagonal_color
         )
 
         # determine dims
@@ -8634,6 +8764,7 @@ wbWorkbook <- R6::R6Class(
     #' @param gradient_fill a gradient fill xml pattern.
     #' @param every_nth_col which col should be filled
     #' @param every_nth_row which row should be filled
+    #' @param bg_color (optional) background [wb_color()]
     #' @return The `wbWorksheetObject`, invisibly
     add_fill = function(
         sheet         = current_sheet(),
@@ -8643,6 +8774,7 @@ wbWorkbook <- R6::R6Class(
         gradient_fill = "",
         every_nth_col = 1,
         every_nth_row = 1,
+        bg_color      = NULL,
         ...
     ) {
       sheet <- private$get_sheet_index(sheet)
@@ -8668,7 +8800,8 @@ wbWorkbook <- R6::R6Class(
         new_fill <- create_fill(
           gradient_fill = gradient_fill,
           pattern_type = pattern,
-          fg_color = color
+          fg_color = color,
+          bg_color = bg_color
         )
         self$styles_mgr$add(new_fill, new_fill)
 
@@ -10099,16 +10232,18 @@ wbWorkbook <- R6::R6Class(
         collapse = ":"
       )
 
-      nms <- c(names(self$worksheets[[sheet]]$conditionalFormatting), sqref)
       dxfId <- max(dxfId, 0L)
 
-      priority <- max(0,
-        as.integer(
+      prty <- 0
+
+      if (is.data.frame(self$worksheets[[sheet]]$conditionalFormatting))
+        prty <- as.integer(
           openxlsx2:::rbindlist(
-            xml_attr(self$worksheets[[sheet]]$conditionalFormatting, "cfRule")
+            xml_attr(self$worksheets[[sheet]]$conditionalFormatting$cf, "cfRule")
           )$priority
         )
-      ) + 1L
+
+      priority <- max(0, prty) + 1L
 
       # big switch statement
       cfRule <- switch(
@@ -10176,8 +10311,18 @@ wbWorkbook <- R6::R6Class(
       }
 
       if (length(cfRule)) {
-        private$append_sheet_field(sheet, "conditionalFormatting", read_xml(cfRule, pointer = FALSE))
-        names(self$worksheets[[sheet]]$conditionalFormatting) <- nms
+
+        cfc <- data.frame(pivot = "", sqref = sqref, cf = read_xml(cfRule, pointer = FALSE))
+        cfs <- self$worksheets[[sheet]]$conditionalFormatting
+
+        sel <- c("sqref", "cf")
+        if (is.data.frame(cfs))
+          sel <- names(cfs)
+
+        self$worksheets[[sheet]]$conditionalFormatting <- rbind(
+          cfs,
+          cfc[sel] # pick names with or without pivot
+        )
       }
       invisible(self)
     },
