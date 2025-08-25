@@ -1,3 +1,22 @@
+# openxlsx2 1.19
+
+## New features
+
+* Add `fix` argument to `wb_dims()`. This allows setting the type of the dimension. The default is a relative reference, but it can be fully fixed `"all"`, rows fixed `"row"`, or columns fixed `"col"`. [1417](https://github.com/JanMarvin/openxlsx2/pull/1417)
+* Initial support for files with webextensions. [1422](https://github.com/JanMarvin/openxlsx2/pull/1423)
+
+## Fixes
+
+* Fixed a regression where changes to the internal structure of conditional formatting prevented files from loading. Unfortunately, the issue turned out to be more severe. When a worksheet cell contains multiple conditional formatting rules with expressions, the cell references may get shuffled. In cases where a single cell is linked to multiple conditional formatting rules with expressions, the system attempts to dynamically extend the references. If this process fails, it’s because the cell ranges cannot be extended to the same size. If it succeeds, the references are still likely to be shuffled. [1420](https://github.com/JanMarvin/openxlsx2/pull/1420)
+* Optimize certain style functions by preventing duplicate creation of the `dims_to_dataframe()` object. Previously, it was being generated twice; running it only once improves performance specifically when applied to large cell ranges. [1425](https://github.com/JanMarvin/openxlsx2/pull/1425)
+
+## Breaking changes
+
+* The `magrittr` package is no longer imported by `openxlsx2`. Users that rely on the `magrittr` pipe operator `%>%` should load the package manually. [1409](https://github.com/JanMarvin/openxlsx2/pull/1409)
+
+
+***************************************************************************
+
 # openxlsx2 1.18
 
 ## New features

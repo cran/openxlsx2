@@ -74,16 +74,15 @@ line_plot <- ms_linechart(
 )
 
 # add the charts to the data
-wb <- wb %>%
-  wb_add_mschart(dims = "F4:L20", graph = scatter_plot) %>%
-  wb_add_mschart(dims = "F21:L37", graph = bar_plot) %>%
-  wb_add_mschart(dims = "M4:S20", graph = area_plot) %>%
-  wb_add_mschart(dims = "M21:S37", graph = line_plot)
+wb$
+  add_mschart(dims = "F4:L20", graph = scatter_plot)$
+  add_mschart(dims = "F21:L37", graph = bar_plot)$
+  add_mschart(dims = "M4:S20", graph = area_plot)$
+  add_mschart(dims = "M21:S37", graph = line_plot)
 
 # add chartsheet
-wb <- wb %>%
-  wb_add_chartsheet() %>%
-  wb_add_mschart(graph = scatter_plot)
-
+wb$
+  add_chartsheet()$
+  add_mschart(graph = scatter_plot)
 }
 

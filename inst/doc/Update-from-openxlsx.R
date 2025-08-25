@@ -1,6 +1,7 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 # library(openxlsx)
 library(openxlsx2)
+modern_r <- getRversion() >= "4.1.0"
 
 ## ----read---------------------------------------------------------------------
 file <- system.file("extdata", "openxlsx2_example.xlsx", package = "openxlsx2")
@@ -63,35 +64,35 @@ wb <- wb_workbook(creator = "My name here")$
   )$ # remove the value in A1
   add_data(dims = "A1", x = "")
 
-## ----new_style_pipes----------------------------------------------------------
+## ----new_style_pipes, eval = modern_r-----------------------------------------
 # openxlsx2 with pipes
 border_color <- wb_color(hex = "4F81BD")
-wb <- wb_workbook(creator = "My name here") %>%
-  wb_add_worksheet(sheet = "Expenditure", grid_lines = FALSE) %>%
-  wb_add_data(x = USPersonalExpenditure, row_names = TRUE) %>%
+wb <- wb_workbook(creator = "My name here") |>
+  wb_add_worksheet(sheet = "Expenditure", grid_lines = FALSE) |>
+  wb_add_data(x = USPersonalExpenditure, row_names = TRUE) |>
   wb_add_border( # add the outer and inner border
     dims = "A1:F6",
     top_border = "thin", top_color = border_color,
     bottom_border = "thin", bottom_color = border_color,
     inner_hgrid = "thin", inner_hcolor = border_color,
     left_border = "", right_border = ""
-  ) %>%
+  ) |>
   wb_set_col_widths( # set column width
     cols = 1:6,
     widths = c(20, rep(10, 5))
-  ) %>% # remove the value in A1
+  ) |> # remove the value in A1
   wb_add_data(dims = "A1", x = "")
 
-## ----pipe_chain---------------------------------------------------------------
+## ----pipe_chain, eval = modern_r----------------------------------------------
 # openxlsx2
-wbp <- wb_workbook() %>% wb_add_worksheet()
+wbp <- wb_workbook() |> wb_add_worksheet()
 wbc <- wb_workbook()$add_worksheet()
 
 # need to assign wbp
-wbp <- wbp %>% wb_add_data(x = iris)
+wbp <- wbp |> wb_add_data(x = iris)
 wbc$add_data(x = iris)
 
-## ----new_cf-------------------------------------------------------------------
+## ----new_cf, eval = modern_r--------------------------------------------------
 # openxlsx2 with chains
 wb <- wb_workbook()$
   add_worksheet("a")$
@@ -99,9 +100,9 @@ wb <- wb_workbook()$
   add_conditional_formatting(dims = "A1:A4", rule = ">2")
 
 # openxlsx2 with pipes
-wb <- wb_workbook() %>%
-  wb_add_worksheet("a") %>%
-  wb_add_data(x = 1:4, col_names = FALSE) %>%
+wb <- wb_workbook() |>
+  wb_add_worksheet("a") |>
+  wb_add_data(x = 1:4, col_names = FALSE) |>
   wb_add_conditional_formatting(dims = "A1:A4", rule = ">2")
 
 ## ----old_dv, eval = FALSE-----------------------------------------------------
@@ -114,7 +115,7 @@ wb <- wb_workbook() %>%
 #   operator = "between", value = c(1, 9)
 # )
 
-## ----new_dv-------------------------------------------------------------------
+## ----new_dv, eval = modern_r--------------------------------------------------
 # openxlsx2 with chains
 wb <- wb_workbook()$
   add_worksheet("Sheet 1")$
@@ -128,9 +129,9 @@ wb <- wb_workbook()$
   )
 
 # openxlsx2 with pipes
-wb <- wb_workbook() %>%
-  wb_add_worksheet("Sheet 1") %>%
-  wb_add_data_table(1, x = iris[1:30, ]) %>%
+wb <- wb_workbook() |>
+  wb_add_worksheet("Sheet 1") |>
+  wb_add_data_table(1, x = iris[1:30, ]) |>
   wb_add_data_validation(
     sheet = 1,
     dims = "A2:C31", # alternatively, dims = wb_dims(rows = 2:31, cols = 1:3)

@@ -834,3 +834,15 @@ test_that("reverse rows and cols work", {
   expect_equal("C1:A3", wb_dims(rows = 1:3, cols = 3:1))
   expect_equal("A3:C1", wb_dims(rows = 3:1, cols = 1:3))
 })
+
+test_that("wb_dims() type works", {
+  expect_equal("A1:K33", wb_dims(x = mtcars))
+  expect_equal("A1:K33", wb_dims(x = mtcars, fix = "none"))
+  expect_equal("$A$1:$K$33", wb_dims(x = mtcars, fix = "all"))
+  expect_equal("A$1:K$33", wb_dims(x = mtcars, fix = "row"))
+  expect_equal("$A1:$K33", wb_dims(x = mtcars, fix = "col"))
+
+  expect_equal("$A1:K33", wb_dims(x = mtcars, fix = c("col", "none")))
+  expect_equal("A1:$K33", wb_dims(x = mtcars, fix = c("none", "col")))
+  expect_equal("$A1:K$33", wb_dims(x = mtcars, fix = c("col", "row")))
+})

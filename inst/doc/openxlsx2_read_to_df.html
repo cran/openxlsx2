@@ -546,7 +546,7 @@ empty cells were removed prior to the conversion to R data frames, now
 they are removed after the conversion and are removed only if they are
 completely empty</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># erase empty rows from dataset</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">sheet =</span> <span class="dv">1</span>, <span class="at">skip_empty_rows =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span> <span class="fu">tail</span>()</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">tail</span>(<span class="fu">wb_to_df</span>(file, <span class="at">sheet =</span> <span class="dv">1</span>, <span class="at">skip_empty_rows =</span> <span class="cn">TRUE</span>))</span>
 <span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 &lt;NA&gt; Var3  Var4       Var5 Var6 Var7     Var8</span></span>
 <span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; 6  FALSE    2   NA &lt;NA&gt; #NUM!       &lt;NA&gt; &lt;NA&gt;    2 17:24:53</span></span>
 <span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; 7  FALSE    3   NA 1.56     e       &lt;NA&gt; &lt;NA&gt; &lt;NA&gt;     &lt;NA&gt;</span></span>

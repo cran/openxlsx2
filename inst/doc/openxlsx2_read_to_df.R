@@ -48,7 +48,7 @@ wb_to_df(file, convert = FALSE)
 
 ## -----------------------------------------------------------------------------
 # erase empty rows from dataset
-wb_to_df(file, sheet = 1, skip_empty_rows = TRUE) %>% tail()
+tail(wb_to_df(file, sheet = 1, skip_empty_rows = TRUE))
 
 ## -----------------------------------------------------------------------------
 # erase empty cols from dataset

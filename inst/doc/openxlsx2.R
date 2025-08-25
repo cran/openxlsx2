@@ -5,6 +5,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+modern_r <- getRversion() >= "4.1.0"
 
 ## ----eval = FALSE-------------------------------------------------------------
 # install.packages("openxlsx2")
@@ -16,34 +17,34 @@ knitr::opts_chunk$set(
 # wb <- wb_load("your_file.xlsx")
 
 ## ----eval = FALSE-------------------------------------------------------------
-# wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = your_data)
+# wb <- wb_workbook() |> wb_add_worksheet() |> wb_add_data(x = your_data)
 
 ## ----eval = FALSE-------------------------------------------------------------
 # wb <- wb_add_data(wb_add_worksheet(wb_workbook()), x = your_data)
 
-## -----------------------------------------------------------------------------
-wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_data(x = mtcars)
+## ----eval = modern_r----------------------------------------------------------
+wb <- wb_workbook() |> wb_add_worksheet() |> wb_add_data(x = mtcars)
 
 ## -----------------------------------------------------------------------------
 wb
 
-## -----------------------------------------------------------------------------
-wb <- wb_workbook() %>% wb_add_worksheet() %>% wb_add_worksheet() %>% wb_add_data(x = mtcars)
+## ----eval = modern_r----------------------------------------------------------
+wb <- wb_workbook() |> wb_add_worksheet() |> wb_add_worksheet() |> wb_add_data(x = mtcars)
 
 ## -----------------------------------------------------------------------------
 wb
 
-## -----------------------------------------------------------------------------
-wb %>% wb_to_df() %>% head()
+## ----eval = modern_r----------------------------------------------------------
+wb |> wb_to_df() |> head()
 
-## -----------------------------------------------------------------------------
-wb %>% wb_to_df(sheet = "Sheet 2") %>% head()
-
-## ----eval = FALSE-------------------------------------------------------------
-# wb %>% wb_save(file = "my_first_worksheet.xlsx")
+## ----eval = modern_r----------------------------------------------------------
+wb |> wb_to_df(sheet = "Sheet 2") |> head()
 
 ## ----eval = FALSE-------------------------------------------------------------
-# wb %>% wb_open()
+# wb |> wb_save(file = "my_first_worksheet.xlsx")
+
+## ----eval = FALSE-------------------------------------------------------------
+# wb |> wb_open()
 
 ## ----eval = FALSE-------------------------------------------------------------
 # wb <- wb_workbook()
@@ -53,10 +54,10 @@ wb %>% wb_to_df(sheet = "Sheet 2") %>% head()
 ## ----echo = FALSE-------------------------------------------------------------
 wb <- wb_workbook()
 wb_add_worksheet(wb, sheet = "USexp")
-wb_add_data(wb, "USexp", USPersonalExpenditure) %>% try()
+wb_add_data(wb, "USexp", USPersonalExpenditure) |> try()
 
-## -----------------------------------------------------------------------------
-wb %>% wb_get_sheet_names()
+## ----eval = modern_r----------------------------------------------------------
+wb |> wb_get_sheet_names()
 
 ## -----------------------------------------------------------------------------
 wb <- wb_workbook()

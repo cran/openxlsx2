@@ -156,6 +156,9 @@ wb_load <- function(
   calcChainXML      <- grep_xml("xl/calcChain.xml")
   embeddings        <- grep_xml("xl/embeddings")
   activeX           <- grep_xml("xl/activeX")
+  python            <- grep_xml("xl/python.xml$")
+  webextensions     <- grep_xml("xl/webextensions")
+
 
   # comments
   commentsBIN       <- grep_xml("xl/comments[0-9]+\\.bin")
@@ -225,7 +228,7 @@ wb_load <- function(
   namedSheetViewsXML <- grep_xml("namedSheetViews/namedSheetView[0-9]+.xml$")
 
   cleanup_dir <- function(data_only) {
-    grep_xml("media|vmlDrawing|customXml|embeddings|activeX|vbaProject", ignore.case = TRUE, invert = TRUE)
+    grep_xml("media|vmlDrawing|customXml|embeddings|activeX|vbaProject|webextensions", ignore.case = TRUE, invert = TRUE)
   }
 
   ## remove all EXCEPT media and charts
@@ -247,7 +250,7 @@ wb_load <- function(
     "namedSheetViews", "persons", "pivotCache", "pivotTables",
     "printerSettings", "queryTables", "richData", "slicerCaches",
     "slicers", "tables", "theme", "threadedComments", "timelineCaches",
-    "timelines", "worksheets", "xl", "[trash]"
+    "timelines", "worksheets", "webextensions", "xl", "[trash]"
   )
   unknown <- file_folders[!file_folders %in% known]
   # nocov start
@@ -838,6 +841,19 @@ wb_load <- function(
     wb$featurePropertyBag <- read_xml(featureProperty, pointer = FALSE)
   }
 
+  if (!data_only && length(python)) {
+    wb$append(
+      "Content_Types",
+      '<Override PartName="/xl/python.xml" ContentType="application/vnd.ms-excel.python+xml"/>'
+    )
+    wb$append(
+      "workbook.xml.rels",
+      '<Relationship Id="rId7" Type="http://schemas.microsoft.com/office/2023/09/relationships/Python" Target="python.xml"/>'
+    )
+
+    wb$python <- read_xml(python, pointer = FALSE)
+  }
+
 
   ##* ----------------------------------------------------------------------------------------------*##
   ### BEGIN READING IN WORKSHEET DATA
@@ -987,14 +1003,22 @@ wb_load <- function(
         # need to expand the names. multiple conditions can be combined in one conditionalFormatting
         cfs <- xml_node(worksheet_xml, "worksheet", "conditionalFormatting")
         if (length(cfs)) {
-
           nms <- rbindlist(xml_attr(cfs, "conditionalFormatting"))
-          cf <- xml_node(cfs, "conditionalFormatting", "cfRule")
+
+          ## one sqref can contain multiple conditional formating rules
+          nm <- NULL
+          cf <- NULL
+          for (cfi in seq_along(cfs)) {
+            tmp_cf <- xml_node(cfs[cfi], "conditionalFormatting", "cfRule")
+            cf <- c(cf, tmp_cf)
+            tmp_nm <- nms[cfi, , drop = FALSE]
+            nm <- rbind2(nm, tmp_nm[rep_len(1, length(tmp_cf)), , drop = FALSE])
+          }
 
           # our xlsb parser does not support conditional formatting
           if (!identical(cf, character())) {
             conditionalFormatting <- data.frame(
-              nms, cf, stringsAsFactors = FALSE
+              nm, cf, stringsAsFactors = FALSE
             )
             wb$worksheets[[i]]$conditionalFormatting <- conditionalFormatting
           }
@@ -1476,6 +1500,19 @@ wb_load <- function(
 
       wb$append("Content_Types", '<Default Extension="bin" ContentType="application/vnd.ms-office.activeX"/>')
       wb$append("Content_Types", sprintf('<Override PartName="/xl/activeX/%s" ContentType="application/vnd.ms-office.activeX+xml"/>', ax_fls))
+    }
+
+    ## xl\webextensions
+    if (length(webextensions)) {
+      wb$webextensions <- webextensions
+      wx_sel <- file_ext2(webextensions) == "xml"
+      wx_fls <- basename2(webextensions[wx_sel])
+
+      # theres one taskpane for every webextension
+      if ("taskpanes.xml" %in% wx_fls)
+        wb$append("Content_Types", '<Override PartName="/xl/webextensions/taskpanes.xml" ContentType="application/vnd.ms-office.webextensiontaskpanes+xml"/>')
+
+      wb$append("Content_Types", sprintf('<Override PartName="/xl/webextensions/%s" ContentType="application/vnd.ms-office.webextension+xml"/>', wx_fls[grep("webextension",  wx_fls)]))
     }
 
   } else {

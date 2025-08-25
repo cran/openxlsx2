@@ -165,6 +165,8 @@ random_string <- function(n = 1, length = 16, pattern = "[A-Za-z0-9]", keep_seed
 #' @param row a numeric vector of rows
 #' @param col a numeric or character vector of cols
 #' @param single argument indicating if [rowcol_to_dims()] returns a single cell dimension
+#' @param fix setting the type of the reference. Per default, no type is set. Options are
+#' `"all"`, `"row"`, and `"col"`
 #' @returns
 #'   * A `dims` string for `_to_dim` i.e  "A1:A1"
 #'   * A named list of rows and columns for `to_rowcol`
@@ -226,9 +228,48 @@ dims_to_rowcol <- function(x, as_integer = FALSE) {
   list(col = cols_out, row = rows_out)
 }
 
+
+#' @rdname dims_helper
+#' @noRd
+rowcol_to_dim <- function(row, col, fix = NULL) {
+  # no assert for col. will output character anyways
+  # assert_class(row, "numeric") - complains if integer
+  col_int <- col2int(col)
+  min_col <- int2col(min(col_int))
+  min_row <- min(row)
+
+  # we will always return something like "A1"
+  if (!is.null(fix)) {
+    match.arg(fix, c("all", "col", "row", "none"))
+    if (fix == "all")
+      return(stringi::stri_join("$", min_col, "$", min_row))
+    if (fix == "col")
+      return(stringi::stri_join("$", min_col, min_row))
+    if (fix == "row")
+      return(stringi::stri_join(min_col, "$", min_row))
+  }
+
+  stringi::stri_join(min_col, min_row)
+}
+
+# begin - end
+rc_to_dims <- function(cb, rb, ce, re, fix = NULL) {
+  if (is.null(fix) || length(fix) == 1) {
+    sell <- 1
+    selr <- 1
+  } else if (length(fix) == 2) {
+    sell <- 1
+    selr <- 2
+  }
+  fixl <- fix[sell]
+  fixr <- fix[selr]
+
+  stringi::stri_join(rowcol_to_dim(rb, cb, fixl), ":", rowcol_to_dim(re, ce, fixr))
+}
+
 #' @rdname dims_helper
 #' @export
-rowcol_to_dims <- function(row, col, single = TRUE) {
+rowcol_to_dims <- function(row, col, single = TRUE, fix = NULL) {
 
   # no assert for col. will output character anyways
   # assert_class(row, "numeric") - complains if integer
@@ -237,11 +278,11 @@ rowcol_to_dims <- function(row, col, single = TRUE) {
   col_int <- col2int(col)
 
   if (col_int[1] < col[length(col_int)]) {
-    min_col <- int2col(min(col_int))
-    max_col <- int2col(max(col_int))
+    min_col <- min(col_int)
+    max_col <- max(col_int)
   } else {
-    min_col <- int2col(max(col_int))
-    max_col <- int2col(min(col_int))
+    min_col <- max(col_int)
+    max_col <- min(col_int)
   }
 
   if (row[1] < row[length(row)]) {
@@ -254,24 +295,11 @@ rowcol_to_dims <- function(row, col, single = TRUE) {
 
   # we will always return something like "A1:A1", even for single cells
   if (single) {
-    return(stringi::stri_join(min_col, min_row, ":", max_col, max_row))
+    return(rc_to_dims(min_col, min_row, max_col, max_row, fix = fix))
   } else {
-    return(paste0(vapply(int2col(col_int), FUN = function(x) stringi::stri_join(x, min_row, ":", x, max_row), ""), collapse = ","))
+    return(paste0(vapply(int2col(col_int), FUN = function(x) rc_to_dims(x, min_row, x, max_row, fix = fix), ""), collapse = ","))
   }
 
-}
-
-#' @rdname dims_helper
-#' @noRd
-rowcol_to_dim <- function(row, col) {
-  # no assert for col. will output character anyways
-  # assert_class(row, "numeric") - complains if integer
-  col_int <- col2int(col)
-  min_col <- int2col(min(col_int))
-  min_row <- min(row)
-
-  # we will always return something like "A1"
-  stringi::stri_join(min_col, min_row)
 }
 
 #' consecutive range in vector
@@ -636,6 +664,13 @@ determine_select_valid <- function(args, select = NULL) {
 #' wb$add_fill(dims = wb_dims_vs, fill = wb_color("yellow"))
 #' wb$add_conditional_formatting(dims = wb_dims(x = mtcars, cols = "mpg"), type = "dataBar")
 #' # wb_open(wb)
+#'
+#' # fix relative ranges
+#' wb_dims(x = mtcars) # equal to none: A1:K33
+#' wb_dims(x = mtcars, fix = "all") # $A$1:$K$33
+#' wb_dims(x = mtcars, fix = "row") # A$1:K$33
+#' wb_dims(x = mtcars, fix = "col") # $A1:$K33
+#' wb_dims(x = mtcars, fix = c("col", "row")) # $A1:K$33
 wb_dims <- function(..., select = NULL) {
   args <- list(...)
   len <- length(args)
@@ -647,7 +682,7 @@ wb_dims <- function(..., select = NULL) {
   # nams cannot be NULL now
   nams <- names(args) %||% rep("", len)
   valid_arg_nams <- c("x", "rows", "cols", "from_row", "from_col", "from_dims", "row_names", "col_names",
-                      "left", "right", "above", "below", "select")
+                      "left", "right", "above", "below", "select", "fix")
   any_args_named <- any(nzchar(nams))
   # unused, but can be used, if we need to check if any, but not all
   # Check if valid args were provided if any argument is named.
@@ -938,22 +973,22 @@ wb_dims <- function(..., select = NULL) {
         cdims <- NULL
         if (any(abs(diff(col_span)) != 1L)) {
           for (col_start in col_span) {
-            tmp  <- rowcol_to_dim(row_start, col_start)
+            tmp  <- rowcol_to_dim(row_start, col_start, args$fix)
             cdims <- c(cdims, tmp)
           }
         } else {
-          cdims <- rowcol_to_dim(row_start, col_span)
+          cdims <- rowcol_to_dim(row_start, col_span, args$fix)
         }
         dims <- c(dims, cdims)
       }
     } else {
       if (any(abs(diff(col_span)) != 1L)) {
         for (col_start in col_span) {
-          tmp  <- rowcol_to_dim(row_span, col_start)
+          tmp  <- rowcol_to_dim(row_span, col_start, args$fix)
           dims <- c(dims, tmp)
         }
       } else {
-        dims <- rowcol_to_dim(row_span, col_span)
+        dims <- rowcol_to_dim(row_span, col_span, args$fix)
       }
     }
 
@@ -965,22 +1000,22 @@ wb_dims <- function(..., select = NULL) {
         cdims <- NULL
         if (any(abs(diff(col_span)) != 1L)) {
           for (col_start in col_span) {
-            tmp  <- rowcol_to_dims(row_start, col_start)
+            tmp  <- rowcol_to_dims(row_start, col_start, fix = args$fix)
             cdims <- c(cdims, tmp)
           }
         } else {
-          cdims <- rowcol_to_dims(row_start, col_span)
+          cdims <- rowcol_to_dims(row_start, col_span, fix = args$fix)
         }
         dims <- c(dims, cdims)
       }
     } else {
       if (any(abs(diff(col_span)) != 1L)) {
         for (col_start in col_span) {
-          tmp  <- rowcol_to_dims(row_span, col_start)
+          tmp  <- rowcol_to_dims(row_span, col_start, fix = args$fix)
           dims <- c(dims, tmp)
         }
       } else {
-        dims <- rowcol_to_dims(row_span, col_span)
+        dims <- rowcol_to_dims(row_span, col_span, fix = args$fix)
       }
     }
   }
@@ -1009,7 +1044,7 @@ get_relship_id <- function(obj, x) {
   relship <- rbindlist(xml_attr(obj, "Relationship"))
   relship$typ <- basename(relship$Type)
   relship <- relship[relship$typ == x, ]
-  unname(unlist(relship[c("Id")]))
+  unlist(relship[c("Id")], use.names = FALSE)
 }
 
 #' filename_id returns an integer vector with the file name as name
@@ -1381,6 +1416,15 @@ carry_forward <- function(x) {
 # calculate difference for each shared formula to the origin
 calc_distance <- function(x) {
   x - x[1]
+}
+
+# safer rbind
+rbind2 <- function(df1, df2) {
+  if (is.null(df1)) return(df2)
+  nms <- unique(c(names(df1), names(df2)))
+  df1[setdiff(nms, names(df1))] <- ""
+  df2[setdiff(nms, names(df2))] <- ""
+  rbind(df1[nms], df2[nms])
 }
 
 # ave function to avoid a dependency on stats. if we ever rely on stats,

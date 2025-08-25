@@ -915,9 +915,9 @@ wb_read <- function(
 #' @returns A data frame of class `wb_data`.
 #' @seealso [wb_to_df()] [wb_add_mschart()], [wb_add_pivot_table()]
 #' @examples
-#'  wb <- wb_workbook() %>%
-#'    wb_add_worksheet() %>%
-#'    wb_add_data(x = mtcars, dims = "B2")
+#'  wb <- wb_workbook()
+#'  wb <- wb_add_worksheet(wb)
+#'  wb <- wb_add_data(wb, x = mtcars, dims = "B2")
 #'
 #'  wb_data(wb, 1, dims = "B2:E6")
 #' @export
@@ -927,7 +927,7 @@ wb_data <- function(wb, sheet = current_sheet(), dims, ...) {
   sheetname <- wb$get_sheet_names(escape = TRUE)[[sheetno]]
 
   if (missing(dims)) {
-    dims <- unname(unlist(xml_attr(wb$worksheets[[sheetno]]$dimension, "dimension")))
+    dims <- unlist(xml_attr(wb$worksheets[[sheetno]]$dimension, "dimension"), use.names = FALSE)
   }
 
   z <- wb_to_df(wb, sheet, dims = dims, ...)

@@ -846,11 +846,11 @@ test_that("conditional formatting with gradientFill works", {
 
   # check that the wrapper handles dims as well
   expect_silent(
-    wb_workbook() %>%
-    wb_add_worksheet() %>%
-    wb_add_conditional_formatting(dims = "A1:B5",
-                                  type = "between",
-                                  rule = c(2, 4))
+    wb_workbook()$
+      add_worksheet()$
+      add_conditional_formatting(dims = "A1:B5",
+                                 type = "between",
+                                 rule = c(2, 4))
   )
 
 })
@@ -1118,6 +1118,19 @@ test_that("cf for pivot tables works", {
 
   exp <- c("1", "1", "")
   got <- wb$worksheets[[1]]$conditionalFormatting$pivot
+  expect_equal(exp, got)
+
+})
+
+
+test_that("combined cells with uneven cf work", {
+
+  skip_online_checks()
+
+  wb <- wb_load(testfile_path("gh_issue_1419.xlsx"))
+
+  exp <- c("A1", "A1", "A1", "A1", "A1", "A1", "A2", "A2", "A2")
+  got <- wb$worksheets[[1]]$conditionalFormatting$sqref
   expect_equal(exp, got)
 
 })
