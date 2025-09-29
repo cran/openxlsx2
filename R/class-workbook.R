@@ -7449,6 +7449,9 @@ wbWorkbook <- R6::R6Class(
     #' @param summary_row summaryRow
     #' @param summary_col summaryCol
     #' @param tab_color tabColor
+    #' @param horizontal_centered horizontal_centered
+    #' @param vertical_centered vertical_centered
+    #' @param print_headings print_headings
     #' @param ... additional arguments
     #' @return The `wbWorkbook` object, invisibly
     set_page_setup = function(
@@ -7486,6 +7489,10 @@ wbWorkbook <- R6::R6Class(
       summary_col           = NULL,
       # tabColor properties
       tab_color             = NULL,
+      # print options
+      horizontal_centered   = NULL,
+      vertical_centered     = NULL,
+      print_headings        = NULL,
       ...
     ) {
 
@@ -7582,6 +7589,13 @@ wbWorkbook <- R6::R6Class(
           outlinepr <- c(outlinepr, c(summaryRight = "1"))
         }
       }
+
+      ## print options ----
+      self$worksheets[[sheet]]$set_print_options(
+        horizontalCentered = horizontal_centered,
+        verticalCentered = vertical_centered,
+        headings = print_headings
+      )
 
       ## update sheetPr ----
       xml <- self$worksheets[[sheet]]$sheetPr
@@ -7721,6 +7735,13 @@ wbWorkbook <- R6::R6Class(
       standardize_case_names(...)
 
       sheet <- private$get_sheet_index(sheet)
+
+      if (getOption("openxlsx2.soon_deprecated", default = FALSE)) {
+        .Deprecated(
+          new = "wb_set_page_setup",
+          old = "wb_page_setup"
+        )
+      }
 
       self$set_page_setup(
         sheet            = sheet,
@@ -7961,7 +7982,15 @@ wbWorkbook <- R6::R6Class(
       self$worksheets[[sheet]]$set_sheetview(show_grid_lines = as_xml_attr(show))
 
       ## print
-      self$worksheets[[sheet]]$set_print_options(gridLines = as_xml_attr(print), gridLinesSet = as_xml_attr(print))
+      # if print == FALSE, gridLinesSet must be removed. Otherwise print options
+      # will be ignored in some spreadsheet software. This is contrary to the
+      # ECMA specification.
+      print_grid_lines <- print
+      print_grid_lines_set <- if (as_xml_attr(print) == "0") NULL else print
+      self$worksheets[[sheet]]$set_print_options(
+        gridLines = as_xml_attr(print_grid_lines),
+        gridLinesSet = as_xml_attr(print_grid_lines_set)
+      )
 
       invisible(self)
     },
@@ -9175,7 +9204,10 @@ wbWorkbook <- R6::R6Class(
         styid <- style
       }
 
-      sel <- match(dims[dims != ""], self$worksheets[[sheet]]$sheet_data$cc$r)
+      # in openxlsx2 < 1.19
+      # sel <- self$worksheets[[sheet]]$sheet_data$cc$r %in% dims
+      # in 1.19 switched to match, but the match result was unsorted
+      sel <- sort(match(dims[dims != ""], self$worksheets[[sheet]]$sheet_data$cc$r))
 
       self$worksheets[[sheet]]$sheet_data$cc$c_s[sel] <- styid
 
@@ -9750,6 +9782,10 @@ wbWorkbook <- R6::R6Class(
       if (is.null(self$sheet_names)) {
         warning("Workbook has no sheets")
         return(NA_integer_)
+      }
+
+      if (is.factor(sheet)) {
+        sheet <- as.character(sheet)
       }
 
       if (is.character(sheet)) {

@@ -1,7 +1,7 @@
-352039932b2cbc208ddbf0b62fd255c0 *DESCRIPTION
+51f25f4d06788545915e299ab0aaaba8 *DESCRIPTION
 8cd702d212b7d0fcd4b8b199e3f7cb10 *LICENSE
-0c5308ab7ea0e9e3b1de00ccc4a1c853 *NAMESPACE
-2ea1a7081a327695451eebac7724b523 *NEWS.md
+78b618009dbab07f9c4a22613d23758c *NAMESPACE
+c3a5ac2aecb9f2b417d2095b264a5c07 *NEWS.md
 e26c081ed5c27a747a1dd268ec02b87a *R/RcppExports.R
 d662efc4e4f75b2573b8758da9bd8fe3 *R/asserts.R
 7cf1e3ee823ebb3762e9ed0cb956fc1f *R/baseXML.R
@@ -12,12 +12,12 @@ fc64946ecf4b4a53edc323de73d18249 *R/class-color.R
 537cf79cf5e51ab3f907836c1f745455 *R/class-sheet-data.R
 c7099a6c7b0e44d89cca6f6e5cde0073 *R/class-style_mgr.R
 97f2a85b8c5c6b1ae45594bb7d8eb422 *R/class-workbook-utils.R
-0f5aa5840bb3207e3d1a79ed590fe3a4 *R/class-workbook-wrappers.R
-0a96b28001cfa5063d56f12cafbb4b43 *R/class-workbook.R
+5a50ead91f9ae99965c25fb01bfe5aca *R/class-workbook-wrappers.R
+10441a4bfaa59468078ee77ef5de36f1 *R/class-workbook.R
 0dc96fdae4dd4ab051891041931f93a1 *R/class-worksheet.R
 1ed9eace6066575d81da52dc026ecdb1 *R/conditional_formatting.R
 050a0036325b4ce0d9a05508839356f8 *R/converters.R
-caa5848e5d088f270e6b199aeba91b52 *R/dates.R
+d2338e13cc938b3f80b691d1f639bd6b *R/dates.R
 83e215dbe0bf32414a90c8b0640d57cb *R/deprecate.R
 a323ef5839c55dfd978a3c65eaf4a6e6 *R/get-named-regions.R
 7ec9470791afbcb4e96b447194e328d2 *R/helper-functions.R
@@ -26,9 +26,9 @@ c61e3024c32df5ec75b6c86eae1a0e73 *R/onUnload.R
 b882e5674203fb762f239ee3f7caad08 *R/openxlsx2-package.R
 5495eb756b536a9fdfb30fb889340229 *R/pivot_table.R
 a9c1eaecb0185f6dc61282cc6c840efd *R/pugixml.R
-c83a80502fa3320ff9360c43e1e21150 *R/read.R
+123ca6b9f8f7b32fbcbe05db16e73bb3 *R/read.R
 36630cbd52f1ccb652baa441e2ba137d *R/standardize.R
-9b7585ecbff1175177cd87bd401c06c2 *R/utils.R
+4f89c1c48d597b2f58d0b7313120a24b *R/utils.R
 eb07999cc9974e92e903dc5bc42be961 *R/wb_functions.R
 3d7ba96fca73c6e7e936eb366e76bb1f *R/wb_load.R
 884eda5847a135d024421688f9da2b1e *R/wb_styles.R
@@ -39,7 +39,7 @@ bb98f51e31995719b2480fc217a780f6 *R/write_xlsx.R
 6b6cf9f3084b5a344b17fcf6a4073c15 *build/vignette.rds
 fe07b0276630cea99ffac9ba06e5026f *inst/AUTHORS
 812a80e53d1268bc4ce0747313bd1ed3 *inst/CITATION
-36ec07cdf3a2228733c2d7311c78a283 *inst/WORDLIST
+79741bdd2a7889bc669b10600f6cede4 *inst/WORDLIST
 99b22176a60a7ec723115bfc78bf43b7 *inst/doc/Update-from-openxlsx.R
 e93be98bca69961440ff70e7bb3c958c *inst/doc/Update-from-openxlsx.Rmd
 02a89d6001904af107315f8984c8bdca *inst/doc/Update-from-openxlsx.html
@@ -88,7 +88,7 @@ a05d658fe3c944b52b27f2276236bc60 *man/col2int.Rd
 a7eadfefc5a67b4f94ec522be4a3f6d9 *man/con_dims.Rd
 71ef2c576855148a5eccf8a5cd895724 *man/con_rng.Rd
 8dcf28917ac9db6c07a13e8b756fafe6 *man/convertToExcelDate.Rd
-aa71d75437ed66db19030b9e9081cb6e *man/convert_date.Rd
+b9e0a8a2448017137f229435ee02ed40 *man/convert_date.Rd
 9edb6d8928f0115dd3d79438f4f49424 *man/convert_to_excel_date.Rd
 19f2ef4da85095d6cfd2e981fe57c25d *man/create_border.Rd
 d4caf7fd13c24e5b2d8905faa2f8b925 *man/create_cell_style.Rd
@@ -139,7 +139,7 @@ efe60297d1ec1fcb334c94e69673dc13 *man/sheet_visibility-wb.Rd
 5d49c43d4b9973f837dddccbf114efee *man/styles_on_sheet.Rd
 48d5b760fb6f4c891e38a3c6672b65d8 *man/temp_xlsx.Rd
 78f9caaef7b2e5eed0bf35f916aec031 *man/waivers.Rd
-65f2ef99f9a9ce832f93edefa0220c6e *man/wbWorkbook.Rd
+e6f9ff5d7cc5ffee871f791db736d3e1 *man/wbWorkbook.Rd
 908edd5bb5bedffbeef033f9efc011c0 *man/wb_add_border.Rd
 77ce606faecc3851056570574720859a *man/wb_add_cell_style.Rd
 e55de2a0d8182c827965e5cf5c803e7c *man/wb_add_chart_xml.Rd
@@ -186,7 +186,7 @@ f676b008c0e39a5ca8e93726e515a940 *man/wb_dims.Rd
 4e5350f12b0d6b967b10cab7c68ec02b *man/wb_merge_cells.Rd
 6ed330502552580415623b4b65ca2ae7 *man/wb_open.Rd
 90610031a93dd01f02d210fe168eb893 *man/wb_order.Rd
-cf38bf1b33ef85d70bfb44d3c34df4f1 *man/wb_page_setup.Rd
+46a8b08433f8dc20c08115ce12d2a73c *man/wb_page_setup.Rd
 44cb6284eb60c12ebc805b7427cc960a *man/wb_protect.Rd
 3e0983285e3abd22ba8c3ac0a799a17b *man/wb_protect_worksheet.Rd
 705a05fa16a52cc7e7e1fd5e9d417e1a *man/wb_remove_tables.Rd
@@ -236,9 +236,9 @@ cf1ef6d82ad819751be023902c309b22 *tests/testthat/test-class-chart-sheet.R
 be83fc659140bd76a16718ef0c4e8bc5 *tests/testthat/test-class-hyperlink.R
 919623b7f9427497c25f755b8c32e9f3 *tests/testthat/test-class-sheet-data.R
 637529e28b3a0f8eb4b1cbfadc382806 *tests/testthat/test-class-workbook-utils.R
-e433e2af26ce23bf255b484172ddc55e *tests/testthat/test-class-workbook-wrappers.R
+7f84cb54aac9a01e022bfd5d774bdd02 *tests/testthat/test-class-workbook-wrappers.R
 24c73a796ad1157f84f86795ec728431 *tests/testthat/test-class-workbook.R
-ab6aea8755489f73e847368735aad2f7 *tests/testthat/test-class-worksheet.R
+96c100583df5ad8f04081ef2af2b5471 *tests/testthat/test-class-worksheet.R
 aef4c54dc19d2668842adf572a8d02f7 *tests/testthat/test-clean_sheet.R
 f4235d2a2f2c80c1b194cf2c602a0eb4 *tests/testthat/test-cloneWorksheet.R
 c50844457ebcf4db25947ce91dd928b2 *tests/testthat/test-conditional_formatting.R
@@ -262,7 +262,7 @@ ac6f1774ec4a44307b6cd61654ea85f7 *tests/testthat/test-protect-workbook.R
 260c929b128e3e743cedd436ec1cfb80 *tests/testthat/test-protect-worksheet.R
 e62ccf2bb9deca1b8aa231fae81abbca *tests/testthat/test-pugi_cpp.R
 cd6c48019da65b0e23a95735b63f4078 *tests/testthat/test-pugixml.R
-fe5f6d810228eba976460c34b8060134 *tests/testthat/test-read_from_created_wb.R
+fdab8802e05973903296f199842220a2 *tests/testthat/test-read_from_created_wb.R
 d4b5f9ef744e923b6fabcda27f13ea57 *tests/testthat/test-read_sources.R
 8a990bb8c7101117937d1ab8aebbab67 *tests/testthat/test-read_write_logicals.R
 e971e497dceb59765681ed81fc056d05 *tests/testthat/test-read_xlsb.R
@@ -276,7 +276,7 @@ e971e497dceb59765681ed81fc056d05 *tests/testthat/test-read_xlsb.R
 bdb04ce7a188991f98e5d9bbfd8bc434 *tests/testthat/test-tables.R
 5373622569fe375a35246c3d84f2fe87 *tests/testthat/test-utils.R
 5ddeabdfbbafe817372474b155be8692 *tests/testthat/test-wb_functions.R
-6b6fa0cafdd916ea81eaea81f37f4836 *tests/testthat/test-wb_styles.R
+ccd30e7cbe5a57cd52c2c8299499646e *tests/testthat/test-wb_styles.R
 64e2c3e793c71562c9c754598e21e275 *tests/testthat/test-write.R
 a27d48341c0551fa12fac153b16d5634 *tests/testthat/test-writing_posixct.R
 0ed0f465c0ef47c7529002a2c4e09a78 *tests/testthat/test-xl_open.R
