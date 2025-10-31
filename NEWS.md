@@ -1,3 +1,13 @@
+# openxlsx2 1.21
+
+## Fixes
+
+* Improve date detection to ignore numfmt 'GENERAL'
+* Fix handling of three and four digit hex colors ([1445](https://github.com/JanMarvin/openxlsx2/pull/1445), @rogerssam)
+
+
+***************************************************************************
+
 # openxlsx2 1.20
 
 ## New features

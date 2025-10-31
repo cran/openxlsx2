@@ -284,8 +284,8 @@ wb_add_data <- function(
 #' \cr\cr
 #' \cr**The below options correspond to Excel table options:**
 #' \cr
-#' \if{html}{\figure{tableoptions.png}{options: width="40\%" alt="Figure: table_options.png"}}
-#' \if{latex}{\figure{tableoptions.pdf}{options: width=7cm}}
+#' \if{html}{\figure{tableoptions.png}{options: alt="Figure: table_options.png"}}
+#' \if{latex}{\figure{tableoptions.pdf}{options: width=265px}}
 #' @param first_column logical. If `TRUE`, the first column is bold.
 #' @param last_column logical. If `TRUE`, the last column is bold.
 #' @param banded_rows logical. If `TRUE`, rows are color banded.
@@ -712,6 +712,14 @@ wb_remove_timeline <- function(
 #' [wb_remove_named_region()]. Contrary to other formulas, custom formulas must
 #' be registered with the workbook before they can be used (see the example
 #' below).
+#'
+#' If a function that normally works in spreadsheet software does not behave
+#' as expected when written using [wb_add_formula()], e.g., if spurious
+#' `@` symbols appear in the formula, it is likely that the formula is either
+#' an array formula or requires a future function prefix. In modern spreadsheet
+#' software, it is no longer straightforward to detect whether a formula is an
+#' array formula, since this hidden in cell metadata (cm). Therefore, a formula
+#' like `SUM(1+(A1:A2))` will not be displayed as `{SUM(1+(A1:A2))}`.
 #'
 #' @param wb A Workbook object containing a worksheet.
 #' @param sheet The worksheet to write to. (either as index or name)
