@@ -23,7 +23,7 @@ wb_to_df(file, col_names = FALSE)
 wb_to_df(file, detect_dates = FALSE)
 
 ## -----------------------------------------------------------------------------
-# return the underlying Excel formula instead of their values
+# return the underlying spreadsheet formula instead of their values
 wb_to_df(file, show_formula = TRUE)
 
 ## -----------------------------------------------------------------------------

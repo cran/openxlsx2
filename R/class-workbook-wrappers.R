@@ -1,7 +1,19 @@
 
 #' Create a new Workbook object
 #'
-#' Initialize a [wbWorkbook] object. You can set workbook properties as well.
+#' This function initializes and returns a [wbWorkbook] object,
+#' which is the core structure for building and modifying openxml files
+#' (`.xlsx`) in `openxlsx2`.
+#'
+#' You can define various metadata properties at creation, such as the
+#' `creator`, `title`, `subject`, and timestamps. You can also
+#' specify a workbook theme.
+#'
+#' The returned [wb_workbook()] object is an [R6::R6Class()] instance.
+#' Once created, the standard workflow is to immediately add a worksheet
+#' using [wb_add_worksheet()]. From there, you can populate the sheet with data
+#' ([wb_add_data()]), or formulas ([wb_add_formula()]), and apply styling
+#' or other elements.
 #'
 #' `theme` can be one of
 #' "Atlas", "Badge", "Berlin", "Celestial", "Crop", "Depth", "Droplet",
@@ -34,6 +46,10 @@
 #'   subject  = "Expense Report - 2022 Q1",
 #'   category = "sales"
 #' )
+#'
+#' ## Cloning a workbook
+#' wb1 <- wb_workbook()
+#' wb2 <- wb1$clone(deep = TRUE)
 wb_workbook <- function(
   creator           = NULL,
   title             = NULL,
@@ -80,6 +96,25 @@ wb_workbook <- function(
 #' preliminary sanity checks before writing. As the name suggests,
 #' the output is simply flushed to disk.
 #'
+#' By default, the [utils::zip()] function is used to create output files.
+#' This requires a working zip utility to be available on the system. A valid
+#' zip program must be found either via `Sys.which("zip")` or through the
+#' `R_ZIPCMD` environment variable.
+#'
+#' On Windows, a suitable zip tool is typically provided by Rtools. If
+#' `R_ZIPCMD` is not set, `openxlsx2` will automatically use the first detected
+#' Rtools installation. If no zip utility is available, `bsdtar` can be used as
+#' an alternative. On Windows this is shipped as `tar.exe`; on Mac and Linux
+#' it is usually available as `bsdtar` (often requiring installation of the
+#' `archive` package).
+#'
+#' A further fallback—primarily for older Windows systems—is to point
+#' `R_ZIPCMD` to `7z.exe`. This approach has not been extensively tested and is
+#' not reliable with 7-Zip on macOS.
+#'
+#' As an additional fallback, the `zip` package can be used. It is no longer
+#' listed in `Imports` and must be installed separately if needed.
+#'
 #' @param wb A `wbWorkbook` object to write to file
 #' @param file A path to save the workbook to
 #' @param overwrite If `FALSE`, will not overwrite when `file` already exists.
@@ -99,6 +134,18 @@ wb_workbook <- function(
 #' ## Save workbook to working directory
 #' \donttest{
 #' wb_save(wb, file = temp_xlsx(), overwrite = TRUE)
+#'
+#' ## do not use utils::zip, will try to use bsdtar
+#' # options("openxlsx2.no_utils_zip" = TRUE)
+#'
+#' ## if the above is set as well, do not use bsdtar
+#' # options("openxlsx2.no_bsdtar" = TRUE)
+#'
+#' ## use 7zip on Windows this works, on Mac not
+#' # Sys.setenv("R_ZIPCMD" = "C:\\Program Files\\7-Zip\\7z.exe")
+#'
+#' # if the last one is left blank the fallback is zip::zip
+#' openxlsx2::write_xlsx(x = cars, temp_xlsx())
 #' }
 wb_save <- function(wb, file = NULL, overwrite = TRUE, path = NULL, flush = FALSE) {
   assert_workbook(wb)
@@ -137,7 +184,8 @@ wb_save <- function(wb, file = NULL, overwrite = TRUE, path = NULL, flush = FALS
 #' @export
 #' @details Formulae written using [wb_add_formula()] to a Workbook object will
 #' not get picked up by `read_xlsx()`. This is because only the formula is written
-#' and left to Excel to evaluate the formula when the file is opened in Excel.
+#' into the worksheet and it will be evaluated once the file is opened in
+#' spreadsheet software.
 #' The string `"_openxlsx_NA"` is reserved for `openxlsx2`.
 #' If the data frame contains this string, the output will be broken. Similar
 #' factor labels `"_openxlsx_Inf"`, `"_openxlsx_nInf"`, and `"_openxlsx_NaN"`
@@ -270,7 +318,7 @@ wb_add_data <- function(
 
 #' Add a data table to a worksheet
 #'
-#' Add data to a worksheet and format as an Excel table.
+#' Add data to a worksheet and format as an spreadsheet table.
 #'
 #' @inherit wb_add_data details
 #' @inheritParams wb_add_data
@@ -281,11 +329,6 @@ wb_add_data <- function(
 #' @param sep Only applies to list columns. The separator used to collapse list
 #'   columns to a character vector e.g.
 #'   `sapply(x$list_column, paste, collapse = sep)`.
-#' \cr\cr
-#' \cr**The below options correspond to Excel table options:**
-#' \cr
-#' \if{html}{\figure{tableoptions.png}{options: alt="Figure: table_options.png"}}
-#' \if{latex}{\figure{tableoptions.pdf}{options: width=265px}}
 #' @param first_column logical. If `TRUE`, the first column is bold.
 #' @param last_column logical. If `TRUE`, the last column is bold.
 #' @param banded_rows logical. If `TRUE`, rows are color banded.
@@ -342,7 +385,7 @@ wb_add_data_table <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_data_table(
+  wb$clone(deep = TRUE)$add_data_table(
     sheet             = sheet,
     x                 = x,
     dims              = dims,
@@ -618,7 +661,7 @@ wb_add_slicer <- function(
   assert_workbook(wb)
   if (missing(params)) params <- substitute()
 
-  wb$clone()$add_slicer(
+  wb$clone(deep = TRUE)$add_slicer(
     x           = x,
     sheet       = sheet,
     dims        = dims,
@@ -655,7 +698,7 @@ wb_add_timeline <- function(
   assert_workbook(wb)
   if (missing(params)) params <- substitute()
 
-  wb$clone()$add_timeline(
+  wb$clone(deep = TRUE)$add_timeline(
     x           = x,
     sheet       = sheet,
     dims        = dims,
@@ -781,7 +824,7 @@ wb_add_formula <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_formula(
+  wb$clone(deep = TRUE)$add_formula(
     sheet             = sheet,
     x                 = x,
     dims              = dims,
@@ -836,7 +879,7 @@ wb_add_hyperlink <- function(
 
   assert_workbook(wb)
 
-  wb$clone()$add_hyperlink(
+  wb$clone(deep = TRUE)$add_hyperlink(
     sheet       = sheet,
     dims        = dims,
     target      = target,
@@ -1004,7 +1047,7 @@ wb_add_chartsheet <- function(
   ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_chartsheet(
+  wb$clone(deep = TRUE)$add_chartsheet(
     sheet       = sheet,
     tab_color   = tab_color,
     zoom        = zoom,
@@ -1269,6 +1312,7 @@ wb_freeze_pane <- function(
 #' @param rows Indices of rows to set / remove (if any) custom height.
 #' @param heights Heights to set `rows` to specified in a spreadsheet column height units.
 #' @param hidden Option to hide rows. A logical vector of length 1 or length of `rows`
+#' @param hide_blanks Option to hide blank (uninitialized) rows. These rows are not only empty, they must not be part of the worksheet.
 #' @name row_heights-wb
 #' @family workbook wrappers
 #' @family worksheet content functions
@@ -1294,16 +1338,16 @@ wb_freeze_pane <- function(
 NULL
 #' @rdname row_heights-wb
 #' @export
-wb_set_row_heights <- function(wb, sheet = current_sheet(), rows, heights = NULL, hidden = FALSE) {
+wb_set_row_heights <- function(wb, sheet = current_sheet(), rows, heights = NULL, hidden = FALSE, hide_blanks = NULL) {
   assert_workbook(wb)
-  assert_class(heights, c("numeric", "integer"), or_null = TRUE, arg_nm = "heights")
-  wb$clone()$set_row_heights(sheet = sheet, rows, heights, hidden)
+  if (missing(rows)) rows <- substitute()
+  wb$clone(deep = TRUE)$set_row_heights(sheet = sheet, rows = rows, heights = heights, hidden = hidden, hide_blanks = hide_blanks)
 }
 #' @rdname row_heights-wb
 #' @export
 wb_remove_row_heights <- function(wb, sheet = current_sheet(), rows) {
   assert_workbook(wb)
-  wb$clone()$remove_row_heights(sheet = sheet, rows = rows)
+  wb$clone(deep = TRUE)$remove_row_heights(sheet = sheet, rows = rows)
 }
 
 #' Modify column widths of a worksheet
@@ -1313,7 +1357,7 @@ wb_remove_row_heights <- function(wb, sheet = current_sheet(), rows) {
 #' @details
 #' The global min and max column width for "auto" columns is set by (default values show):
 #' * `options("openxlsx2.minWidth" = 3)`
-#' * `options("openxlsx2.maxWidth" = 250)` Maximum width allowed in Excel
+#' * `options("openxlsx2.maxWidth" = 250)` Maximum width allowed in OOXML
 #'
 #' NOTE: The calculation of column widths can be slow for large worksheets.
 #'
@@ -1368,7 +1412,7 @@ NULL
 #' @export
 wb_set_col_widths <- function(wb, sheet = current_sheet(), cols, widths = 8.43, hidden = FALSE) {
   assert_workbook(wb)
-  wb$clone()$set_col_widths(
+  wb$clone(deep = TRUE)$set_col_widths(
     sheet  = sheet,
     cols   = cols,
     widths = widths,
@@ -1444,7 +1488,7 @@ wb_add_plot <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_plot(
+  wb$clone(deep = TRUE)$add_plot(
     sheet      = sheet,
     dims       = dims,
     width      = width,
@@ -1494,7 +1538,7 @@ wb_add_drawing <- function(
   ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_drawing(
+  wb$clone(deep = TRUE)$add_drawing(
     sheet      = sheet,
     dims       = dims,
     xml        = xml,
@@ -1555,7 +1599,7 @@ wb_add_mschart <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_mschart(
+  wb$clone(deep = TRUE)$add_mschart(
     sheet      = sheet,
     dims       = dims,
     graph      = graph,
@@ -1630,7 +1674,7 @@ wb_set_base_font <- function(
   ...
 ) {
   assert_workbook(wb)
-  wb$clone()$set_base_font(
+  wb$clone(deep = TRUE)$set_base_font(
     font_size   = font_size,
     font_color  = font_color,
     font_name   = font_name,
@@ -2133,7 +2177,7 @@ wb_set_page_setup <- function(
       ...
 ) {
   assert_workbook(wb)
-  wb$clone()$set_page_setup(
+  wb$clone(deep = TRUE)$set_page_setup(
       sheet                 = sheet,
       # page properties
       black_and_white       = black_and_white,
@@ -2199,7 +2243,7 @@ wb_page_setup <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$page_setup(
+  wb$clone(deep = TRUE)$page_setup(
     sheet            = sheet,
     orientation      = orientation,
     scale            = scale,
@@ -2527,7 +2571,7 @@ wb_remove_named_region <- function(wb, sheet = current_sheet(), name = NULL) {
 
 #' Add/remove column filters in a worksheet
 #'
-#' Add or remove excel column filters to a worksheet
+#' Add or remove spreadsheet column filters to a worksheet
 #'
 #' Adds filters to worksheet columns, same as `with_filter = TRUE` in [wb_add_data()]
 #' [wb_add_data_table()] automatically adds filters to first row of a table.
@@ -2578,13 +2622,13 @@ NULL
 #' @export
 wb_add_filter <- function(wb, sheet = current_sheet(), rows, cols) {
   assert_workbook(wb)
-  wb$clone()$add_filter(sheet = sheet, rows = rows, cols = cols)
+  wb$clone(deep = TRUE)$add_filter(sheet = sheet, rows = rows, cols = cols)
 }
 #' @rdname filter-wb
 #' @export
 wb_remove_filter <- function(wb, sheet = current_sheet()) {
   assert_workbook(wb)
-  wb$clone()$remove_filter(sheet = sheet)
+  wb$clone(deep = TRUE)$remove_filter(sheet = sheet)
 }
 
 
@@ -2592,7 +2636,7 @@ wb_remove_filter <- function(wb, sheet = current_sheet()) {
 
 #' Add data validation to cells in a worksheet
 #'
-#' Add Excel data validation to cells
+#' Add spreadsheet data validation to cells
 #'
 #' @param wb A Workbook object
 #' @param sheet A name or index of a worksheet
@@ -2755,15 +2799,13 @@ wb_set_sheet_visibility <- function(wb, sheet = current_sheet(), value) {
 #' wb$add_page_break(sheet = 1, row = 10)
 #' wb$add_page_break(sheet = 1, row = 20)
 #' wb$add_page_break(sheet = 1, col = 2)
-#'
-#' ## In Excel: View tab -> Page Break Preview
 wb_add_page_break <- function(wb, sheet = current_sheet(), row = NULL, col = NULL) {
   assert_workbook(wb)
   wb$clone(deep = TRUE)$add_page_break(sheet = sheet, row = row, col = col)
 }
 
 
-#' List Excel tables in a worksheet
+#' List tables in a worksheet
 #'
 #' @param wb A workbook object
 #' @param sheet A name or index of a worksheet
@@ -2783,10 +2825,9 @@ wb_get_tables <- function(wb, sheet = current_sheet()) {
 }
 
 
-
 #' Remove a data table from a worksheet
 #'
-#' Remove Excel tables in a workbook using its name.
+#' Remove tables in a workbook using its name.
 #'
 #' @param wb A Workbook object
 #' @param sheet A name or index of a worksheet
@@ -2819,7 +2860,7 @@ wb_get_tables <- function(wb, sheet = current_sheet()) {
 wb_remove_tables <- function(wb, sheet = current_sheet(), table, remove_data = TRUE) {
   assert_workbook(wb)
   if (missing(table)) table <- substitute()
-  wb$clone()$remove_tables(sheet = sheet, table = table, remove_data = remove_data)
+  wb$clone(deep = TRUE)$remove_tables(sheet = sheet, table = table, remove_data = remove_data)
 }
 
 
@@ -2870,7 +2911,7 @@ NULL
 #' @rdname grouping-wb
 wb_group_cols <- function(wb, sheet = current_sheet(), cols, collapsed = FALSE, levels = NULL) {
   assert_workbook(wb)
-  wb$clone()$group_cols(
+  wb$clone(deep = TRUE)$group_cols(
     sheet     = sheet,
     cols      = cols,
     collapsed = collapsed,
@@ -2882,7 +2923,7 @@ wb_group_cols <- function(wb, sheet = current_sheet(), cols, collapsed = FALSE, 
 #' @rdname grouping-wb
 wb_ungroup_cols <- function(wb, sheet = current_sheet(), cols) {
   assert_workbook(wb)
-  wb$clone()$ungroup_cols(sheet = sheet, cols = cols)
+  wb$clone(deep = TRUE)$ungroup_cols(sheet = sheet, cols = cols)
 }
 
 
@@ -2911,7 +2952,7 @@ wb_ungroup_cols <- function(wb, sheet = current_sheet(), cols) {
 #' wb$group_rows("AirPass", rows = grp_rows)
 wb_group_rows <- function(wb, sheet = current_sheet(), rows, collapsed = FALSE, levels = NULL) {
   assert_workbook(wb)
-  wb$clone()$group_rows(
+  wb$clone(deep = TRUE)$group_rows(
     sheet     = sheet,
     rows      = rows,
     collapsed = collapsed,
@@ -2923,7 +2964,7 @@ wb_group_rows <- function(wb, sheet = current_sheet(), rows, collapsed = FALSE, 
 #' @rdname grouping-wb
 wb_ungroup_rows <- function(wb, sheet = current_sheet(), rows) {
   assert_workbook(wb)
-  wb$clone()$ungroup_rows(sheet = sheet, rows = rows)
+  wb$clone(deep = TRUE)$ungroup_rows(sheet = sheet, rows = rows)
 }
 
 
@@ -3181,7 +3222,7 @@ wb_add_image <- function(
   ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_image(
+  wb$clone(deep = TRUE)$add_image(
     sheet      = sheet,
     dims       = dims,
     file       = file,
@@ -3217,7 +3258,7 @@ wb_add_chart_xml <- function(
   ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_chart_xml(
+  wb$clone(deep = TRUE)$add_chart_xml(
     sheet      = sheet,
     xml        = xml,
     dims       = dims,
@@ -3270,11 +3311,14 @@ wb_clean_sheet <- function(
 #' To open xlsx files, see [xl_open()].
 #'
 #' @param wb a [wbWorkbook] object
+#' @param interactive If `FALSE` will throw a warning and not open the path.
+#'   This can be manually set to `TRUE`, otherwise when `NA` (default) uses
+#'   the value returned from [base::interactive()]
 #' @param flush if the flush option should be used
 #' @export
-wb_open <- function(wb, flush = FALSE) {
+wb_open <- function(wb, interactive = NA, flush = FALSE) {
   assert_workbook(wb)
-  wb$open(flush = flush)
+  wb$open(interactive = interactive, flush = flush)
 }
 
 #' Set the default style in a workbook
@@ -3305,7 +3349,7 @@ wb_add_style <- function(wb, style = NULL, style_name = NULL) {
   assert_workbook(wb)
   # deparse this name, otherwise it will remain "style"
   if (is.null(style_name)) style_name <- deparse(substitute(style))
-  wb$clone()$add_style(style, style_name)
+  wb$clone(deep = TRUE)$add_style(style, style_name)
 }
 
 #' Apply styling to a cell region
@@ -3460,7 +3504,7 @@ wb_add_border <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_border(
+  wb$clone(deep = TRUE)$add_border(
     sheet          = sheet,
     dims           = dims,
     bottom_color   = bottom_color,
@@ -3539,7 +3583,7 @@ wb_add_fill <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_fill(
+  wb$clone(deep = TRUE)$add_fill(
     sheet         = sheet,
     dims          = dims,
     color         = color,
@@ -3618,7 +3662,7 @@ wb_add_font <- function(
       ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_font(
+  wb$clone(deep = TRUE)$add_font(
     sheet      = sheet,
     dims       = dims,
     name       = name,
@@ -3721,7 +3765,7 @@ wb_add_numfmt <- function(
     numfmt
 ) {
   assert_workbook(wb)
-  wb$clone()$add_numfmt(
+  wb$clone(deep = TRUE)$add_numfmt(
     sheet  = sheet,
     dims   = dims,
     numfmt = numfmt
@@ -3817,7 +3861,7 @@ wb_add_cell_style <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_cell_style(
+  wb$clone(deep = TRUE)$add_cell_style(
     sheet               = sheet,
     dims                = dims,
     apply_alignment     = apply_alignment,
@@ -3887,7 +3931,7 @@ wb_add_named_style <- function(
 ) {
   assert_workbook(wb)
   assert_class(name, "character")
-  wb$clone()$add_named_style(
+  wb$clone(deep = TRUE)$add_named_style(
     sheet = sheet,
     dims = dims,
     name = name,
@@ -3946,7 +3990,7 @@ wb_add_dxfs_style <- function(
 ) {
 
   assert_workbook(wb)
-  wb$clone()$add_dxfs_style(
+  wb$clone(deep = TRUE)$add_dxfs_style(
     name           = name,
     font_name      = font_name,
     font_size      = font_size,
@@ -4020,7 +4064,7 @@ wb_add_comment <- function(
 
   assert_comment(comment)
 
-  wb$clone()$add_comment(
+  wb$clone(deep = TRUE)$add_comment(
     sheet   = sheet,
     dims    = dims,
     comment = comment,
@@ -4149,7 +4193,7 @@ wb_add_thread <- function(
   }
 
   assert_workbook(wb)
-  wb$clone()$add_thread(
+  wb$clone(deep = TRUE)$add_thread(
     sheet     = sheet,
     dims      = dims,
     comment   = comment,
@@ -4207,7 +4251,7 @@ wb_add_form_control <- function(
     checked = FALSE
 ) {
   assert_workbook(wb)
-  wb$clone()$add_form_control(
+  wb$clone(deep = TRUE)$add_form_control(
       sheet   = sheet,
       dims    = dims,
       type    = type,
@@ -4242,7 +4286,7 @@ wb_add_form_control <- function(
 #' \describe{
 #'   \item{`expression`}{
 #'     `[style]`\cr A `Style` object\cr\cr
-#'     `[rule]`\cr An Excel expression (as a character). Valid operators are: `<`, `<=`, `>`, `>=`, `==`, `!=`
+#'     `[rule]`\cr A formula expression (as a character). Valid operators are: `<`, `<=`, `>`, `>=`, `==`, `!=`
 #'   }
 #'   \item{`colorScale`}{
 #'     `[style]`\cr A `character` vector of valid colors with length `2` or `3`\cr\cr
@@ -4319,7 +4363,7 @@ wb_add_conditional_formatting <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_conditional_formatting(
+  wb$clone(deep = TRUE)$add_conditional_formatting(
     sheet  = sheet,
     dims   = dims,
     rule   = rule,
@@ -4360,7 +4404,7 @@ wb_remove_conditional_formatting <- function(
 #' @export
 wb_clone_sheet_style <- function(wb, from = current_sheet(), to) {
   assert_workbook(wb)
-  wb$clone()$clone_sheet_style(from, to)
+  wb$clone(deep = TRUE)$clone_sheet_style(from, to)
 }
 
 #' Add sparklines to a worksheet
@@ -4415,7 +4459,7 @@ wb_add_ignore_error <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$add_ignore_error(
+  wb$clone(deep = TRUE)$add_ignore_error(
     sheet                 = sheet,
     dims                  = dims,
     calculated_column     = calculated_column,
@@ -4498,7 +4542,7 @@ wb_set_sheetview <- function(
     ...
 ) {
   assert_workbook(wb)
-  wb$clone()$set_sheetview(
+  wb$clone(deep = TRUE)$set_sheetview(
     sheet                        = sheet,
     color_id                     = color_id,
     default_grid_color           = default_grid_color,

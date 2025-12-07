@@ -439,7 +439,7 @@ opened in software that provides such functionality as certain tabular
 calculation software. Therefore the user might be interested in the
 underlying functions to see what is going on in the sheet. Using
 <code>show_formula</code> this is possible</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># return the underlying Excel formula instead of their values</span></span>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># return the underlying spreadsheet formula instead of their values</span></span>
 <span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">show_formula =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 &lt;NA&gt;  Var3  Var4       Var5         Var6            Var7     Var8</span></span>
 <span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1   NA     1     a 2023-05-29 3209324 This            E3/0 01:27:15</span></span>
@@ -466,8 +466,8 @@ notion used in the <code>openxml</code> standard</p>
 <span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co">#&gt; 3 NA TRUE    1</span></span>
 <span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt; 4 NA TRUE &lt;NA&gt;</span></span>
 <span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; 5 NA TRUE    2</span></span></code></pre></div>
-<p>Alternatively, if you don’t know the Excel sheet’s address, you can
-use <code>wb_dims()</code> to specify the dimension. See below or
+<p>Alternatively, if you don’t know the spreadsheet’s A1 notation, you
+can use <code>wb_dims()</code> to specify the dimension. See below or
 in<code>?wb_dims</code> for more details.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># read dimension without column names with `wb_dims()`</span></span>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">dims =</span> <span class="fu">wb_dims</span>(<span class="at">rows =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">5</span>, <span class="at">cols =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>), <span class="at">col_names =</span> <span class="cn">FALSE</span>)</span>

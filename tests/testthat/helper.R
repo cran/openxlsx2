@@ -34,7 +34,8 @@ expect_equal_workbooks <- function(object, expected, ..., ignore_fields = NULL) 
   }
 
   testthat::succeed()
-  return(invisible())
+
+  invisible()
 }
 
 # expect_wrapper helper --------------------
@@ -148,6 +149,9 @@ expect_wrapper <- function(
     wb_fun <- wb$clone(deep = TRUE)
     wb_method <- wb$clone(deep = TRUE)
 
+    # take pre-call deep copies for immutability check
+    wb_fun_pre    <- wb_fun$clone(deep = TRUE)
+
     # be careful and report when we failed to run these
 
 
@@ -207,6 +211,20 @@ expect_wrapper <- function(
       ignore_formula_env = TRUE
     )
 
+    bad_mut_fun <- waldo::compare(
+      wb_fun, wb_fun_pre,
+      x_arg = paste0(fun, " post"), y_arg = paste0(fun, " pre"),
+      ignore_attr = ignore_attr
+    )
+
+    if (length(bad_mut_fun)) {
+      testthat::fail(c(
+        sprintf("%s altered its input workbook", fun),
+        bad_mut_fun
+      ))
+      return(invisible())
+    }
+
     if (length(bad)) {
       testthat::fail(bad)
       return(invisible())
@@ -214,7 +232,8 @@ expect_wrapper <- function(
   }
 
   testthat::succeed()
-  return(invisible())
+
+  invisible()
 }
 
 # `expect_pseudo_wrapper()` -------
@@ -274,7 +293,8 @@ expect_pseudo_wrapper <- function(
   }
 
   testthat::succeed()
-  return(invisible())
+
+  invisible()
 }
 
 # Miscellaneous helpers for testthat -----------
@@ -1049,7 +1069,7 @@ dns_lookup <- function(host = "captive.apple.com") {
     socketConnection(host, port = 80, open = "r+", timeout = 2),
     silent = TRUE
   )
-  on.exit(close(con))
+  on.exit(close(con), add = TRUE)
 
   if (inherits(con, "try-error")) return(FALSE)
 

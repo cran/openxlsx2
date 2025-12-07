@@ -72,6 +72,10 @@ create_char_dataframe <- function(colnames, n) {
     .Call(`_openxlsx2_create_char_dataframe`, colnames, n)
 }
 
+create_int_dataframe <- function(char_df) {
+    .Call(`_openxlsx2_create_int_dataframe`, char_df)
+}
+
 read_xml2df <- function(xml, vec_name, vec_attrs, vec_chlds) {
     .Call(`_openxlsx2_read_xml2df`, xml, vec_name, vec_attrs, vec_chlds)
 }
@@ -80,12 +84,12 @@ write_df2xml <- function(df, vec_name, vec_attrs, vec_chlds) {
     .Call(`_openxlsx2_write_df2xml`, df, vec_name, vec_attrs, vec_chlds)
 }
 
-col_to_df <- function(doc) {
-    .Call(`_openxlsx2_col_to_df`, doc)
-}
-
 df_to_xml <- function(name, df_col) {
     .Call(`_openxlsx2_df_to_xml`, name, df_col)
+}
+
+col_to_df <- function(doc) {
+    .Call(`_openxlsx2_col_to_df`, doc)
 }
 
 loadvals <- function(sheet_data, doc) {

@@ -57,7 +57,6 @@ test_that("Load and saving a file with Threaded Comments works", {
 
 test_that("Read and save file with inlineStr", {
 
-  ## loadThreadComment.xlsx is a simple xlsx file that uses Threaded Comment.
   fl <- testfile_path("inlineStr.xlsx")
   wb <- wb_load(fl)
   wb_df <- wb_read(wb)
@@ -469,7 +468,7 @@ test_that("Loading a workbook with property preserves it.", {
 
   wb$set_properties(
     custom = list(
-      Software    = "openxlsx2",
+      # Software    = "openxlsx2",
       Version     = "1.5.0.9000",
       ReleaseDate = as.Date("2024-03-31"),
       CRAN        = FALSE,
@@ -505,11 +504,77 @@ test_that("failing to unzip works as expected", {
   expect_silent(wb <- wb_load(tmp))
 
   # zip file
-  tmp <- temp_xlsx()
+  tmp_dir <- temp_dir()
+  tmp <- tempfile(tmpdir = tmp_dir, fileext = ".txt")
   writeLines("", tmp)
   tmp_zip <- tempfile(fileext = ".zip")
-  zip::zip(zipfile = tmp_zip, files = basename(tmp), root = dirname(tmp))
+  zip_output(zip_path = tmp_zip, source_dir = tmp_dir, compression_level = 1)
   expect_error(wb <- wb_load(tmp_zip), "File does not appear to be xlsx, xlsm or xlsb")
+
+})
+
+test_that("test utils::zip", {
+
+  skip_if(Sys.which("zip") == "")
+  op <- options(
+    "openxlsx2.debug" = TRUE,
+    "openxlsx2.no_utils_zip" = FALSE,
+    "openxlsx2.no_bsdtar" = FALSE
+  )
+  on.exit(options(op), add = TRUE)
+
+  expect_message(write_xlsx(x = mtcars, temp_xlsx()), "utils::zip")
+
+})
+
+test_that("test (bsd)tar", {
+
+  skip_if(
+    (.Platform$OS.type == "windows" && Sys.which("tar") == "") ||
+    (.Platform$OS.type == "unix" && Sys.which("bsdtar") == "")
+  )
+
+  op <- options(
+    "openxlsx2.debug" = TRUE,
+    "openxlsx2.no_utils_zip" = TRUE,
+    "openxlsx2.no_bsdtar" = FALSE
+  )
+  on.exit(options(op), add = TRUE)
+
+  expect_message(write_xlsx(x = mtcars, temp_xlsx()), "bsdtar")
+
+})
+
+test_that("test 7zip", {
+
+  skip_if(!file.exists("C:\\Program Files\\7-zip\\7z.exe"))
+
+  r_zipcmd <- Sys.getenv("R_ZIPCMD")
+  Sys.setenv("R_ZIPCMD" = "C:\\Program Files\\7-Zip\\7z.exe")
+  on.exit(Sys.setenv("R_ZIPCMD" = r_zipcmd), add = TRUE)
+
+  op <- options(
+    "openxlsx2.debug" = TRUE,
+    "openxlsx2.no_utils_zip" = TRUE,
+    "openxlsx2.no_bsdtar" = TRUE
+  )
+  on.exit(options(op), add = TRUE)
+
+  expect_message(write_xlsx(x = mtcars, temp_xlsx()), "7z")
+
+})
+
+test_that("saving using zip::zip", {
+
+  skip_if_not_installed("zip")
+  op <- options(
+    "openxlsx2.debug" = TRUE,
+    "openxlsx2.no_utils_zip" = TRUE,
+    "openxlsx2.no_bsdtar" = TRUE
+  )
+  on.exit(options(op), add = TRUE)
+
+  expect_message(write_xlsx(x = mtcars, temp_xlsx()), "zip::zip")
 
 })
 
@@ -548,5 +613,21 @@ test_that("loading and saving named sheet views works", {
 
   wb1 <- wb_load(tmp)
   expect_equal(wb$namedSheetViews, wb1$namedSheetViews)
+
+})
+
+test_that("saving a workbook as xlsm", {
+
+  fl <- temp_xlsx(macros = TRUE)
+  write_xlsx(x = cars, file = fl)
+
+  tmpdir <- temp_dir()
+  ct <- "[Content_Types].xml"
+  unzip(fl, files = ct, exdir = tmpdir)
+  tmpxml <- read_xml(file.path(tmpdir, ct), pointer = FALSE)
+  expect_true(grepl(pattern = "macroEnabled", tmpxml))
+
+  wb <- wb_load(fl)
+  expect_true(grepl(pattern = "macroEnabled", paste0(wb$Content_Types, collapse = "")))
 
 })

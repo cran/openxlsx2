@@ -199,6 +199,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// create_int_dataframe
+Rcpp::DataFrame create_int_dataframe(const Rcpp::DataFrame& char_df);
+RcppExport SEXP _openxlsx2_create_int_dataframe(SEXP char_dfSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::DataFrame& >::type char_df(char_dfSEXP);
+    rcpp_result_gen = Rcpp::wrap(create_int_dataframe(char_df));
+    return rcpp_result_gen;
+END_RCPP
+}
 // read_xml2df
 Rcpp::DataFrame read_xml2df(XPtrXML xml, std::string vec_name, std::vector<std::string> vec_attrs, std::vector<std::string> vec_chlds);
 RcppExport SEXP _openxlsx2_read_xml2df(SEXP xmlSEXP, SEXP vec_nameSEXP, SEXP vec_attrsSEXP, SEXP vec_chldsSEXP) {
@@ -227,17 +238,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// col_to_df
-Rcpp::DataFrame col_to_df(XPtrXML doc);
-RcppExport SEXP _openxlsx2_col_to_df(SEXP docSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< XPtrXML >::type doc(docSEXP);
-    rcpp_result_gen = Rcpp::wrap(col_to_df(doc));
-    return rcpp_result_gen;
-END_RCPP
-}
 // df_to_xml
 Rcpp::CharacterVector df_to_xml(std::string name, Rcpp::DataFrame df_col);
 RcppExport SEXP _openxlsx2_df_to_xml(SEXP nameSEXP, SEXP df_colSEXP) {
@@ -247,6 +247,17 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< std::string >::type name(nameSEXP);
     Rcpp::traits::input_parameter< Rcpp::DataFrame >::type df_col(df_colSEXP);
     rcpp_result_gen = Rcpp::wrap(df_to_xml(name, df_col));
+    return rcpp_result_gen;
+END_RCPP
+}
+// col_to_df
+Rcpp::DataFrame col_to_df(XPtrXML doc);
+RcppExport SEXP _openxlsx2_col_to_df(SEXP docSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< XPtrXML >::type doc(docSEXP);
+    rcpp_result_gen = Rcpp::wrap(col_to_df(doc));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -817,10 +828,11 @@ static const R_CallMethodDef CallEntries[] = {
     {"_openxlsx2_is_charnum", (DL_FUNC) &_openxlsx2_is_charnum, 1},
     {"_openxlsx2_wide_to_long", (DL_FUNC) &_openxlsx2_wide_to_long, 14},
     {"_openxlsx2_create_char_dataframe", (DL_FUNC) &_openxlsx2_create_char_dataframe, 2},
+    {"_openxlsx2_create_int_dataframe", (DL_FUNC) &_openxlsx2_create_int_dataframe, 1},
     {"_openxlsx2_read_xml2df", (DL_FUNC) &_openxlsx2_read_xml2df, 4},
     {"_openxlsx2_write_df2xml", (DL_FUNC) &_openxlsx2_write_df2xml, 4},
-    {"_openxlsx2_col_to_df", (DL_FUNC) &_openxlsx2_col_to_df, 1},
     {"_openxlsx2_df_to_xml", (DL_FUNC) &_openxlsx2_df_to_xml, 2},
+    {"_openxlsx2_col_to_df", (DL_FUNC) &_openxlsx2_col_to_df, 1},
     {"_openxlsx2_loadvals", (DL_FUNC) &_openxlsx2_loadvals, 2},
     {"_openxlsx2_readXML", (DL_FUNC) &_openxlsx2_readXML, 8},
     {"_openxlsx2_is_xml", (DL_FUNC) &_openxlsx2_is_xml, 1},

@@ -167,7 +167,7 @@ df <- data.frame(
   "TinyNumbers" = runif(20) / 1E9, stringsAsFactors = FALSE
 )
 
-## openxlsx will apply default Excel styling for these classes
+## openxlsx will apply default spreadsheet styling for these classes
 class(df$Cash) <- c(class(df$Cash), "currency")
 class(df$Cash2) <- c(class(df$Cash2), "accounting")
 class(df$hLink) <- "hyperlink"
@@ -195,7 +195,7 @@ df <- data.frame(
   "numeric" = 1
 )
 
-## openxlsx will apply default Excel styling for these classes
+## openxlsx will apply default spreadsheet styling for these classes
 class(df$Cash) <- c(class(df$Cash), "currency")
 class(df$Cash2) <- c(class(df$Cash2), "accounting")
 class(df$hLink) <- "hyperlink"

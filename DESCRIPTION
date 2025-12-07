@@ -1,7 +1,7 @@
 Type: Package
 Package: openxlsx2
 Title: Read, Write and Edit 'xlsx' Files
-Version: 1.21
+Version: 1.22
 Language: en-US
 Authors@R: c(
   person("Jordan Mark", "Barbone", email = "jmbarbone@gmail.com", role = "aut", comment = c(ORCID = "0000-0001-9788-3628")),
@@ -18,17 +18,16 @@ URL: https://janmarvin.github.io/openxlsx2/,
         https://github.com/JanMarvin/openxlsx2
 BugReports: https://github.com/JanMarvin/openxlsx2/issues
 Depends: R (>= 3.5.0)
-Imports: R6, Rcpp, grDevices, stringi, utils, zip
+Imports: R6, Rcpp, grDevices, stringi, utils
 LinkingTo: Rcpp
 Suggests: ggplot2, knitr, mschart (>= 0.4), rmarkdown, rvg, testthat
-        (>= 3.0.0), waldo
+        (>= 3.0.0), waldo, zip
 VignetteBuilder: knitr
 Encoding: UTF-8
 RoxygenNote: 7.3.3
 Config/testthat/edition: 3
-Config/testthat/parallel: true
 NeedsCompilation: yes
-Packaged: 2025-10-30 19:58:31 UTC; janmarvingarbuszus
+Packaged: 2025-11-30 12:14:46 UTC; janmarvingarbuszus
 Author: Jordan Mark Barbone [aut] (ORCID:
     <https://orcid.org/0000-0001-9788-3628>),
   Jan Marvin Garbuszus [aut, cre],
@@ -37,4 +36,4 @@ Author: Jordan Mark Barbone [aut] (ORCID:
   Arseny Kapoulkine [ctb, cph] (Author of included pugixml code)
 Maintainer: Jan Marvin Garbuszus <jan.garbuszus@ruhr-uni-bochum.de>
 Repository: CRAN
-Date/Publication: 2025-10-31 06:10:37 UTC
+Date/Publication: 2025-12-07 07:00:02 UTC

@@ -114,7 +114,7 @@ Blank cells will be returned as \code{NA}.}
 
 \item{dims}{Character string of type "A1:B2" as optional dimensions to be imported.}
 
-\item{show_formula}{If \code{TRUE}, the underlying Excel formulas are shown.}
+\item{show_formula}{If \code{TRUE}, the underlying spreadsheet formulas are shown.}
 
 \item{convert}{If \code{TRUE}, a conversion to dates and numerics is attempted.}
 
@@ -181,6 +181,12 @@ If date detection is disabled, dates will show up as a spreadsheet date
 format. To convert these, you can use the functions \code{\link[=convert_date]{convert_date()}},
 \code{\link[=convert_datetime]{convert_datetime()}}, or \code{\link[=convert_hms]{convert_hms()}}. If types are specified, date
 detection is disabled.
+
+You can use wildcards for all available columns or rows in \code{dims} by using
+\code{+} and \code{-}. For example, \code{dims = "A-:+9"} will read everything from the
+first row in column A through the last column in row 9. This makes it
+unnecessary to update dimensions when working with files whose sizes change
+frequently.
 }
 \examples{
 ###########################################################################
@@ -197,7 +203,7 @@ wb_to_df(wb1, col_names = FALSE)
 # do not try to identify dates in the data
 wb_to_df(wb1, detect_dates = FALSE)
 
-# return the underlying Excel formula instead of their values
+# return the underlying spreadsheet formula instead of their values
 wb_to_df(wb1, show_formula = TRUE)
 
 # read dimension without colNames
@@ -229,6 +235,9 @@ wb_to_df(wb1, start_row = 5, col_names = FALSE)
 
 # na string
 wb_to_df(wb1, na.strings = "a")
+
+# read names from row two and data starting from row 4
+wb_to_df(wb1, dims = "B2:C2,B4:C+")
 
 ###########################################################################
 # Named regions

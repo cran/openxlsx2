@@ -36,6 +36,25 @@ memory usage but skips some XML validity checks. It also bypasses
 the \code{pugixml} functions that \code{openxlsx2} uses, omitting certain
 preliminary sanity checks before writing. As the name suggests,
 the output is simply flushed to disk.
+
+By default, the \code{\link[utils:zip]{utils::zip()}} function is used to create output files.
+This requires a working zip utility to be available on the system. A valid
+zip program must be found either via \code{Sys.which("zip")} or through the
+\code{R_ZIPCMD} environment variable.
+
+On Windows, a suitable zip tool is typically provided by Rtools. If
+\code{R_ZIPCMD} is not set, \code{openxlsx2} will automatically use the first detected
+Rtools installation. If no zip utility is available, \code{bsdtar} can be used as
+an alternative. On Windows this is shipped as \code{tar.exe}; on Mac and Linux
+it is usually available as \code{bsdtar} (often requiring installation of the
+\code{archive} package).
+
+A further fallback—primarily for older Windows systems—is to point
+\code{R_ZIPCMD} to \verb{7z.exe}. This approach has not been extensively tested and is
+not reliable with 7-Zip on macOS.
+
+As an additional fallback, the \code{zip} package can be used. It is no longer
+listed in \code{Imports} and must be installed separately if needed.
 }
 \examples{
 ## Create a new workbook and add a worksheet
@@ -45,6 +64,18 @@ wb$add_worksheet(sheet = "My first worksheet")
 ## Save workbook to working directory
 \donttest{
 wb_save(wb, file = temp_xlsx(), overwrite = TRUE)
+
+## do not use utils::zip, will try to use bsdtar
+# options("openxlsx2.no_utils_zip" = TRUE)
+
+## if the above is set as well, do not use bsdtar
+# options("openxlsx2.no_bsdtar" = TRUE)
+
+## use 7zip on Windows this works, on Mac not
+# Sys.setenv("R_ZIPCMD" = "C:\\Program Files\\7-Zip\\7z.exe")
+
+# if the last one is left blank the fallback is zip::zip
+openxlsx2::write_xlsx(x = cars, temp_xlsx())
 }
 }
 \seealso{

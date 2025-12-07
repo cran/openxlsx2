@@ -6,7 +6,6 @@ test_that("test return values for wb_save", {
   expect_error(wb_save(wb, tempFile, overwrite = FALSE))
 
   expect_identical(tempFile, wb_save(wb, tempFile)$path)
-  file.remove(tempFile)
 })
 
 # regression test for a typo
@@ -68,7 +67,7 @@ test_that("write_data2", {
   wb$add_worksheet("sheet4")
   write_data2(wb, "sheet4", as.data.frame(Titanic), startRow = 2, startCol = 2)
 
-  file <- tempfile(fileext = ".xlsx")
+  file <- temp_xlsx()
   wb_save(wb, file)
 
   wb1 <- wb_load(file)
@@ -92,7 +91,6 @@ test_that("write_data2", {
     ignore_attr = TRUE
   )
 
-  file.remove(file)
 })
 
 
@@ -215,7 +213,7 @@ test_that("writing NA, NaN and Inf", {
   wb$add_worksheet("Test2")$add_data_table(x = x, na.strings = "N/A")$save(tmp)
   wb$add_worksheet("Test3")$add_data(x = x, na.strings = "N/A")$save(tmp)
 
-  exp <- c(NA, "s", "s", "s")
+  exp <- c(NA, 0L, 0L, 0L)
   got <- unname(unlist(attr(wb_to_df(tmp, "Test1", keep_attributes = TRUE), "tt")))
   expect_equal(exp, got)
 
@@ -226,7 +224,7 @@ test_that("writing NA, NaN and Inf", {
   wb$clone_worksheet("Test1", "Clone1")$add_data(x = x, na.strings = NULL)$save(tmp)
   wb$clone_worksheet("Test3", "Clone3")$add_data(x = x, na.strings = "N/A")$save(tmp)
 
-  exp <- c(NA, "s", "s", "s")
+  exp <- c(NA, 0L, 0L, 0L)
   got <- unname(unlist(attr(wb_to_df(tmp, "Test1", keep_attributes = TRUE), "tt")))
   expect_equal(exp, got)
 

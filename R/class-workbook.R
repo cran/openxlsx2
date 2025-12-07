@@ -136,7 +136,7 @@ worksheet_lock_properties <- function() {
 #' @param sheet The name of the sheet
 #' @param datetime_created The datetime (as `POSIXt`) the workbook is
 #'   created.  Defaults to the current `Sys.time()` when the workbook object
-#'   is created, not when the Excel files are saved.
+#'   is created, not when the [wb_workbook()] files are saved.
 #' @param datetime_modified The datetime (as `POSIXt`) that should be recorded
 #'   as last modification date. Defaults to the creation date.
 #' @param ... additional arguments
@@ -2806,7 +2806,7 @@ wbWorkbook <- R6::R6Class(
     #' @param row_names If TRUE, the first col of data will be used as row names.
     #' @param dims Character string of type "A1:B2" as optional dimensions to be imported.
     #' @param detect_dates If TRUE, attempt to recognize dates and perform conversion.
-    #' @param show_formula If TRUE, the underlying Excel formulas are shown.
+    #' @param show_formula If TRUE, the underlying spreadsheet formulas are shown.
     #' @param convert If TRUE, a conversion to dates and numerics is attempted.
     #' @param skip_empty_cols If TRUE, empty columns are skipped.
     #' @param skip_empty_rows If TRUE, empty rows are skipped.
@@ -2814,8 +2814,8 @@ wbWorkbook <- R6::R6Class(
     #' @param skip_hidden_rows If TRUE, hidden rows are skipped.
     #' @param start_row first row to begin looking for data.
     #' @param start_col first column to begin looking for data.
-    #' @param rows A numeric vector specifying which rows in the Excel file to read. If NULL, all rows are read.
-    #' @param cols A numeric vector specifying which columns in the Excel file to read. If NULL, all columns are read.
+    #' @param rows A numeric vector specifying which rows in the spreadsheet to read. If NULL, all rows are read.
+    #' @param cols A numeric vector specifying which columns in the spreadsheet to read. If NULL, all columns are read.
     #' @param named_region Character string with a named_region (defined name or table). If no sheet is selected, the first appearance will be selected.
     #' @param types A named numeric indicating, the type of the data. 0: character, 1: numeric, 2: date, 3: posixt, 4:logical. Names must match the returned data
     #' @param na.strings A character vector of strings which are to be interpreted as NA. Blank cells will be returned as NA.
@@ -2945,18 +2945,13 @@ wbWorkbook <- R6::R6Class(
         call. = FALSE)
       }
 
-      ## temp directory to save XML files prior to compressing
-      tmpDir <- file.path(tempfile(pattern = "workbookTemp_"))
-      on.exit(unlink(tmpDir, recursive = TRUE), add = TRUE)
-
-      if (file.exists(tmpDir)) {
-        unlink(tmpDir, recursive = TRUE, force = TRUE)
+      if (file_extension == "xlsm" && is.null(self$vbaProject)) {
+        self$Content_Types[grepl('<Override PartName="/xl/workbook.xml" ', self$Content_Types)] <- '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/>'
       }
 
-      success <- dir.create(path = tmpDir, recursive = FALSE)
-      if (!success) { # nocov start
-        stop(sprintf("Failed to create temporary directory '%s'", tmpDir))
-      } # nocov end
+      ## temp directory to save XML files prior to compressing
+      tmpDir <- temp_dir(pattern = "workbookTemp_")
+      on.exit(unlink(tmpDir, recursive = TRUE), add = TRUE)
 
       private$preSaveCleanUp()
 
@@ -2974,8 +2969,12 @@ wbWorkbook <- R6::R6Class(
       docPropsDir     <- dir_create(tmpDir, "docProps")
       xlDir           <- dir_create(tmpDir, "xl")
       xlrelsDir       <- dir_create(tmpDir, "xl", "_rels")
-      xlTablesDir     <- dir_create(tmpDir, "xl", "tables")
-      xlTablesRelsDir <- dir_create(xlTablesDir, "_rels")
+      if (length(self$tables)) {
+        xlTablesDir     <- dir_create(tmpDir, "xl", "tables")
+      }
+      if (length(self$tables.xml.rels)) {
+        xlTablesRelsDir <- dir_create(xlTablesDir, "_rels")
+      }
 
       if (length(self$media)) {
         xlmediaDir <- dir_create(tmpDir, "xl", "media")
@@ -3004,11 +3003,21 @@ wbWorkbook <- R6::R6Class(
 
       ## will always have drawings
       xlworksheetsDir     <- dir_create(tmpDir, "xl", "worksheets")
-      xlworksheetsRelsDir <- dir_create(tmpDir, "xl", "worksheets", "_rels")
-      xldrawingsDir       <- dir_create(tmpDir, "xl", "drawings")
-      xldrawingsRelsDir   <- dir_create(tmpDir, "xl", "drawings", "_rels")
-      xlchartsDir         <- dir_create(tmpDir, "xl", "charts")
-      xlchartsRelsDir     <- dir_create(tmpDir, "xl", "charts", "_rels")
+      if (sum(sapply(self$worksheets_rels, length))) {
+        xlworksheetsRelsDir <- dir_create(tmpDir, "xl", "worksheets", "_rels")
+      }
+      if (length(self$drawings) || length(self$vml)) {
+        xldrawingsDir       <- dir_create(tmpDir, "xl", "drawings")
+      }
+      if (length(self$drawings_rels) || length(self$vml_rels)) {
+        xldrawingsRelsDir   <- dir_create(tmpDir, "xl", "drawings", "_rels")
+      }
+      if (length(self$charts)) {
+        xlchartsDir         <- dir_create(tmpDir, "xl", "charts")
+      }
+      if (length(self$charts)) {
+        xlchartsRelsDir     <- dir_create(tmpDir, "xl", "charts", "_rels")
+      }
 
       ## xl/comments.xml
       if (nComments > 0 | nVML > 0) {
@@ -3798,17 +3807,10 @@ wbWorkbook <- R6::R6Class(
         getOption("openxlsx2.compresssionevel") %||%
         6L
 
-      ## zip it
-      zip::zip(
-        zipfile = tmpFile,
-        files = list.files(tmpDir, full.names = FALSE),
-        recurse = TRUE,
-        compression_level = compr_level,
-        include_directories = FALSE,
-        # change the working directory for this
-        root = tmpDir,
-        # change default to match historical zipr
-        mode = "cherry-pick"
+      zipped <- zip_output(
+        zip_path = tmpFile,
+        source_dir = tmpDir,
+        compression_level = compr_level
       )
 
       # Copy file; stop if failed
@@ -3821,7 +3823,7 @@ wbWorkbook <- R6::R6Class(
       invisible(self)
     },
 
-    #' @description open wbWorkbook in Excel.
+    #' @description open wbWorkbook in spreadsheet software
     #' @details minor helper wrapping xl_open which does the entire same thing
     #' @param interactive If `FALSE` will throw a warning and not open the path.
     #'   This can be manually set to `TRUE`, otherwise when `NA` (default) uses
@@ -4294,9 +4296,7 @@ wbWorkbook <- R6::R6Class(
     #' @param plot plot
     get_base_colors = function(xml = FALSE, plot = TRUE) {
 
-      if (is.null(self$theme)) self$theme <- genBaseTheme()
-
-      current <- xml_node(self$theme, "a:theme", "a:themeElements", "a:clrScheme")
+      current <- xml_node(if (is.null(self$theme)) genBaseTheme() else self$theme, "a:theme", "a:themeElements", "a:clrScheme")
       name    <- xml_attr(current, "a:clrScheme")[[1]][["name"]]
 
       nodes  <- xml_node_name(current, "a:clrScheme")
@@ -4600,12 +4600,26 @@ wbWorkbook <- R6::R6Class(
     #' @param rows rows
     #' @param heights heights
     #' @param hidden hidden
+    #' @param hide_blanks hide_blanks
     #' @return The `wbWorkbook` object, invisibly
-    set_row_heights = function(sheet = current_sheet(), rows, heights = NULL, hidden = FALSE) {
+    set_row_heights = function(sheet = current_sheet(), rows, heights = NULL, hidden = FALSE, hide_blanks = NULL) {
       sheet <- private$get_sheet_index(sheet)
       assert_class(heights, c("numeric", "integer"), or_null = TRUE, arg_nm = "heights")
 
       # TODO move to wbWorksheet method
+
+      ## hide empty rows per default
+      if (!is.null(hide_blanks)) {
+        if (!hide_blanks) hide_blanks <- NULL
+        self$worksheets[[sheet]]$sheetFormatPr <- xml_attr_mod(
+          self$worksheets[[sheet]]$sheetFormatPr,
+          xml_attributes = c(zeroHeight = as_xml_attr(hide_blanks))
+        )
+
+        if (missing(rows)) {
+          return(invisible(self))
+        }
+      }
 
       # create all A columns so that row_attr is available.
       # Someone thought that it would be a splendid idea, if
@@ -4631,12 +4645,6 @@ wbWorkbook <- R6::R6Class(
         row_attr[sel, "ht"] <- as_xml_attr(heights)
         row_attr[sel, "customHeight"] <- "1"
       }
-
-      ## hide empty rows per default
-      # xml_attr_mod(
-      #   wb$worksheets[[1]]$sheetFormatPr,
-      #   xml_attributes = c(zeroHeight = "1")
-      # )
 
       if (hidden) {
         row_attr[sel, "hidden"] <- "1"
@@ -4925,7 +4933,7 @@ wbWorkbook <- R6::R6Class(
         # To avoid this, we have to check character vectors for potentially
         # unconverted numerics and have to apply something like format(as.numeric(...))
         tt  <- attr(df, "tt")
-        sel <- tt == "n" & !is.na(df)
+        sel <- tt == 1L & !is.na(df)
 
         df[sel]   <- vapply(df[sel], function(x) format(as.numeric(x)), NA_character_)
         col_width <- vapply(df, function(x) max(nchar(format(x))), NA_real_)
@@ -5922,7 +5930,7 @@ wbWorkbook <- R6::R6Class(
 
             expression = {
               # TODO should we bother to do any conversions or require the text
-              # entered to be exactly as an Excel expression would be written?
+              # entered to be exactly as an spreadsheet expression would be written?
               msg <- "When type == 'expression', "
 
               if (!is.character(orig_rule) || length(orig_rule) != 1L) {
@@ -7315,7 +7323,7 @@ wbWorkbook <- R6::R6Class(
 
           # TODO add update or remove option
           if (anyDuplicated(c(old_names, new_names))) {
-            message("File has duplicated custom section")
+            # message("File has duplicated custom section")
             cstm <- self$custom
             idxs <- which(old_names %in% new_names)
             # remove all duplicates in reverse order
@@ -9947,12 +9955,6 @@ wbWorkbook <- R6::R6Class(
       ## write charts
       if (NROW(self$charts) && any(self$charts != "")) {
 
-        if (!file.exists(xlchartsDir)) {
-          dir.create(xlchartsDir, recursive = TRUE)
-          if (any(self$charts$rels != "") || any(self$charts$relsEx != ""))
-            dir.create(xlchartsRelsDir, recursive = TRUE)
-        }
-
         for (crt in seq_len(nrow(self$charts))) {
 
           if (self$charts$chart[crt] != "") {
@@ -10288,7 +10290,7 @@ wbWorkbook <- R6::R6Class(
 
       if (is.data.frame(self$worksheets[[sheet]]$conditionalFormatting))
         prty <- as.integer(
-          openxlsx2:::rbindlist(
+          rbindlist(
             xml_attr(self$worksheets[[sheet]]$conditionalFormatting$cf, "cfRule")
           )$priority
         )
@@ -10362,7 +10364,7 @@ wbWorkbook <- R6::R6Class(
 
       if (length(cfRule)) {
 
-        cfc <- data.frame(pivot = "", sqref = sqref, cf = read_xml(cfRule, pointer = FALSE))
+        cfc <- data.frame(pivot = "", sqref = sqref, cf = read_xml(cfRule, pointer = FALSE), stringsAsFactors = FALSE)
         cfs <- self$worksheets[[sheet]]$conditionalFormatting
 
         sel <- c("sqref", "cf")

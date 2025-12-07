@@ -96,6 +96,12 @@ convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_characte
 #' [convert_datetime()], or [convert_hms()]. If types are specified, date
 #' detection is disabled.
 #'
+#' You can use wildcards for all available columns or rows in `dims` by using
+#' `+` and `-`. For example, `dims = "A-:+9"` will read everything from the
+#' first row in column A through the last column in row 9. This makes it
+#' unnecessary to update dimensions when working with files whose sizes change
+#' frequently.
+#'
 #' @seealso [wb_get_named_regions()], \link[openxlsx2:openxlsx2-package]{openxlsx2}
 #'
 #' @param file An xlsx file, [wbWorkbook] object or URL to xlsx file.
@@ -104,7 +110,7 @@ convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_characte
 #' @param row_names If `TRUE`, the first col of data will be used as row names.
 #' @param dims Character string of type "A1:B2" as optional dimensions to be imported.
 #' @param detect_dates If `TRUE`, attempt to recognize dates and perform conversion.
-#' @param show_formula If `TRUE`, the underlying Excel formulas are shown.
+#' @param show_formula If `TRUE`, the underlying spreadsheet formulas are shown.
 #' @param convert If `TRUE`, a conversion to dates and numerics is attempted.
 #' @param skip_empty_cols If `TRUE`, empty columns are skipped.
 #' @param skip_empty_rows If `TRUE`, empty rows are skipped.
@@ -146,7 +152,7 @@ convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_characte
 #' # do not try to identify dates in the data
 #' wb_to_df(wb1, detect_dates = FALSE)
 #'
-#' # return the underlying Excel formula instead of their values
+#' # return the underlying spreadsheet formula instead of their values
 #' wb_to_df(wb1, show_formula = TRUE)
 #'
 #' # read dimension without colNames
@@ -178,6 +184,9 @@ convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_characte
 #'
 #' # na string
 #' wb_to_df(wb1, na.strings = "a")
+#'
+#' # read names from row two and data starting from row 4
+#' wb_to_df(wb1, dims = "B2:C2,B4:C+")
 #'
 #' ###########################################################################
 #' # Named regions
@@ -345,8 +354,8 @@ wb_to_df <- function(
   xlsx_posix_style <- style_is_posix(wb$styles_mgr$styles$cellXfs, numfmt_posix)
 
   # create temporary data frame. hard copy required
-  z  <- dims_to_dataframe(dims, empty_rm = TRUE)
-  tt <- copy(z)
+  z  <- dims_to_dataframe(dims, empty_rm = TRUE, cc = cc)
+  tt <- create_int_dataframe(z)
 
   keep_cols <- colnames(z)
   keep_rows <- rownames(z)
@@ -357,8 +366,9 @@ wb_to_df <- function(
   if (!is.null(start_row)) {
     keep_rows <- as.character(seq(start_row, maxRow))
     if (start_row <= maxRow) {
-      z  <- z[rownames(z) %in% keep_rows, , drop = FALSE]
-      tt <- tt[rownames(tt) %in% keep_rows, , drop = FALSE]
+      sel <- rownames(z) %in% keep_rows
+      z  <- z[sel, , drop = FALSE]
+      tt <- tt[sel, , drop = FALSE]
     } else {
       keep_rows <- as.character(start_row)
       z  <- z[keep_rows, , drop = FALSE]
@@ -372,33 +382,35 @@ wb_to_df <- function(
   if (!is.null(rows)) {
     keep_rows <- as.character(as.integer(rows))
 
-    if (all(keep_rows %in% rownames(z))) {
-      z  <- z[rownames(z) %in% keep_rows, , drop = FALSE]
-      tt <- tt[rownames(tt) %in% keep_rows, , drop = FALSE]
+    if (!anyNA(sel <- match(keep_rows, rownames(z)))) {
+      z  <- z[sel, , drop = FALSE]
+      tt <- tt[sel, , drop = FALSE]
     } else {
       z  <- z[keep_rows, , drop = FALSE]
       tt <- tt[keep_rows, , drop = FALSE]
 
-      rownames(z)  <- as.integer(keep_rows)
-      rownames(tt) <- as.integer(keep_rows)
+      ints <- as.integer(keep_rows)
+      rownames(z)  <- ints
+      rownames(tt) <- ints
     }
   }
 
   if (!is.null(start_col)) {
     keep_cols <- int2col(seq(col2int(start_col), maxCol))
 
-    if (!all(keep_cols %in% colnames(z))) {
-      keep_col <- keep_cols[!keep_cols %in% colnames(z)]
+    if (!all(sel <- keep_cols %in% colnames(z))) {
+      keep_col <- keep_cols[!sel]
 
       z[keep_col]  <- NA_character_
-      tt[keep_col] <- NA_character_
+      tt[keep_col] <- NA_integer_
 
       z  <- z[keep_cols]
       tt <- tt[keep_cols]
     }
 
-    z  <- z[, match(keep_cols, colnames(z)), drop = FALSE]
-    tt <- tt[, match(keep_cols, colnames(tt)), drop = FALSE]
+    sel <- match(keep_cols, colnames(z))
+    z  <- z[, sel, drop = FALSE]
+    tt <- tt[, sel, drop = FALSE]
   }
 
   if (!is.null(cols)) {
@@ -408,11 +420,12 @@ wb_to_df <- function(
       keep_col <- keep_cols[!keep_cols %in% colnames(z)]
 
       z[keep_col] <- NA_character_
-      tt[keep_col] <- NA_character_
+      tt[keep_col] <- NA_integer_
     }
 
-    z  <- z[, match(keep_cols, colnames(z)), drop = FALSE]
-    tt <- tt[, match(keep_cols, colnames(tt)), drop = FALSE]
+    sel <- match(keep_cols, colnames(z))
+    z  <- z[, sel, drop = FALSE]
+    tt <- tt[, sel, drop = FALSE]
   }
 
   keep_rows <- keep_rows[keep_rows %in% rnams]
@@ -421,8 +434,8 @@ wb_to_df <- function(
   if (has_dims && length(keep_rows) && length(keep_cols))
     cc <- cc[cc$row_r %in% keep_rows & cc$c_r %in% keep_cols, ]
 
-  cc$val <- NA_character_
-  cc$typ <- NA_character_
+  cc$val <- rep_len(NA_character_, nrow(cc))
+  cc$typ <- rep_len(NA_integer_, nrow(cc))
 
   cc_tab <- unique(cc$c_t)
 
@@ -430,25 +443,25 @@ wb_to_df <- function(
   if (any(cc_tab == "b")) {
     sel <- cc$c_t %in% "b"
     cc$val[sel] <- as.logical(as.numeric(cc$v[sel]))
-    cc$typ[sel] <- "b"
+    cc$typ[sel] <- 4L
   }
   # text in v
   if (any(cc_tab %in% c("str", "e"))) {
     sel <- cc$c_t %in% c("str", "e")
     cc$val[sel] <- replaceXMLEntities(cc$v[sel])
-    cc$typ[sel] <- "s"
+    cc$typ[sel] <- 0L
   }
   # text in t
   if (any(cc_tab %in% c("inlineStr"))) {
     sel <- cc$c_t %in% c("inlineStr")
     cc$val[sel] <- is_to_txt(cc$is[sel])
-    cc$typ[sel] <- "s"
+    cc$typ[sel] <- 0L
   }
   # test is sst
   if (any(cc_tab %in% c("s"))) {
     sel <- cc$c_t %in% c("s")
     cc$val[sel] <- si_to_txt(sst[as.numeric(cc$v[sel]) + 1])
-    cc$typ[sel] <- "s"
+    cc$typ[sel] <- 0L
   }
 
   has_na_string <- FALSE
@@ -457,7 +470,7 @@ wb_to_df <- function(
     sel <- cc$val %in% na.strings
     if (any(sel)) {
       cc$val[sel] <- NA_character_
-      cc$typ[sel] <- "na_string"
+      cc$typ[sel] <- -1L
       has_na_string <- TRUE
     }
   }
@@ -470,7 +483,7 @@ wb_to_df <- function(
     sel <- cc$v %in% na.numbers
     if (any(sel)) {
       cc$val[sel] <- NA_character_
-      cc$typ[sel] <- "na_number"
+      cc$typ[sel] <- -2L
       has_na_number <- TRUE
     }
   }
@@ -496,7 +509,7 @@ wb_to_df <- function(
           cc$val[sel] <- date_to_unix(cc$v[sel], origin = origin)
         else
           cc$val[sel] <- as.character(convert_date(cc$v[sel], origin = origin))
-        cc$typ[sel]  <- "d"
+        cc$typ[sel]  <- 2L
       }
 
       if (any(uccs %in% xlsx_hms_style)) {
@@ -507,7 +520,7 @@ wb_to_df <- function(
         } else {
           cc$val[sel] <- as.character(convert_hms(cc$v[sel]))
         }
-        cc$typ[sel]  <- "h"
+        cc$typ[sel]  <- 5L
       }
 
       if (any(uccs %in% xlsx_posix_style)) {
@@ -516,7 +529,7 @@ wb_to_df <- function(
           cc$val[sel] <- date_to_unix(cc$v[sel], origin = origin, datetime = TRUE)
         else
           cc$val[sel] <- as.character(convert_datetime(cc$v[sel], origin = origin))
-        cc$typ[sel]  <- "p"
+        cc$typ[sel]  <- 3L
       }
     }
   }
@@ -525,7 +538,7 @@ wb_to_df <- function(
   if (any(cc_tab %in% c("n", ""))) {
     sel <- which(is.na(cc$typ))
     cc$val[sel] <- cc$v[sel]
-    cc$typ[sel] <- "n"
+    cc$typ[sel] <- 1L
   }
 
   if (show_formula) {
@@ -544,7 +557,7 @@ wb_to_df <- function(
 
     sel <- cc$f != ""
     cc$val[sel] <- replaceXMLEntities(cc$f[sel])
-    cc$typ[sel] <- "f"
+    cc$typ[sel] <- 6L
 
   }
 
@@ -567,8 +580,8 @@ wb_to_df <- function(
   }
 
   # convert "na_string" to missing
-  if (has_na_string) cc$typ[cc$typ == "na_string"] <- NA
-  if (has_na_number) cc$typ[cc$typ == "na_number"] <- NA
+  if (has_na_string) cc$typ[cc$typ == -1] <- NA_integer_
+  if (has_na_number) cc$typ[cc$typ == -2] <- NA_integer_
 
   # prepare to create output object z
   zz <- cc[c("val", "typ")]
@@ -752,17 +765,17 @@ wb_to_df <- function(
       chrs <- names(which(types[sel] == 0))
 
       for (chr in chrs) {
-        sel <- tt[[chr]] == "d" & !is.na(z[[chr]])
+        sel <- tt[[chr]] == 2L & !is.na(z[[chr]])
         if (length(sel)) {
           z[[chr]][sel] <- vapply(z[[chr]][sel], date_conv_c, NA_character_)
         }
 
-        sel <- tt[[chr]] == "p" & !is.na(z[[chr]])
+        sel <- tt[[chr]] == 3L & !is.na(z[[chr]])
         if (length(sel)) {
           z[[chr]][sel] <- vapply(z[[chr]][sel], datetime_conv_c, NA_character_)
         }
 
-        sel <- tt[[chr]] == "h" & !is.na(z[[chr]])
+        sel <- tt[[chr]] == 5L & !is.na(z[[chr]])
         if (length(sel)) {
           z[[chr]][sel] <- vapply(z[[chr]][sel], hms_conv_c, NA_character_)
         }
@@ -800,7 +813,7 @@ wb_to_df <- function(
 
 # `read_xlsx()` -----------------------------------------------------------------
 # Ignored by roxygen2 when combining documentation
-# #' Read from an Excel file or Workbook object
+# #' Read from an input file or Workbook object
 #' @rdname wb_to_df
 #' @export
 read_xlsx <- function(

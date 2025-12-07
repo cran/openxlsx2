@@ -1,3 +1,56 @@
+#' Expand cell reference -/+ with min or max column and row
+#' @param dims dims
+#' @param clim,rlim range for columns and rows
+#' @keywords internal
+#' @noRd
+expand_ref <- function(dims, clim, rlim) {
+  m <- regexec("^([A-Z]+|[+-])([0-9]+|[+-])$", dims)
+  parts <- regmatches(dims, m)[[1]]
+
+  col <- parts[2]
+  row <- parts[3]
+
+  if (grepl("-", col)) {
+    col <- gsub("-", clim[1], col)
+  }
+  if (grepl("\\+", col)) {
+    col <- gsub("\\+", clim[2], col)
+  }
+
+  if (grepl("-", row)) {
+    row <- gsub("-", rlim[1], row)
+  }
+  if (grepl("\\+", row)) {
+    row <- gsub("\\+", rlim[2], row)
+  }
+
+  paste0(col, row)
+}
+
+#' Expand cell ranges -/+ with min or max column and row
+#' @param dims dims
+#' @param clim,rlim range for columns and rows
+#' @keywords internal
+#' @noRd
+expand_range <- function(dims, clim, rlim) {
+  ends <- strsplit(dims, ":", fixed = TRUE)[[1]]
+  left  <- expand_ref(ends[1], clim, rlim)
+  right <- expand_ref(ends[2], clim, rlim)
+  paste0(left, ":", right)
+}
+
+#' Expand dims
+#' @param dims dims
+#' @param clim,rlim range for columns and rows
+#' @keywords internal
+#' @noRd
+expand_dims <- function(dims, clim, rlim) {
+  if (any(grepl(":", dims))) {
+    return(expand_range(dims, clim, rlim))
+  }
+  expand_ref(dims, clim, rlim)
+}
+
 #' Create dataframe from dimensions
 #'
 #' Non consecutive decreasing dims will return an increasing data frame.
@@ -5,11 +58,12 @@
 #' @param dims Character vector of expected dimension.
 #' @param fill If `TRUE`, fills the dataframe with variables
 #' @param empty_rm Logical if empty columns and rows should be included
+#' @param cc A reference `cc` frame
 #' @examples
 #' dims_to_dataframe("A1:B2")
 #' @keywords internal
 #' @export
-dims_to_dataframe <- function(dims, fill = FALSE, empty_rm = FALSE) {
+dims_to_dataframe <- function(dims, fill = FALSE, empty_rm = FALSE, cc = NULL) {
 
   # in R 4.4.0 grepl(",", data.frame(x = paste0("K",))) == TRUE
   if (inherits(dims, "data.frame"))
@@ -27,6 +81,13 @@ dims_to_dataframe <- function(dims, fill = FALSE, empty_rm = FALSE) {
   if (any(grepl(",", dims))) {
     dims <- unlist(strsplit(dims, ","))
     has_dim_sep <- TRUE
+  }
+
+  if (any(grep("-|\\+", dims)) && !is.null(cc)) {
+    rows <- range(as.integer(unique(cc$row_r)))
+    cols <- int2col(range(col2int(unique(cc$c_r))))
+
+    dims <- vapply(dims, function(x) expand_dims(x, cols, rows), "")
   }
 
   # this is only required, if dims is not equal sized
@@ -91,6 +152,7 @@ dims_to_dataframe <- function(dims, fill = FALSE, empty_rm = FALSE) {
 #' @export
 dataframe_to_dims <- function(df, dim_break = FALSE) {
 
+  tmp <- NULL
   if (dim_break) {
 
     dims <- dims_to_dataframe(dataframe_to_dims(df, dim_break = FALSE), fill = TRUE)
@@ -108,7 +170,7 @@ dataframe_to_dims <- function(df, dim_break = FALSE) {
 
     out <- dims[matrix == 1]
 
-    return(paste0(out, collapse = ","))
+    tmp <- paste0(out, collapse = ",")
 
   } else {
 
@@ -124,10 +186,9 @@ dataframe_to_dims <- function(df, dim_break = FALSE) {
     } else {
       tmp <- con_dims(col2int(cols), rows)
     }
-
-    return(tmp)
-
   }
+
+  tmp
 }
 
 #' function to estimate the column type.
@@ -143,7 +204,7 @@ guess_col_type <- function(tt) {
   # Identify the unique types present in the data frame
   uu <- lapply(tt, unique)
   unique_types <- unique(unlist(uu))
-  unique_types[is.na(unique_types)] <- "n"
+  unique_types[is.na(unique_types)] <- 1L
 
   # Function to check column type
   check_col_type <- function(x, type_char) {
@@ -153,34 +214,34 @@ guess_col_type <- function(tt) {
   check_type <- function(x) vapply(uu, check_col_type, NA, type_char = x)
 
   # Check for each type and update types vector accordingly
-  if ("n" %in% unique_types) {
-    col_num <- check_type("n")
-    types[col_num] <- 1
+  if (1L %in% unique_types) {
+    col_num <- check_type(1L)
+    types[col_num] <- 1L
   }
 
-  if ("d" %in% unique_types) {
-    col_dte <- check_type("d")
-    types[col_dte & types == 0] <- 2
+  if (2L %in% unique_types) {
+    col_dte <- check_type(2L)
+    types[col_dte & types == 0] <- 2L
   }
 
-  if ("p" %in% unique_types) {
-    col_posix <- check_type("p")
-    types[col_posix & types == 0] <- 3
+  if (3L %in% unique_types) {
+    col_posix <- check_type(3L)
+    types[col_posix & types == 0] <- 3L
   }
 
-  if ("b" %in% unique_types) {
-    col_log <- check_type("b")
-    types[col_log & types == 0] <- 4
+  if (4L %in% unique_types) {
+    col_log <- check_type(4L)
+    types[col_log & types == 0] <- 4L
   }
 
-  if ("h" %in% unique_types) {
-    col_hms <- check_type("h")
-    types[col_hms & types == 0] <- 5
+  if (5L %in% unique_types) {
+    col_hms <- check_type(5L)
+    types[col_hms & types == 0] <- 5L
   }
 
-  if ("f" %in% unique_types) {
-    col_fml <- check_type("f")
-    types[col_fml & types == 0] <- 6
+  if (6L %in% unique_types) {
+    col_fml <- check_type(6L)
+    types[col_fml & types == 0] <- 6L
   }
 
   types

@@ -95,7 +95,7 @@ test_that("encoding", {
 
   exp <- structure(list("hähä" = "ÄÖÜ", "höhö" = "äöüß"),
                    row.names = 2L, class = "data.frame",
-                   tt = structure(list("hähä" = "s", "höhö" = "s"),
+                   tt = structure(list("hähä" = 0L, "höhö" = 0L),
                                   row.names = 2L, class = "data.frame"),
                    types = c(A = 0, B = 0))
 
@@ -156,8 +156,7 @@ test_that("reading charts", {
   wb$save(temp)
 
   # check that we wrote a chartshape
-  xlsx_unzip <- paste0(tempdir(), "/unzip")
-  dir.create(xlsx_unzip)
+  xlsx_unzip <- temp_dir("unzip")
 
 
   unzip(temp, exdir = xlsx_unzip)
@@ -368,8 +367,7 @@ test_that("hyperlinks work", {
   tmp <- temp_xlsx()
   wb_load(testfile_path("Single_hyperlink.xlsx"))$save(tmp)
 
-  temp_uzip <- paste0(tempdir(), "/unzip_openxlsx2")
-  dir.create(temp_uzip)
+  temp_uzip <- temp_dir("unzip_openxlsx2")
   unzip(tmp, exdir = temp_uzip)
 
   exp <- "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"https://www.github.com/JanMarvin/openxlsx2\" TargetMode=\"External\"/></Relationships>"

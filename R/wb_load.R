@@ -236,7 +236,7 @@ wb_load <- function(
     unlink(
       # TODO: this removes all files, the folders remain
       cleanup_dir(data_only),
-      recursive = TRUE, force = TRUE
+      recursive = TRUE
     ),
     add = TRUE
   )
@@ -715,10 +715,12 @@ wb_load <- function(
   }
 
   ## xl\vbaProject
-  if (!data_only && length(vbaProject)) {
-    wb$vbaProject <- vbaProject
+  if (!data_only && length(vbaProject) || tolower(file_ext2(file)) == "xlsm") {
+    if (length(vbaProject)) {
+      wb$vbaProject <- vbaProject
+      wb$append("Content_Types", '<Override PartName="/xl/vbaProject.bin" ContentType="application/vnd.ms-office.vbaProject"/>')
+    }
     wb$Content_Types[grepl('<Override PartName="/xl/workbook.xml" ', wb$Content_Types)] <- '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/>'
-    wb$append("Content_Types", '<Override PartName="/xl/vbaProject.bin" ContentType="application/vnd.ms-office.vbaProject"/>')
   }
 
 
@@ -2061,6 +2063,5 @@ wb_load <- function(
     wb$workbook$xti <- NULL
   }
 
-
-  return(wb)
+  wb
 }

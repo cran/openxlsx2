@@ -52,7 +52,7 @@ test_that("Deleting worksheets", {
   wb$remove_worksheet(sheet = 1)
   expect_equal(names(wb$get_sheet_names()), character(0))
 
-  unlink(tempFile, recursive = TRUE, force = TRUE)
+  unlink(tempFile, recursive = TRUE)
 
   wb <- wb_load(file = system.file("extdata", "oxlsx2_sheet.xlsx", package = "openxlsx2"))
   expect_silent(wb$remove_worksheet())
@@ -72,8 +72,7 @@ test_that("removing leading chartsheets works", {
     remove_worksheet(1)
 
   wb$save(tmp)
-  tmp_dir <- paste0(tempdir(), "/openxlsx2_unzip")
-  dir.create(tmp_dir)
+  tmp_dir <- temp_dir("openxlsx2_unzip")
   unzip(tmp, exdir = tmp_dir)
 
   exp <- c("sheet1.xml", "sheet2.xml", "sheet3.xml")
@@ -94,7 +93,6 @@ test_that("removing leading chartsheets works", {
   ###
   skip_if_not_installed("mschart")
 
-  require(mschart)
   wb <- wb_workbook()$
     add_worksheet()$
     add_data(x = mtcars)
@@ -103,7 +101,7 @@ test_that("removing leading chartsheets works", {
   dat <- wb_data(wb, 1)
 
   # call ms_scatterplot
-  data_plot <- ms_scatterchart(
+  data_plot <- mschart::ms_scatterchart(
     data = dat,
     x = "mpg",
     y = c("disp", "hp"),
@@ -119,8 +117,7 @@ test_that("removing leading chartsheets works", {
   wb$remove_worksheet(2)
 
   wb$save(tmp)
-  tmp_dir <- paste0(tempdir(), "/openxlsx2_unzip")
-  dir.create(tmp_dir)
+  tmp_dir <- temp_dir("openxlsx2_unzip")
   unzip(tmp, exdir = tmp_dir)
 
   got <- dir(paste0(tmp_dir, "/xl/worksheets"), pattern = "*.xml")

@@ -37,7 +37,7 @@ test_that("Reading from new workbook", {
 })
 
 test_that("Reading NAs and NaN values", {
-  fileName <- file.path(tempdir(), "NaN.xlsx")
+  fileName <- temp_xlsx("NaN")
   na.string <- "*"
 
   wb <- wb_workbook()
@@ -82,7 +82,7 @@ test_that("Reading NAs and NaN values", {
   )
 
   expect_equal(read_xlsx(fileName), exp, ignore_attr = TRUE)
-  unlink(fileName, recursive = TRUE, force = TRUE)
+  unlink(fileName, recursive = TRUE)
 })
 
 test_that("dims != rows & cols", {
@@ -159,7 +159,7 @@ test_that("reading with pre defined types works", {
     numeric = seq(-0.1, 0.1, by = 0.05),
     integer = sample(1:5, 5, TRUE),
     date = Sys.Date() - 0:4,
-    datetime = as.POSIXct(Sys.time() - 0:4, tz = "UTC"),
+    datetime = .POSIXct(Sys.time() - 0:4, tz = "UTC"),
     character = letters[1:5],
     stringsAsFactors = FALSE
   )
@@ -386,5 +386,81 @@ test_that("factors are treated as character", {
   exp <- c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec", "vs", "am", "gear", "carb")
   got <- names(wb$to_df(sheet = ffs[[1]]))
   expect_equal(exp, got)
+
+})
+
+test_that("wb_to_df respects the row order", {
+
+  ## select rows 1 and 2 while the column names are in row 2
+  got <- wb_workbook() |>
+    wb_add_worksheet() |>
+    wb_add_data(
+      x = letters,
+      dims = "A2:Z2",
+      col_names = FALSE
+    ) |>
+    wb_add_data(
+      x = 1:26,
+      dims = "A1:Z1",
+      col_names = FALSE
+    ) |>
+    wb_to_df(
+      rows = 2:1
+    )
+
+  exp <- data.frame(t(1:26))
+  names(exp) <- letters
+
+  expect_equal(exp, got)
+
+  ## select arbitrary row order of input matrix
+  mm <- as.data.frame(matrix(1:6, nrow = 6, ncol = 6))
+  names(mm) <- LETTERS[1:6]
+  wb <- wb_workbook()$add_worksheet()$add_data(x = mm, col_names = FALSE)
+
+  exp <- mm[c(2, 3, 1, 5, 6, 4), ]
+  got <- wb$to_df(rows = c(2, 3, 1, 5, 6, 4), col_names = FALSE)
+
+  expect_equal(exp, got)
+})
+
+test_that("expanding dims works", {
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(dims = "B3", x = matrix(1:25, 5, 5),
+             col_names = FALSE)
+
+  exp <- wb$to_df()
+  got <- wb$to_df(dims = "--:++")
+  expect_equal(exp, got)
+
+  got <- wb$to_df(dims = "B3:++")
+  expect_equal(exp, got)
+
+  got <- wb$to_df(dims = "--:F7")
+  expect_equal(exp, got)
+
+  got <- wb$to_df(dims = "B-:+7")
+  expect_equal(exp, got)
+
+  got <- wb$to_df(dims = "B-:+7")
+  expect_equal(exp, got)
+})
+
+test_that("reading all cols or rows works", {
+
+  wb <- wb_workbook()$add_worksheet()$add_data(
+    x = 1
+  )
+
+  exp <- c(1L, 16384L)
+  # better dims = "-4:+5"
+  got <- wb_to_df(wb, dims = "4:5")
+  expect_equal(exp, dim(got))
+
+  exp <- c(1048575L, 3L)
+  # better dims = "A-:B+"
+  got <- wb_to_df(wb, dims = "A:C")
+  expect_equal(exp, dim(got))
 
 })

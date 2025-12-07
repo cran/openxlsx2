@@ -395,7 +395,7 @@ test_that("dims with separator work", {
     df[c("5", "6"), c("G", "H")]
   )
 
-  for (i in seq_len(length(ll)))
+  for (i in seq_along(ll))
     names(ll[[i]]) <- c("V1", "V2")
 
   exp <- data.frame(
@@ -483,10 +483,10 @@ test_that("improve non consecutive dims", {
   exp <- dims_to_dataframe(dims, fill = TRUE)
   exp <- unname(unlist(exp[exp != ""]))
   got <- wb1$worksheets[[1]]$sheet_data$cc$r[wb1$worksheets[[1]]$sheet_data$cc$c_s != ""]
-  expect_contains(got, exp)
+  expect_identical(sort(got), sort(exp))
 
   got <- wb2$worksheets[[1]]$sheet_data$cc$r[wb2$worksheets[[1]]$sheet_data$cc$c_s != ""]
-  expect_contains(got, exp)
+  expect_identical(sort(got), sort(exp))
 
   ### Test rowwise
   # dims <- "D5:E5,I5:J5,C6:F6,H6:K6,B7:L9,C10:K10,D11:J11,E12:I12,F13:H13,G14"
@@ -508,10 +508,10 @@ test_that("improve non consecutive dims", {
   exp <- dims_to_dataframe(dims, fill = TRUE)
   exp <- unname(unlist(exp[exp != ""]))
   got <- wb3$worksheets[[1]]$sheet_data$cc$r[wb3$worksheets[[1]]$sheet_data$cc$c_s != ""]
-  expect_contains(got, exp)
+  expect_identical(sort(got), sort(exp))
 
   got <- wb4$worksheets[[1]]$sheet_data$cc$r[wb4$worksheets[[1]]$sheet_data$cc$c_s != ""]
-  expect_contains(got, exp)
+  expect_identical(sort(got), sort(exp))
 })
 
 test_that("reading equal sized ranges works", {

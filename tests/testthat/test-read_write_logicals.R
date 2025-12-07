@@ -1,6 +1,6 @@
 test_that("TRUE, FALSE, NA", {
   curr_wd <- getwd()
-  fileName <- file.path(tempdir(), "T_F_NA.xlsx")
+  fileName <- temp_xlsx("T_F_NA")
 
   x <- iris
   x$Species <- as.character(x$Species)
@@ -36,5 +36,4 @@ test_that("TRUE, FALSE, NA", {
   expect_equal(is.na(x$tf_na), is.na(y$tf_na))
 
   expect_equal(object = getwd(), curr_wd)
-  unlink(fileName, recursive = TRUE, force = TRUE)
 })
