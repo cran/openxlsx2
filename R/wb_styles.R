@@ -154,7 +154,7 @@ create_border <- function(
 
   valid_borders <- c("none",  "thin",  "medium",  "dashed",  "dotted",  "thick",  "double",  "hair",  "mediumDashed",  "dashDot",  "mediumDashDot",  "dashDotDot",  "mediumDashDotDot", "slantDashDot", "")
   borders       <- c(left, right, top, bottom, diagonal, start, end, horizontal, vertical)
-  match.arg_wrapper(borders, valid_borders, several.ok = TRUE, fn_name = "create_border")
+  match.arg_wrapper(borders, valid_borders, fn_name = "create_border")
 
   # excel dies on style=\"\"
   if (!is.null(left))       left       <- c(style = left)
@@ -229,11 +229,7 @@ create_border <- function(
 #' @export
 create_numfmt <- function(numFmtId = 164, formatCode = "#,##0.00") {
 
-  # in dates a slash does not indicate a fraction, but can be used to
-  # separate year, month, day
-  if (grepl("(y{2,4}|m{1,4}|d{1,2})", tolower(formatCode)) && grepl("/", formatCode)) {
-    formatCode <- escape_forward_slashes(formatCode)
-  }
+  formatCode <- escape_format_code(formatCode)
 
   df_numfmt <- data.frame(
     numFmtId         = as_xml_attr(numFmtId),
@@ -242,6 +238,7 @@ create_numfmt <- function(numFmtId = 164, formatCode = "#,##0.00") {
   )
   write_numfmt(df_numfmt)
 }
+
 
 #' Create font format
 #'
@@ -689,6 +686,16 @@ set_border <- function(xf_node, border_id) {
   write_xf(z)
 }
 
+#' internal function to remove border from a style
+#' @param xf_node some xf node
+#' @noRd
+remove_border <- function(xf_node) {
+  z <- read_xf(read_xml(xf_node))
+  z$applyBorder <- ""
+  z$borderId <- "0"
+  write_xf(z)
+}
+
 #' internal function to set fill to a style
 #' @param xf_node some xf node
 #' @param fill_id some numeric value as character
@@ -697,6 +704,16 @@ set_fill <- function(xf_node, fill_id) {
   z <- read_xf(read_xml(xf_node))
   z$applyFill <- "1"
   z$fillId <- as_xml_attr(fill_id)
+  write_xf(z)
+}
+
+#' internal function to remove fill from a style
+#' @param xf_node some xf node
+#' @noRd
+remove_fill <- function(xf_node) {
+  z <- read_xf(read_xml(xf_node))
+  z$applyFill <- ""
+  z$fillId <- "0"
   write_xf(z)
 }
 
@@ -711,6 +728,16 @@ set_font <- function(xf_node, font_id) {
   write_xf(z)
 }
 
+#' internal function to remove font from a style
+#' @param xf_node some xf node
+#' @noRd
+remove_font <- function(xf_node) {
+  z <- read_xf(read_xml(xf_node))
+  z$applyFont <- ""
+  z$fontId <- "0"
+  write_xf(z)
+}
+
 #' internal function to set numfmt to a style
 #' @param xf_node some xf node
 #' @param numfmt_id some numeric value as character
@@ -719,6 +746,16 @@ set_numfmt <- function(xf_node, numfmt) {
   z <- read_xf(read_xml(xf_node))
   z$applyNumberFormat <- "1"
   z$numFmtId <- as_xml_attr(numfmt)
+  write_xf(z)
+}
+
+#' internal function to remove numfmt from a style
+#' @param xf_node some xf node
+#' @noRd
+remove_numfmt <- function(xf_node) {
+  z <- read_xf(read_xml(xf_node))
+  z$applyNumberFormat <- ""
+  z$numFmtId <- "0"
   write_xf(z)
 }
 
@@ -1494,4 +1531,603 @@ create_colors_xml <- function(
 #' @usage NULL
 create_colours_xml <- create_colors_xml
 
+# OOXML builtin formats
+## in spreadsheet software the accounting style is shown with the symbol of the
+## local currency and its either in front or behind the digits. We cannot do this
+## therefore the symbol is dropped.
+builtin_fmts_df <- data.frame(
+  numFmtId = c(
+    # 0,
+    1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+    37, 38, 39, 40, 44, 45, 46, 47, 48, 49
+  ),
+  formatCode = c(
+    # "General",                               # 0
+    "0",                                     # 1
+    "0.00",                                  # 2
+    "#,##0",                                 # 3
+    "#,##0.00",                              # 4
+    "0%",                                    # 9
+    "0.00%",                                 # 10
+    "0.00E+00",                              # 11
+    "# ?/?",                                 # 12
+    "# ??/??",                               # 13
+    "mm-dd-yy",                              # 14
+    "d-mmm-yy",                              # 15
+    "d-mmm",                                 # 16
+    "mmm-yy",                                # 17
+    "h:mm AM/PM",                            # 18
+    "h:mm:ss AM/PM",                         # 19
+    "h:mm",                                  # 20
+    "h:mm:ss",                               # 21
+    "m/d/yy h:mm",                           # 22
+    "#,##0 ;(#,##0)",                        # 37
+    "#,##0 ;[Red](#,##0)",                   # 38
+    "#,##0.00;(#,##0.00)",                   # 39
+    "#,##0.00;[Red](#,##0.00)",              # 40
+    "_(* #,##0.00_);_(* (#,##0.00);_(* \"-\"??_);_(@_)", # 44 (Accounting)
+    "mm:ss",                                 # 45
+    "[h]:mm:ss",                             # 46
+    "mmss.0",                                # 47
+    "##0.0E+0",                              # 48
+    "@"                                      # 49 (Text)
+  ),
+  stringsAsFactors = FALSE
+)
+
 # nocov end
+
+# style helper used in wb_to_df()
+get_numfmt_style <- function(wb, cc) {
+  nms_uni_styles <- unique(cc$c_s)
+  uni_styles <- as.numeric(nms_uni_styles) + 1L
+  names(uni_styles) <- nms_uni_styles
+  uni_styles <- uni_styles[!is.na(uni_styles)]
+
+  cc$num_fmt <- rep_len("", nrow(cc))
+
+  if (length(uni_styles) == 0) {
+    return(cc)
+  }
+
+  styles <- rbindlist(
+    xml_attr(
+      wb$styles_mgr$styles$cellXfs[uni_styles],
+      "xf"
+    )
+  )
+  styles$style_id <- names(uni_styles)
+
+  # in an xlsx file created by LibreOffice there were duplicates in
+  # numFmtId for some reason
+  sel <- !duplicated(styles[c("numFmtId", "style_id")]) & styles$applyNumberFormat %in% c("1", "true")
+  styles <- styles[sel, c("style_id", "numFmtId")]
+
+  numfmts <- rbindlist(
+    xml_attr(
+      wb$styles_mgr$styles$numFmts,
+      "numFmt"
+    )
+  )
+
+  numfmts <- rbind(numfmts, builtin_fmts_df)
+
+  styles <- merge(
+    styles,
+    numfmts,
+    by = "numFmtId",
+    all.x = TRUE,
+    all.y = FALSE
+  )
+
+  # 1. Calculate the match indices
+  idx <- match(cc$c_s, styles$style_id)
+
+  # 2. Only map values where a match was found
+  # This prevents errors if idx contains NAs
+  matches <- !is.na(idx)
+  cc$num_fmt[matches] <- styles$formatCode[idx[matches]]
+
+  cc
+}
+
+# --- Helper: Split OOXML Sections Safely ---
+split_ooxml_sections <- function(fmt) {
+  unlist(strsplit(fmt, ";(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", perl = TRUE))
+}
+
+# --- Helper: Process Literals and Alignment ---
+process_literals <- function(fmt, value = NULL) {
+  res <- fmt
+  res <- gsub('\"(.*?)\"', "\\1", res)
+  res <- gsub("\\\\(.)", "\\1", res)
+  res <- gsub("\\*.", " ", res)
+  res <- gsub("_.", "", res)
+
+  # Alignment placeholders (?) become spaces in non-fraction contexts
+  if (!grepl("/", res)) {
+    res <- gsub("\\?", " ", res)
+  }
+
+  if (!is.null(value) && grepl("@", res)) {
+    res <- gsub("@", as.character(value), res)
+  }
+
+  res <- gsub("\\s+", " ", res)
+  res <- trimws(res)
+  Encoding(res) <- "UTF-8"
+
+  enc2native(res)
+}
+
+# --- Helper: Date and Time Formatter ---
+format_date_time <- function(value, format_code) {
+
+  # 1. Determine if this is a calendar date or a pure duration
+  # If it contains brackets or is numeric, it's likely a duration.
+  is_duration_fmt <- grepl("\\[", format_code)
+
+  # Coerce dt_val ONLY if we aren't dealing with a pure numeric duration
+  # to avoid the format() crash you are seeing.
+  dt_val <- NA
+  if (!is.numeric(value)) {
+    dt_val <- if (inherits(value, "POSIXct") || inherits(value, "Date")) {
+      value
+    } else if (is.character(value)) {
+      # for a hms format we need to add a date
+      if (grepl("^\\d{1,2}:\\d{2}", value)) {
+        value <- paste("1900-01-01", value)
+      }
+      # Try to parse, but keep as NA if it's just a time string
+      tryCatch(as.POSIXct(value, tz = "UTC"), error = function(e) NA)
+    }
+  }
+
+  res <- format_code
+
+  # 2. Handle Elapsed Units [h], [m], [s]
+  # We do this first and use FIXED matching to avoid regex/bracket confusion
+  if (is_duration_fmt) {
+
+    if (is.character(value)) {
+      value <- as.POSIXct(value, "UTC")
+    }
+
+    if (inherits(dt_val, "POSIXct")) {
+      origin <- as.POSIXct("1899-12-31", tz = "UTC")
+      value <- as.numeric(difftime(dt_val, origin, units = "days"))
+    }
+
+    excel_res <- convert_to_excel_date(list(v = value))
+    serial_num <- excel_res[[1]]
+
+    if (is.numeric(serial_num)) {
+      # Literal tags for durations. Must be greedy (hh before h).
+      tags <- c("[hh]", "[h]", "[HH]", "[H]", "[mm]", "[m]", "[MM]", "[M]", "[ss]", "[s]", "[SS]", "[S]")
+      for (tag in tags) {
+        if (grepl(tag, res, fixed = TRUE)) {
+          val_str <- ""
+          unit <- tolower(substr(tag, 2, 2))
+          if (unit == "h") {
+            val <- floor((serial_num * 24) + 1e-7)
+            val_str <- if (nchar(tag) > 3) sprintf("%02d", val) else as.character(val)
+          } else if (unit == "m") {
+            val <- floor((serial_num * 1440) + 1e-7)
+            val_str <- if (nchar(tag) > 3) sprintf("%02d", val) else as.character(val)
+          } else if (unit == "s") {
+            val <- floor((serial_num * 86400) + 1e-7)
+            val_str <- if (nchar(tag) > 3) sprintf("%02d", val) else as.character(val)
+          }
+          res <- gsub(tag, val_str, res, fixed = TRUE)
+        }
+      }
+    }
+  }
+
+  # 3. Calendar & Clock Formatting
+  # ONLY run if we have a valid date and the format isn't purely elapsed seconds/minutes
+  if (!all(is.na(dt_val))) {
+
+    # Standard Date Parts
+    res <- gsub("yyyy", format(dt_val, "%Y"), res, ignore.case = TRUE)
+    res <- gsub("yy", format(dt_val, "%y"), res, ignore.case = TRUE)
+    res <- gsub("dddd", format(dt_val, "%A"), res, ignore.case = TRUE)
+    res <- gsub("ddd", format(dt_val, "%a"), res, ignore.case = TRUE)
+    res <- gsub("dd", format(dt_val, "%d"), res, ignore.case = TRUE)
+    res <- gsub("\\bd\\b", as.numeric(format(dt_val, "%d")), res, perl = TRUE, ignore.case = TRUE)
+
+    # Minute Protection logic
+    res <- gsub("(?<=[Hh\\d]):mm", ":_MINP_", res, perl = TRUE)
+    res <- gsub("(?<=[Hh\\d]):m", ":_MIN_", res, perl = TRUE)
+    res <- gsub("mm(?=:ss|s)", "_MINP_", res, perl = TRUE)
+    res <- gsub("m(?=:ss|s)", "_MIN_", res, perl = TRUE)
+
+    # Contextual minutes for durations
+    if (is_duration_fmt) {
+      res <- gsub("\\bmm\\b(?!(.*_MIN))", "_MINP_", res, perl = TRUE)
+      res <- gsub("\\bm\\b(?!(.*_MIN))", "_MIN_", res, perl = TRUE)
+    }
+
+    # Months
+    res <- gsub("mmmmm", substr(format(dt_val, "%B"), 1, 1), res, ignore.case = TRUE)
+    res <- gsub("mmmm", format(dt_val, "%B"), res, ignore.case = TRUE)
+    res <- gsub("mmm", format(dt_val, "%b"), res, ignore.case = TRUE)
+    res <- gsub("mm", format(dt_val, "%m"), res, ignore.case = TRUE)
+    res <- gsub("\\bm\\b", as.numeric(format(dt_val, "%m")), res, perl = TRUE, ignore.case = TRUE)
+
+    # Restore Minutes
+    res <- gsub("_MINP_", format(dt_val, "%M"), res)
+    res <- gsub("_MIN_", as.numeric(format(dt_val, "%M")), res)
+
+    # Clock Time
+    is_12h <- grepl("AM/PM|A/P", res, ignore.case = TRUE)
+    # \\bh\\b boundary is vital to not overwrite the 296 we just put in
+    res <- gsub("hh", format(dt_val, if (is_12h) "%I" else "%H"), res, ignore.case = TRUE)
+    res <- gsub("\\bh\\b", as.numeric(format(dt_val, if (is_12h) "%I" else "%H")), res, perl = TRUE, ignore.case = TRUE)
+    res <- gsub("ss", format(dt_val, "%S"), res, ignore.case = TRUE)
+    res <- gsub("AM/PM", format(dt_val, "%p"), res, ignore.case = TRUE)
+    res <- gsub("A/P", substr(format(dt_val, "%p"), 1, 1), res, ignore.case = TRUE)
+
+  } else if (is.numeric(value) || is_duration_fmt) {
+    # If we have a numeric value but no valid dt_val (like 3600),
+    # handle the remaining :mm:ss or m using serial math to avoid the prettyNum crash.
+    excel_res <- convert_to_excel_date(list(v = value))
+    s <- excel_res[[1]]
+
+    # Simple replacement for clock-parts in durations when no calendar date exists
+    mins <- sprintf("%02d", floor((s * 1440) %% 60 + 1e-7))
+    secs <- sprintf("%02d", floor((s * 86400) %% 60 + 1e-7))
+
+    res <- gsub(":mm", paste0(":", mins), res, ignore.case = TRUE)
+    res <- gsub(":ss", paste0(":", secs), res, ignore.case = TRUE)
+    # Handle single m if it's the only thing left
+    res <- gsub("\\bm\\b", as.numeric(mins), res, perl = TRUE)
+  }
+
+  process_literals(res)
+}
+
+# --- Helper: Number Formatter ---
+format_number <- function(value, format_code) {
+  is_scientific <- grepl("E\\+", format_code, ignore.case = TRUE)
+
+  mask_regex <- "[#0,\\.E\\+]+"
+  matches <- gregexpr(mask_regex, format_code)[[1]]
+  if (matches[1] == -1) return(process_literals(format_code))
+
+  match_idx <- matches[length(matches)]
+  match_len <- attr(matches, "match.length")[length(matches)]
+  num_pattern <- substr(format_code, match_idx, match_idx + match_len - 1)
+
+  if (is_scientific) {
+    prec_match <- regmatches(num_pattern, regexec("\\.(.*?)E", num_pattern, ignore.case = TRUE))
+    precision <- if (length(prec_match[[1]]) > 1) nchar(prec_match[[1]][2]) else 0
+
+    formatted_num <- sprintf(paste0("%.", precision, "E"), value)
+
+    # OOXML usually uses uppercase 'E+'
+    formatted_num <- gsub("e", "E", formatted_num)
+  } else {
+    parts <- strsplit(num_pattern, "\\.")[[1]]
+    int_pat <- parts[1]
+    frac_pat <- if (length(parts) > 1) parts[2] else ""
+
+    m <- gregexpr(",+$", int_pat, perl = TRUE)
+    if (m[[1]][1] != -1) value <- value / (1000 ^ nchar(regmatches(int_pat, m)[[1]]))
+
+    # Calculate mandatory integer digits
+    mandatory_int <- nchar(gsub("[^0]", "", gsub(",", "", int_pat)))
+    precision <- nchar(gsub("[^0#]", "", frac_pat))
+
+    rounded_val <- abs(round(value, precision))
+
+    # If mandatory_int is 0 and the value is < 1, the integer part should be blank
+    int_part_val <- floor(rounded_val)
+    if (mandatory_int == 0 && int_part_val == 0) {
+      formatted_int <- ""
+    } else {
+      # Standard padding
+      formatted_int <- sprintf(paste0("%0", mandatory_int, "d"), as.integer(int_part_val))
+    }
+
+    # Handle the fractional part
+    if (precision > 0) {
+      # Use a simple %f to get the decimals, then strip the leading "0" or "1" before the dot
+      raw_frac <- sprintf(paste0("%.", precision, "f"), rounded_val)
+      formatted_frac <- gsub("^.*\\.", ".", raw_frac)
+
+      # Apply your existing # trailing-zero-stripping logic to formatted_frac here...
+
+      formatted_num <- paste0(formatted_int, formatted_frac)
+    } else {
+      formatted_num <- formatted_int
+    }
+
+    if (grepl("#", frac_pat)) {
+      # If the entire fractional pattern is #, and there's no fractional value, remove the decimal point too
+      if (!grepl("0", frac_pat) && (rounded_val %% 1 == 0)) {
+        formatted_num <- gsub("\\.0+$", "", formatted_num)
+      } else {
+        # Otherwise, only remove the zeros that correspond to the # positions
+        # This is a simple way: if frac_pat is '0.0#', we keep one zero but drop the second
+        # For now, a common robust approach is trimming trailing zeros if they aren't 'mandatory'
+        num_parts <- strsplit(formatted_num, "\\.")[[1]]
+        if (length(num_parts) > 1) {
+          # Calculate how many zeros are mandatory (the '0's in frac_pat)
+          mandatory_frac_len <- nchar(gsub("[^0]", "", frac_pat))
+          # Trim trailing zeros but keep up to mandatory_frac_len
+          frac_str <- num_parts[2]
+          while (nchar(frac_str) > mandatory_frac_len && substr(frac_str, nchar(frac_str), nchar(frac_str)) == "0") {
+            frac_str <- substr(frac_str, 1, nchar(frac_str) - 1)
+          }
+          formatted_num <- if (nchar(frac_str) > 0) paste0(num_parts[1], ".", frac_str) else num_parts[1]
+        }
+      }
+    }
+
+    if (grepl(",", int_pat)) {
+      num_parts <- strsplit(formatted_num, "\\.")[[1]]
+      num_parts[1] <- gsub("(?<=\\d)(?=(\\d{3})+$)", ",", num_parts[1], perl = TRUE)
+      formatted_num <- paste(num_parts, collapse = ".")
+    }
+  }
+
+  prefix <- substr(format_code, 1, match_idx - 1)
+  suffix <- substr(format_code, match_idx + match_len, nchar(format_code))
+
+  process_literals(paste0(prefix, formatted_num, suffix))
+}
+
+# --- Helper: Fraction Formatter (Farey Algorithm) ---
+format_fraction <- function(value, format_code) {
+  clean_fmt <- process_literals(format_code)
+
+  val_abs <- abs(value)
+  whole_part <- floor(val_abs + 1e-10) # epsilon for precision
+  frac_part <- val_abs - whole_part
+
+  if (frac_part < 1e-10) return(as.character(if (value < 0) -whole_part else whole_part))
+
+  # Determine denominator limit
+  denom_match <- regmatches(clean_fmt, regexpr("/([\\?\\d]+)", clean_fmt))
+  denom_str <- gsub("/", "", denom_match)
+
+  limit <- if (grepl("^[\\d]+$", denom_str)) as.numeric(denom_str)
+  else if (nchar(denom_str) == 3) 999
+  else if (nchar(denom_str) == 2) 99
+  else 9
+
+  # Find best rational approximation within limit (Farey Sequence)
+  low_n <- 0
+  low_d <- 1
+  high_n <- 1
+  high_d <- 0 # Represents 1/0
+
+  while (TRUE) {
+    num <- low_n + high_n
+    den <- low_d + high_d
+    if (den > limit) break
+
+    if (frac_part > (num / den)) {
+      low_n <- num
+      low_d <- den
+    } else if (frac_part < (num / den)) {
+      high_n <- num
+      high_d <- den
+    } else {
+      low_n <- num
+      low_d <- den
+      break
+    }
+  }
+
+  # Pick the closest of the two boundaries
+  if (abs(frac_part - (low_n / low_d)) <= abs(frac_part - (high_n / high_d)) || high_d > limit) {
+    n_res <- low_n
+    d_res <- low_d
+  } else {
+    n_res <- high_n
+    d_res <- high_d
+  }
+
+  sign_str <- if (value < 0) "-" else ""
+
+  if (grepl("#", clean_fmt)) {
+    if (whole_part == 0) return(paste0(sign_str, n_res, "/", d_res))
+    paste0(sign_str, whole_part, " ", n_res, "/", d_res)
+  } else {
+    paste0(sign_str, (whole_part * d_res) + n_res, "/", d_res)
+  }
+}
+
+#' Format Values using OOXML (Spreadsheet) Number Format Codes
+#'
+#' @description
+#' This function emulates a spreadsheet formatting engine. It takes numeric,
+#' date, or character values and applies an OOXML format code to produce
+#' a formatted string. It supports standard number formatting, date/time,
+#' elapsed durations, fractions, and conditional formatting sections.
+#'
+#' @param value A vector of values to format. Supports `numeric`, `Date`,
+#'   `POSIXct`, `character` (ISO dates or times), `hms`, or `difftime`.
+#' @param format_code A character vector of format strings (e.g., `"#,##0.00"`,
+#'   `"yyyy-mm-dd"`, or `"[h]:mm:ss"`).
+#'
+#' @details
+#' The function splits the `format_code` into up to four sections separated
+#' by semicolons (Positive; Negative; Zero; Text).
+#'
+#' \itemize{
+#'   \item \bold{Date and Time:} Supports standard tokens (`yyyy`, `mm`, `dd`,
+#'     `hh`, `ss`) and AM/PM toggles.
+#'   \item \bold{Durations:} Supports elapsed time tokens in square brackets,
+#'     such as `[h]`, `[m]`, and `[s]`, calculating total units.
+#'   \item \bold{HMS Handling:} Character strings in "HH:MM:SS" format are
+#'     automatically coerced to a date-time object using a base date
+#'     to allow clock and duration formatting.
+#'   \item \bold{Numbers:} Supports thousands separators (`,`), precision,
+#'     percentage conversion, and scientific notation (`E+`).
+#'   \item \bold{Fractions:} Uses the Farey algorithm to approximate decimals
+#'     as fractions (e.g., `?/?`, `# ?/?`).
+#'   \item \bold{Conditionals:} Evaluates bracketed conditions like `[<1000]`
+#'     to select the appropriate formatting section.
+#'   \item \bold{Literals:} Handles escaped characters (`\\`), quoted
+#'     text (`"text"`), and the text placeholder (`@`).
+#' }
+#'
+#' Rounding is based on the R function `round()` and does not match spreadsheet
+#' software behavior.
+#'
+#' @return A character vector of formatted strings.
+#'
+#' @examples
+#' # Numeric formatting
+#' apply_numfmt(1234.5678, "#,##0.00") # "1,234.57"
+#'
+#' # Date and Time
+#' apply_numfmt("2025-01-05", "dddd, mmm dd") # "Sunday, Jan 05"
+#' apply_numfmt("13:45:30", "hh:mm AM/PM")    # "01:45 PM"
+#'
+#' # Durations
+#' apply_numfmt("1900-01-12 08:17:47", "[h]:mm:ss") # "296:17:47"
+#'
+#' # Fractions
+#' apply_numfmt(1.75, "# ?/?") # "1 3/4"
+#'
+#' @export
+apply_numfmt <- function(value, format_code) {
+
+  if (inherits(value, "hms") || inherits(value, "difftime")) {
+    value <- convert_datetime(value)
+  }
+
+  # Standardize input lengths
+  max_len <- max(length(value), length(format_code))
+  value <- rep_len(value, max_len)
+  format_code <- rep_len(format_code, max_len)
+
+  results <- character(max_len)
+
+  unique_fmts <- unique(format_code)
+
+  for (fmt_raw in unique_fmts) {
+    idx <- which(format_code == fmt_raw)
+    v_subset <- value[idx]
+
+    # --- Pre-processing ---
+    f <- replaceXMLEntities(fmt_raw)
+    sections <- split_ooxml_sections(f)
+    n_sec <- length(sections)
+
+    # Pre-clean metadata for each section
+    sections_cleaned <- lapply(sections, function(target_fmt) {
+      # Currency Extraction
+      curr_matches <- regmatches(target_fmt, gregexpr("\\[\\$(.*?)-.*?\\]", target_fmt))[[1]]
+      if (length(curr_matches) > 0) {
+        for (m in curr_matches) {
+          symbol <- gsub("^\\[\\$|\\-.*$", "", m)
+          target_fmt <- gsub(m, symbol, target_fmt, fixed = TRUE)
+        }
+      }
+
+      target_fmt <- gsub("\\* ", " ", target_fmt)
+      target_fmt <- gsub("\\*.", "", target_fmt)
+      target_fmt <- gsub("(?<!\\\\)_.", "", target_fmt, perl = TRUE)
+
+      # Strip Conditions ([<1500]) and Colors ([Red]) but PROTECT Durations ([h], [m], [s])
+      target_fmt <- gsub("\\[(?!(?:h|m|s|H|M|S))[^\\]]+\\]", "", target_fmt, perl = TRUE)
+      target_fmt
+    })
+
+    # --- Value Processing ---
+    results[idx] <- vapply(v_subset, function(v) {
+      if (is.na(v)) return(NA_character_)
+
+      # Type Detection
+      is_numeric <- is.numeric(v)
+      is_dt_obj <- inherits(v, "Date") || inherits(v, "POSIXct")
+      is_dt_str <- !is_numeric && !is_dt_obj && is.character(v) && (
+        grepl("^\\d{4}-\\d{2}-\\d{2}", v) || grepl("^\\d{1,2}:\\d{2}:\\d{2}", v)
+      )
+
+      target_fmt <- ""
+      condition_matched <- FALSE
+      sec_idx <- 1
+
+      # 1. Section Selection Logic
+      if (is_numeric && any(grepl("^\\[[<>=!]+[0-9.]+\\]", sections))) {
+        for (i in seq_along(sections)) {
+          sec <- sections[[i]]
+          if (grepl("^\\[([<>=!]+[0-9.]+)\\]", sec)) {
+            cond_str <- gsub("^\\[([<>=!]+[0-9.]+)\\].*", "\\1", sec)
+            if (eval(parse(text = paste(v, cond_str)))) {
+              sec_idx <- i
+              condition_matched <- TRUE
+              break
+            }
+          } else {
+            sec_idx <- i
+            condition_matched <- TRUE
+            break
+          }
+        }
+      }
+
+      if (!condition_matched) {
+        if (is_numeric) {
+          if (v > 0 || (v == 0 && n_sec < 3)) {
+            sec_idx <- 1
+          } else if (v < 0) {
+            if (n_sec >= 2) {
+              sec_idx <- 2
+              v <- abs(v)
+            } else {
+              sec_idx <- 1
+            }
+          } else {
+            if (n_sec >= 3 && !grepl("[#0]", sections[[3]])) return(process_literals(sections_cleaned[[3]]))
+            sec_idx <- if (n_sec >= 3) 3 else 1
+          }
+        } else if (is_dt_str || is_dt_obj) {
+          sec_idx <- 1
+        } else {
+          if (n_sec >= 4) return(process_literals(sections_cleaned[[4]], v))
+          if (grepl("@", sections[[1]])) return(process_literals(sections_cleaned[[1]], v))
+          return(as.character(v))
+        }
+      }
+
+      # Use the pre-cleaned section
+      target_fmt <- sections_cleaned[[sec_idx]]
+      orig_sec <- sections[[sec_idx]]
+
+      # 3. Final Routing
+      # A. Dates/Times
+      if (is_dt_str || is_dt_obj || (grepl("[ymdhs\\[]", orig_sec, ignore.case = TRUE) && !grepl("[#0]", orig_sec))) {
+        return(format_date_time(v, target_fmt))
+      }
+
+      # B. Fractions
+      if (grepl("/[\\?\\d]", target_fmt) && is_numeric) {
+        return(format_fraction(v, target_fmt))
+      }
+
+      # C. Percentages
+      if (grepl("%", target_fmt)) {
+        val_pct <- if (is_numeric) v * 100 else v
+        res <- format_number(val_pct, gsub("%", "", target_fmt))
+        return(paste0(res, "%"))
+      }
+
+      # D. Standard Numbers
+      res <- format_number(v, target_fmt)
+      if (is_numeric && v < 0 && !condition_matched && n_sec == 1 && !grepl("[\\(\\)-]", res)) {
+        res <- paste0("-", res)
+      }
+
+      res
+    }, character(1))
+  }
+
+  results
+}

@@ -3,6 +3,9 @@
 
 #include "openxlsx2_types.h"
 
+#define MAX_OOXML_COL_INT 16384
+#define MAX_OOXML_ROW_INT 1048576
+
 
 inline void check_xptr_validity(XPtrXML doc) {
   if (doc.get() == nullptr) {
@@ -33,6 +36,9 @@ inline void checkInterrupt(R_xlen_t& iteration, R_xlen_t frequency = 10000) {
 template <typename T>
 static inline std::string int_to_col(T cell) {
   std::string col_name = "";
+
+  if (cell == 0 || cell > MAX_OOXML_COL_INT)
+    Rcpp::stop("Column exceeds valid range");
 
   while (cell > 0) {
     auto modulo = (cell - 1) % 26;
@@ -70,10 +76,17 @@ static inline uint32_t uint_col_to_int(std::string& a) {
   uint32_t sum = 0;
   size_t k = a.length();
 
+  if (!std::all_of(a.begin(), a.end(), ::isalpha)) {
+    Rcpp::stop("found non alphabetic character in column to integer conversion");
+  }
+
   for (size_t j = 0; j < k; ++j) {
     sum *= 26;
     sum += static_cast<uint32_t>(a[j] - aVal);
   }
+
+  if (sum == 0 || sum > MAX_OOXML_COL_INT)
+    Rcpp::stop("Column exceeds valid range");
 
   return sum;
 }
@@ -101,7 +114,11 @@ static inline std::string rm_colnum(const std::string& str) {
 // Function to keep only digits in a string
 inline int32_t cell_to_rowint(const std::string& str) {
   std::string result = rm_colnum(str);
-  return std::stoi(result);
+  int32_t res = std::stoi(result);
+  if (res < 1 || res > MAX_OOXML_ROW_INT)
+    Rcpp::stop("Row exceeds valid range");
+
+  return res;
 }
 
 static inline std::string str_toupper(std::string s) {
@@ -153,24 +170,23 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
   // --- 1. Initialization ---
 
   // Base columns
-  Rcpp::CharacterVector r      = Rcpp::CharacterVector(Rcpp::no_init(n));
-  Rcpp::CharacterVector row_r  = Rcpp::CharacterVector(Rcpp::no_init(n));
-  Rcpp::CharacterVector c_r    = Rcpp::CharacterVector(Rcpp::no_init(n));
-  Rcpp::CharacterVector c_s    = Rcpp::CharacterVector(Rcpp::no_init(n));
-  Rcpp::CharacterVector c_t    = Rcpp::CharacterVector(Rcpp::no_init(n));
+  Rcpp::CharacterVector r      = Rcpp::CharacterVector(n);
+  Rcpp::CharacterVector row_r  = Rcpp::CharacterVector(n);
+  Rcpp::CharacterVector c_r    = Rcpp::CharacterVector(n);
+  Rcpp::CharacterVector c_s    = Rcpp::CharacterVector(n);
+  Rcpp::CharacterVector c_t    = Rcpp::CharacterVector(n);
 
   // Content columns
-  Rcpp::CharacterVector v      = Rcpp::CharacterVector(Rcpp::no_init(n));
-  Rcpp::CharacterVector f      = Rcpp::CharacterVector(Rcpp::no_init(n));
-  Rcpp::CharacterVector f_attr = Rcpp::CharacterVector(Rcpp::no_init(n));
-  Rcpp::CharacterVector is     = Rcpp::CharacterVector(Rcpp::no_init(n));
+  Rcpp::CharacterVector v      = Rcpp::CharacterVector(n);
+  Rcpp::CharacterVector f      = Rcpp::CharacterVector(n);
+  Rcpp::CharacterVector f_attr = Rcpp::CharacterVector(n);
+  Rcpp::CharacterVector is     = Rcpp::CharacterVector(n);
 
   // Conditional columns (only allocate if needed)
   Rcpp::CharacterVector c_cm, c_ph, c_vm;
-  if (has_cm) c_cm = Rcpp::CharacterVector(Rcpp::no_init(n));
-  if (has_ph) c_ph = Rcpp::CharacterVector(Rcpp::no_init(n));
-  if (has_vm) c_vm = Rcpp::CharacterVector(Rcpp::no_init(n));
-
+  if (has_cm) c_cm             = Rcpp::CharacterVector(n);
+  if (has_ph) c_ph             = Rcpp::CharacterVector(n);
+  if (has_vm) c_vm             = Rcpp::CharacterVector(n);
 
   // --- 2. Fill Vectors ---
 
@@ -210,39 +226,39 @@ inline SEXP xml_cols_to_df(const std::vector<xml_col>& x, bool has_cm, bool has_
   Rcpp::CharacterVector df_names;
 
   // Base columns
-  df_list.push_back(r);
+  df_list.push_back(std::move(r));
   df_names.push_back("r");
-  df_list.push_back(row_r);
+  df_list.push_back(std::move(row_r));
   df_names.push_back("row_r");
-  df_list.push_back(c_r);
+  df_list.push_back(std::move(c_r));
   df_names.push_back("c_r");
-  df_list.push_back(c_s);
+  df_list.push_back(std::move(c_s));
   df_names.push_back("c_s");
-  df_list.push_back(c_t);
+  df_list.push_back(std::move(c_t));
   df_names.push_back("c_t");
 
   // Conditional columns
   if (has_cm) {
-    df_list.push_back(c_cm);
+    df_list.push_back(std::move(c_cm));
     df_names.push_back("c_cm");
   }
   if (has_ph) {
-    df_list.push_back(c_ph);
+    df_list.push_back(std::move(c_ph));
     df_names.push_back("c_ph");
   }
   if (has_vm) {
-    df_list.push_back(c_vm);
+    df_list.push_back(std::move(c_vm));
     df_names.push_back("c_vm");
   }
 
   // Content columns
-  df_list.push_back(v);
+  df_list.push_back(std::move(v));
   df_names.push_back("v");
-  df_list.push_back(f);
+  df_list.push_back(std::move(f));
   df_names.push_back("f");
-  df_list.push_back(f_attr);
+  df_list.push_back(std::move(f_attr));
   df_names.push_back("f_attr");
-  df_list.push_back(is);
+  df_list.push_back(std::move(is));
   df_names.push_back("is");
 
   df_list.attr("names") = df_names;

@@ -622,14 +622,13 @@ else. To define the row where to begin reading, define it via the
 <span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a><span class="co">#&gt; 11 FALSE  3 NA  67.30     i 2023-12-25 NA       3     &lt;NA&gt;</span></span>
 <span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a><span class="co">#&gt; 12    NA  1 NA 123.00  &lt;NA&gt; 2023-07-31 NA     122     &lt;NA&gt;</span></span></code></pre></div>
 </div>
-<div id="na.strings---define-missing-values" class="section level3">
-<h3><code>na.strings</code> - define missing values</h3>
+<div id="na---define-missing-values" class="section level3">
+<h3><code>na</code> - define missing values</h3>
 <p>There is the “#N/A” string, but often the user will be faced with
 custom missing values and other values we are not interested. Such
-strings can be passed as character vector via
-<code>na.strings</code></p>
+strings can be passed as character vector via <code>na</code></p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="co"># na strings</span></span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">na.strings =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">na =</span> <span class="st">&quot;&quot;</span>)</span>
 <span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt;     Var1 Var2 &lt;NA&gt;  Var3  Var4       Var5         Var6    Var7     Var8</span></span>
 <span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt; 3   TRUE    1   NA     1     a 2023-05-29 3209324 This #DIV/0! 01:27:15</span></span>
 <span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt; 4   TRUE   NA   NA #NUM!     b 2023-05-23         &lt;NA&gt;       0 14:02:57</span></span>

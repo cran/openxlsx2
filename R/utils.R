@@ -18,18 +18,13 @@ naToNULLList <- function(x) {
 # useful for replacing multiple x <- paste(x, new) where the length is checked
 # multiple times.  This combines all elements in ... and removes anything that
 # is zero length.  Much faster than multiple if/else (re)assignments
-paste_c <- function(..., sep = "", collapse = " ", unlist = FALSE) {
+paste_c <- function(..., sep = "", collapse = " ") {
   x <- c(...)
-  if (unlist) x <- unlist(x, use.names = FALSE)
   stringi::stri_join(x[nzchar(x)], sep = sep, collapse = collapse)
 }
 
-`%||%` <- function(x, y) if (is.null(x)) y else x
-`%|||%` <- function(x, y) if (length(x)) x else y
-
-# opposite of %in%
-`%out%` <- function(x, table) {
-  match(x, table, nomatch = 0L) == 0L
+if (getRversion() < "4.4.0") {
+  `%||%` <- function(x, y) if (is.null(x)) y else x
 }
 
 #' helper function to create temporary directory for testing purpose
@@ -70,9 +65,6 @@ unapply <- function(x, FUN, ..., .recurse = TRUE, .names = FALSE) {
 reg_match0 <- function(x, pat) regmatches(x, gregexpr(pat, x, perl = TRUE))
 reg_match  <- function(x, pat) regmatches(x, gregexpr(pat, x, perl = TRUE))[[1]]
 
-apply_reg_match  <- function(x, pat) unapply(x, reg_match,  pat = pat)
-apply_reg_match0 <- function(x, pat) unapply(x, reg_match0, pat = pat)
-
 wapply <- function(x, FUN, ...) {
   FUN <- match.fun(FUN)
   which(vapply(x, FUN, FUN.VALUE = NA, ...))
@@ -87,7 +79,7 @@ dir_create <- function(..., warn = TRUE, recurse = FALSE) {
 
 as_binary <- function(x) {
   # To be used within a function
-  if (any(x %out% list(0, 1, FALSE, TRUE))) {
+  if (any(!x %in% list(0, 1, FALSE, TRUE))) {
     stop(deparse(x), " must be 0, 1, FALSE, or TRUE", call. = FALSE)
   }
 
@@ -177,20 +169,22 @@ dims_to_rowcol <- function(x, as_integer = FALSE) {
 
   dims <- x
   if (length(x) == 1 && inherits(x, "character")) {
-    if (grepl(";", x)) dims <- unlist(strsplit(x, ";"))
-    if (grepl(",", x)) dims <- unlist(strsplit(x, ","))
+    if (any(grepl(",|;", x))) dims <- unlist(strsplit(dims, split = "[,;]"))
   }
 
   cols_out <- NULL
   rows_out <- NULL
   for (dim in dims) {
     dimensions <- unlist(strsplit(dim, ":"))
+    dimensions <- gsub("\\$", "", dimensions)
     cols <- gsub("[[:digit:]]", "", dimensions)
     rows <- gsub("[[:upper:]]", "", dimensions)
 
     # if "A:B"
+    # FIXME this seems poorly handled. A:B should return c(1, 1041048576)
     if (any(rows == "")) rows[rows == ""] <- "1"
 
+    # FIXME "1:1" seems to be entirely unhandled
     if (any(cols == "")) {
       stop(
         "A dims string passed to `dims_to_rowcol()` contained no alphabetic column",
@@ -200,7 +194,7 @@ dims_to_rowcol <- function(x, as_integer = FALSE) {
 
     # convert cols to integer
     cols_int <- col2int(cols)
-    rows_int <- as.integer(rows)
+    rows_int <- row2int(rows)
 
     if (length(dimensions) == 2) {
       # needs integer to create sequence
@@ -215,11 +209,40 @@ dims_to_rowcol <- function(x, as_integer = FALSE) {
       rows <- as.character(rows_int)
     }
 
-    cols_out <- unique(c(cols_out, cols))
-    rows_out <- unique(c(rows_out, rows))
+    cols_out <- union(cols_out, cols)
+    rows_out <- union(rows_out, rows)
   }
 
   list(col = cols_out, row = rows_out)
+}
+
+
+#' @rdname dims_helper
+#' @export
+validate_dims <- function(x) {
+  assert_class(x, "character")
+  dims <- gsub("\\$", "", x)
+
+  if (any(dims == ""))
+    stop("Unexpected blank strings in dims validation detected", call. = FALSE)
+
+  dims <- unlist(strsplit(dims, "[,;]"))
+
+  if (any(grepl("[^A-Z0-9:]", dims)))
+    stop("dims contains invalid character", call. = FALSE)
+
+  dm_list <- strsplit(dims, ":")
+
+  all_parts <- unlist(dm_list)
+
+  has_alpha <- grepl("[[:alpha:]]", all_parts)
+  has_digit <- grepl("[[:digit:]]", all_parts)
+
+  cols <- if (any(has_alpha)) col2int(all_parts) else c(1, 16384)
+  rows <- if (any(has_digit)) row2int(all_parts) else c(1, 1048576)
+
+  # should be TRUE, otherwise the functions above would have thrown an error
+  all(is.numeric(cols) & is.numeric(rows))
 }
 
 
@@ -245,6 +268,7 @@ rowcol_to_dim <- function(row, col, fix = NULL) {
 
   stringi::stri_join(min_col, min_row)
 }
+
 
 # begin - end
 rc_to_dims <- function(cb, rb, ce, re, fix = NULL) {
@@ -367,25 +391,19 @@ check_wb_dims_args <- function(args, select = NULL) {
 
   x_has_colnames <- !is.null(colnames(args$x))
 
-  if (is.character(args$rows) && !is.null(args$rows) && x_has_colnames) {
-    # Not checking whether it's a row name, not supported.
-    is_rows_a_colname <- args$rows %in% colnames(args$x)
+  if (is.character(args$cols) && x_has_colnames) {
+    # Checking whether cols is character, and error if it is not the col names of x
+    missing_cols <- args$cols[!(args$cols %in% colnames(args$x))]
 
-    if (any(is_rows_a_colname)) {
+    if (length(missing_cols) > 0) {
+      missing_label <- paste0("`", missing_cols, "`", collapse = ", ")
+
       stop(
-        "`rows` is the incorrect argument in this case\n",
-        "Use `cols` instead. Subsetting rows by name is not supported.",
+        "`cols` must be an integer or an existing column name of `x`. \n",
+        "The following were not found: ", missing_label,
         call. = FALSE
       )
     }
-  }
-
-  if (is.character(args$cols) && x_has_colnames && !all(args$cols %in% colnames(args$x))) {
-    # Checking whether cols is character, and error if it is not the col names of x
-    stop(
-      "`cols` must be an integer or an existing column name of `x`, not ", args$cols,
-      call. = FALSE
-    )
   }
 
   invisible(NULL)
@@ -395,57 +413,34 @@ check_wb_dims_args <- function(args, select = NULL) {
 # It also provides a more informative error message in case it fails.
 match.arg_wrapper <- function(arg,
                               choices,
-                              several.ok = FALSE,
                               fn_name = NULL,
                               arg_name = NULL) {
   # Check valid argument names
   # partial matching accepted
   fn_name <- fn_name %||% "fn_name"
 
-  if (!several.ok) {
-    if (length(arg) != 1) {
+  invalid_args <- arg[arg != "" & !arg %in% choices]
 
-      valid_arg_nams <- paste0("'", choices[choices != ""], "'", collapse = ", ")
-      if (is.null(arg_name)) {
-        # validating arguments passed as ...
-        msg <- c(
-          "`", fn_name, "()` accepts a single argument\n",
-          "Use one of ", valid_arg_nams
-        )
-      } else {
-        # validating value of argument
-        msg <- c(
-          "`", arg_name, "` accepts a single value in `", fn_name, "()`\n",
-          "Use one of ", valid_arg_nams
-        )
-      }
-
-      stop(msg,  call. = FALSE)
-    }
-  }
-
-  invalid_args <- !arg %in% choices
-  if (any(invalid_args)) {
-    invalid_arg_nams <- paste0("`", arg[invalid_args], "`", collapse = ", ")
-    multi <- length(invalid_arg_nams) > 0
-
+  if (length(invalid_args) > 0) {
     valid_arg_nams <- paste0("'", choices[choices != ""], "'", collapse = ", ")
 
+    invalid_labels <- paste0("`", invalid_args, "`", collapse = ", ")
+
     if (is.null(arg_name)) {
-      # validating arguments passed as ...
-      arg_msg <- ""
-      plural_sentence <- ifelse(multi, " is an invalid argument for `", " are invalid arguments for `")
-
+      msg_start <- ifelse(length(invalid_args) > 1, " are invalid arguments", " is an invalid argument")
+      stop(
+        invalid_labels, msg_start, " for `", fn_name, "()`\n",
+        "Use any of ", valid_arg_nams,
+        call. = FALSE
+      )
     } else {
-      # validating value of argument
-      arg_msg <- c(arg_name, "` in `")
-      plural_sentence <- ifelse(multi, " is an invalid value for `", " are invalid values for `")
+      msg_start <- ifelse(length(invalid_args) > 1, " are invalid values", " is an invalid value")
+      stop(
+        invalid_labels, msg_start, " for `", arg_name, "` in `", fn_name, "()`\n",
+        "Use any of ", valid_arg_nams,
+        call. = FALSE
+      )
     }
-
-    stop(
-      invalid_arg_nams, plural_sentence, arg_msg, fn_name, "()`: ", "\n", "Use any of ", valid_arg_nams,
-      call. = FALSE
-    )
   }
   arg
 }
@@ -471,39 +466,33 @@ determine_select_valid <- function(args, select = NULL) {
   }
 
   select <- select %||% default_select
-  valid_cases_choices <- names(valid_cases)
+
+  # Validate that the string is one of the 4 allowed names
   match.arg_wrapper(
     select,
-    choices = valid_cases_choices,
-    several.ok = FALSE,
+    choices = names(valid_cases),
     fn_name = "wb_dims",
     arg_name = "select"
   )
 
+  # Check if the specific case is valid for the current input x
   if (isFALSE(valid_cases[[select]])) {
-
-    if (isFALSE(args$row_names %||% FALSE) && identical(select, "row_names")) {
       # If the default for row_names ever changes in openxlsx2, this would need adjustment.
+    if (identical(select, "row_names")) {
       stop(
         "`select` can't be \"row_names\" if `x` doesn't have row names.\n",
         "Use `row_names = TRUE` inside `wb_dims()` to ensure row names are preserved.",
         call. = FALSE
       )
-    } else if (isFALSE(args$col_names %||% TRUE) && identical(select, "col_names")) {
       # If the default for col_names ever changes in openxlsx2, this would need adjustment.
+    } else if (identical(select, "col_names")) {
       stop(
         "`select` can't be \"col_names\" if `x` doesn't have column names.\n",
         "Use `col_names = TRUE` inside `wb_dims()` to ensure column names are preserved.",
         call. = FALSE
       )
-    } else {
-      # this is probably redundant now?
-      stop(
-        "You provided a bad value to `select` in `wb_dims()`.\n ",
-        "Please review. see `?wb_dims`.",
-        call. = FALSE
-      )
     }
+    # Removed the 'else' stop as it is unreachable
   }
 
   select
@@ -684,7 +673,7 @@ wb_dims <- function(..., select = NULL) {
     if (any(c("start_col", "start_row") %in% nams)) {
       stop("Use `from_row` / `from_col` instead of `start_row` / `start_col`")
     }
-    match.arg_wrapper(arg = nams, choices = c(valid_arg_nams, ""), several.ok = TRUE, fn_name = "wb_dims")
+    match.arg_wrapper(arg = nams, choices = c(valid_arg_nams, ""), fn_name = "wb_dims")
   }
   # After this point, no need to search for invalid arguments!
 
@@ -722,6 +711,19 @@ wb_dims <- function(..., select = NULL) {
 
   rows_arg <- args$rows
   cols_arg <- args$cols
+
+  if (anyNA(rows_arg) || anyNA(cols_arg)) {
+    stop("NAs are not supported in wb_dims()")
+  }
+
+  if ((!is.null(rows_arg) && !is.atomic(rows_arg)) ||
+      (!is.null(cols_arg) && !is.atomic(cols_arg))) {
+    stop("Input must be a vector type")
+  }
+
+  if (is.factor(rows_arg) || is.factor(cols_arg)) {
+    stop("factors are not supported in wb_dims()")
+  }
 
   if (n_unnamed_args == 1 && len > 1 && !"rows" %in% nams) {
     message("Assuming the first unnamed argument to be `rows`.")
@@ -763,25 +765,33 @@ wb_dims <- function(..., select = NULL) {
     is_lwr_one <- FALSE
     # cols_arg could be name(s) in x or must indicate a positive integer
     if (is.null(args$x) || (!is.null(args$x) && !all(cols_arg %in% names(args$x))))
-      is_lwr_one <- min(col2int(cols_arg)) < 1L
+      is_lwr_one <- if (is.numeric(cols_arg))
+          min(cols_arg) < 1L
+        else
+          min(col2int(cols_arg)) < 1L
 
     if (is_lwr_one)
       stop("You must supply positive values to `cols`")
   }
 
   # in case the user mixes up column and row
+  if (is.character(rows_arg) && !is.null(args$x)) {
+    is_rows_a_colname <- rows_arg %in% colnames(args$x)
+    if (any(is_rows_a_colname)) {
+      stop(
+        "`rows` is the incorrect argument in this case\n",
+        "Use `cols` instead. Subsetting rows by name is not supported.",
+        call. = FALSE
+      )
+    }
+  }
+
   if (is.character(rows_arg) && !all(is_charnum(rows_arg))) {
-    stop("`rows` is character and contains nothing that can be interpreted as number.")
+    stop("`rows` is character and contains nothing that can be interpreted as number.", call. = FALSE)
   }
 
   if (!is.null(rows_arg) && (min(as.integer(rows_arg)) < 1L)) {
     stop("You must supply positive values to `rows`.")
-  }
-
-  # Just keeping this as a safeguard
-  has_some_unnamed_args <- !all(nzchar(nams))
-  if (has_some_unnamed_args) {
-    stop("Internal error, all arguments should be named after this point.")
   }
 
   if (length(args$from_col) > 1 || length(args$from_row) > 1 ||
@@ -831,36 +841,38 @@ wb_dims <- function(..., select = NULL) {
     height_x <- 1
   }
 
-  if (!is.null(left)) {
-    fcol <- min(fcol) - left - width_x + 1L
-    frow <- min(frow)
-  } else if (!is.null(right)) {
-    fcol <- max(fcol) + right
-    frow <- min(frow)
-  } else if (!is.null(above)) {
-    fcol <- min(fcol)
-    frow <- min(frow) - above - height_x + 1L
-  } else if (!is.null(below)) {
-    fcol <- min(fcol)
-    frow <- max(frow) + below
-  } else {
-    fcol <- max(fcol)
-    frow <- max(frow)
+  if (length(fcol) && length(frow)) {
+    if (!is.null(left)) {
+      fcol <- min(fcol) - left - width_x + 1L
+      frow <- min(frow)
+    } else if (!is.null(right)) {
+      fcol <- max(fcol) + right
+      frow <- min(frow)
+    } else if (!is.null(above)) {
+      fcol <- min(fcol)
+      frow <- min(frow) - above - height_x + 1L
+    } else if (!is.null(below)) {
+      fcol <- min(fcol)
+      frow <- max(frow) + below
+    } else {
+      fcol <- max(fcol)
+      frow <- max(frow)
+    }
   }
-  if (length(fcol) == 0) {
-    fcol <- 1
+
+  # max() on empty returns -Inf, which is caught by < 1
+  if (length(fcol) == 0 || fcol < 1) {
+    if (length(fcol) > 0) {
+      warning("columns cannot be left of column A (integer position 1). resetting", call. = FALSE)
+    }
+    fcol <- 1L
   }
-  if (length(frow) == 0) {
-    frow <- 1
-  }
-  # guard against negative values
-  if (fcol < 1) {
-    warning("columns cannot be left of column A (integer position 1). resetting")
-    fcol <- 1
-  }
-  if (frow < 1) {
-    warning("rows cannot be above of row 1 (integer position 1). resetting")
-    frow <- 1
+
+  if (length(frow) == 0 || frow < 1) {
+    if (length(frow) > 0) {
+      warning("rows cannot be above of row 1 (integer position 1). resetting", call. = FALSE)
+    }
+    frow <- 1L
   }
 
   # After this point, all unnamed problems are solved ;)
@@ -914,15 +926,12 @@ wb_dims <- function(..., select = NULL) {
   if (!is.null(x) && is.character(cols_sel) && any(cols_sel %in% names(x))) {
     names(cols_all) <- names(x)
     cols_sel <- match(cols_sel, names(cols_all))
-    if (length(cols_sel) == 0) {
-      warning("selected column not found in `x`.")
-      cols_sel <- cols_all
-    }
   }
 
   # reduce to required length
-  col_span <- cols_all[cols_all %in% cols_sel]
-  row_span <- rows_all[rows_all %in% rows_sel]
+  # intersect() is faster than %in% for long vectors
+  col_span <- if (is.null(cols_sel)) cols_all else intersect(cols_all, cols_sel)
+  row_span <- if (is.null(rows_sel)) rows_all else intersect(rows_all, rows_sel)
 
   # if required add column name and row name
   if (col_names) row_span <- c(max(min(row_span, 1), 1L), row_span + 1L)
@@ -953,8 +962,13 @@ wb_dims <- function(..., select = NULL) {
   row_span <- row_span + (frow - 1L)
   col_span <- col_span + (fcol - 1L)
 
+  # precompute non-consecutive checks (avoid repeated diff())
+  rows_nonconsec <- length(row_span) > 1L && any(abs(diff(row_span)) != 1L)
+  cols_nonconsec <- length(col_span) > 1L && any(abs(diff(col_span)) != 1L)
+
   # return single cells (A1 or A1,B1)
-  if ((length(row_span) == 1 || any(abs(diff(row_span)) != 1L)) && (length(col_span) == 1 || any(abs(diff(col_span)) != 1L))) {
+  if ((length(row_span) == 1 || rows_nonconsec) &&
+      (length(col_span) == 1 || cols_nonconsec)) {
 
     # A1
     row_start <- row_span
@@ -962,10 +976,10 @@ wb_dims <- function(..., select = NULL) {
 
     dims <- NULL
 
-    if (any(abs(diff(row_span)) != 1L)) {
+    if (rows_nonconsec) {
       for (row_start in row_span) {
         cdims <- NULL
-        if (any(abs(diff(col_span)) != 1L)) {
+        if (cols_nonconsec) {
           for (col_start in col_span) {
             tmp  <- rowcol_to_dim(row_start, col_start, args$fix)
             cdims <- c(cdims, tmp)
@@ -976,7 +990,7 @@ wb_dims <- function(..., select = NULL) {
         dims <- c(dims, cdims)
       }
     } else {
-      if (any(abs(diff(col_span)) != 1L)) {
+      if (cols_nonconsec) {
         for (col_start in col_span) {
           tmp  <- rowcol_to_dim(row_span, col_start, args$fix)
           dims <- c(dims, tmp)
@@ -989,10 +1003,10 @@ wb_dims <- function(..., select = NULL) {
   } else { # return range "A1:A7" or "A1:A7,B1:B7"
 
     dims <- NULL
-    if (any(abs(diff(row_span)) != 1L)) {
+    if (rows_nonconsec) {
       for (row_start in row_span) {
         cdims <- NULL
-        if (any(abs(diff(col_span)) != 1L)) {
+        if (cols_nonconsec) {
           for (col_start in col_span) {
             tmp  <- rowcol_to_dims(row_start, col_start, fix = args$fix)
             cdims <- c(cdims, tmp)
@@ -1003,7 +1017,7 @@ wb_dims <- function(..., select = NULL) {
         dims <- c(dims, cdims)
       }
     } else {
-      if (any(abs(diff(col_span)) != 1L)) {
+      if (cols_nonconsec) {
         for (col_start in col_span) {
           tmp  <- rowcol_to_dims(row_span, col_start, fix = args$fix)
           dims <- c(dims, tmp)
@@ -1013,6 +1027,9 @@ wb_dims <- function(..., select = NULL) {
       }
     }
   }
+
+  # final check if any column or row exceeds the valid ranges
+  validate_dims(dims)
 
   paste0(dims, collapse = ",")
 }

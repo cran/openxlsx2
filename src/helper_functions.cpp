@@ -22,7 +22,7 @@ bool to_long(std::string path) {
 // [[Rcpp::export]]
 SEXP openxlsx2_type(SEXP x) {
   const SEXP names = Rf_getAttrib(x, R_NamesSymbol);
-  R_xlen_t ncol = Rf_length(x);
+  R_xlen_t ncol = Rf_xlength(x);
 
   Rcpp::IntegerVector type(ncol);
   if (!Rf_isNull(names)) type.attr("names") = names;
@@ -115,12 +115,14 @@ SEXP openxlsx2_type(SEXP x) {
 // [[Rcpp::export]]
 Rcpp::IntegerVector col_to_int(Rcpp::CharacterVector x) {
   // This function converts the Excel column letter to an integer
-  R_xlen_t n = static_cast<R_xlen_t>(x.size());
+  R_xlen_t n = Rf_xlength(x);
   std::unordered_map<std::string, int> col_map;
   Rcpp::IntegerVector colNums(n);
 
   for (R_xlen_t i = 0; i < n; ++i) {
     std::string a = Rcpp::as<std::string>(x[i]);
+
+    if (a.empty()) Rcpp::stop("Empty string in conversion from column to integer");
 
     // check if the value is digit only, if yes, add it and continue the loop
     // at the top. This avoids slow:
@@ -146,7 +148,7 @@ Rcpp::IntegerVector col_to_int(Rcpp::CharacterVector x) {
 
 // [[Rcpp::export]]
 Rcpp::CharacterVector ox_int_to_col(Rcpp::NumericVector x) {
-  R_xlen_t n = static_cast<R_xlen_t>(x.size());
+  R_xlen_t n = Rf_xlength(x);
   Rcpp::CharacterVector colNames(n);
   std::unordered_map<uint32_t, std::string> cache;  // Updated key type
 
@@ -170,7 +172,7 @@ Rcpp::CharacterVector ox_int_to_col(Rcpp::NumericVector x) {
 // provide a basic rbindlist for lists of named characters
 // [[Rcpp::export]]
 SEXP rbindlist(Rcpp::List x) {
-  R_xlen_t nn = x.size();
+  R_xlen_t nn = Rf_xlength(x);
 
   // --- 1. Collect all unique names ---
   std::set<std::string> unique_names_set;
@@ -181,7 +183,7 @@ SEXP rbindlist(Rcpp::List x) {
     if (!Rf_isNewList(x[i]) && !Rf_isVector(x[i])) continue;
     if (Rcpp::as<Rcpp::List>(x[i]).hasAttribute("names")) {
       Rcpp::CharacterVector names_i = Rcpp::as<Rcpp::List>(x[i]).attr("names");
-      for (int j = 0; j < names_i.size(); ++j) {
+      for (R_xlen_t j = 0; j < Rf_xlength(names_i); ++j) {
         unique_names_set.insert(Rcpp::as<std::string>(names_i[j]));
       }
     }
@@ -200,7 +202,7 @@ SEXP rbindlist(Rcpp::List x) {
   // --- 3. Allocate final DataFrame list ---
   Rcpp::List df(kk);
   for (R_xlen_t i = 0; i < kk; ++i) {
-    SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(Rcpp::no_init(nn)));
+    SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(nn));
   }
 
   // Pre-fetch references to the output vectors for fast assignment
@@ -221,7 +223,7 @@ SEXP rbindlist(Rcpp::List x) {
 
     Rcpp::CharacterVector current_names = current_vec.attr("names");
 
-    for (R_xlen_t j = 0; j < current_vec.size(); ++j) {
+    for (R_xlen_t j = 0; j < Rf_xlength(current_vec); ++j) {
       // Get the column name and find its index (O(1) average lookup)
       std::string current_name = Rcpp::as<std::string>(current_names[j]);
       auto it = name_to_idx.find(current_name);
@@ -328,105 +330,86 @@ std::vector<std::string> needed_cells(const std::string& range, bool all = true)
 //' @noRd
 // [[Rcpp::export]]
 SEXP get_dims(Rcpp::CharacterVector dims, bool check = false) {
-  std::set<int32_t> unique_row_values_for_check;
-  bool first_dim_for_check = true;
+  R_xlen_t n_dims = dims.size();
+  if (n_dims == 0)
+    return R_NilValue;
 
+  // Output containers
   std::vector<Rcpp::IntegerVector> out_row_vectors;
-  std::set<std::vector<int32_t>> seen_rows;  // To track unique rows
+  std::set<std::pair<int32_t, int32_t>> seen_rows;
   std::vector<int32_t> ordered_unique_cols;
   std::set<int32_t> seen_cols_globally;
 
-  for (int i = 0; i < dims.size(); ++i) {
-    std::string dim_str = Rcpp::as<std::string>(dims[i]);
+  // Logic for 'check'
+  int32_t first_min_r = -1, first_max_r = -1;
+  bool check_failed = false;
+  bool reference_set = false;
 
+  for (R_xlen_t i = 0; i < n_dims; ++i) {
+    std::string dim_str = Rcpp::as<std::string>(dims[i]);
     std::vector<std::string> cells = needed_cells(dim_str, false);
 
-    if (cells.empty()) {
-      // Rcpp::Rcout << "Warning: Skipping empty or invalid dimension string: " << dim_str << std::endl;
+    if (cells.empty())
       continue;
-    }
 
-    std::string left_cell_str = cells.front();
-    std::string right_cell_str = cells.back();
+    std::string left_cell = cells.front();
+    std::string right_cell = cells.back();
 
-    // Get original row and column numbers
-    int32_t r1_orig = cell_to_rowint(left_cell_str);
-    int32_t r2_orig = cell_to_rowint(right_cell_str);
-    int32_t c1_orig = cell_to_colint(left_cell_str);
-    int32_t c2_orig = cell_to_colint(right_cell_str);
+    int32_t r1 = cell_to_rowint(left_cell);
+    int32_t r2 = cell_to_rowint(right_cell);
+    int32_t c1 = cell_to_colint(left_cell);
+    int32_t c2 = cell_to_colint(right_cell);
 
-    if (check) {
-      int32_t r_start_for_check = std::min(r1_orig, r2_orig);
-      int32_t r_end_for_check = std::max(r1_orig, r2_orig);
+    int32_t r_min = std::min(r1, r2);
+    int32_t r_max = std::max(r1, r2);
 
-      // Early exit if invalid range detected
-      if (r_start_for_check <= 0 || r_end_for_check <= 0) {
-        // If the logic should ignore invalid ranges, use 'continue' instead of 'return true/false'
-        continue;
-      }
-
-      // Build the set of rows for the current dimension
-      std::set<int32_t> current_dim_rows_set;
-      for (int32_t r = r_start_for_check; r <= r_end_for_check; ++r) {
-        current_dim_rows_set.insert(r);
-      }
-
-      // Compare with the first dimension's set
-      if (first_dim_for_check) {
-        unique_row_values_for_check = std::move(current_dim_rows_set);
-        first_dim_for_check = false;
-      } else {
-        if (current_dim_rows_set != unique_row_values_for_check) {
-          return Rcpp::wrap(false);  // Fail fast: sets of rows are different
-        }
-      }
+    if (!reference_set) {
+      first_min_r = r_min;
+      first_max_r = r_max;
+      reference_set = true;
     } else {
-      // If not checking, collect unique rows and columns preserving specified order.
+      if (r_min != first_min_r || r_max != first_max_r) {
+        if (check) return Rcpp::wrap(false);
+        check_failed = true;
+      }
+    }
 
-      // 1. Rows: store the (r1_orig, r2_orig) pair if not seen before.
-      // Note: This relies on the pair {r1, r2} being treated as unique, even if {r2, r1} is seen later.
-      std::vector<int32_t> current_row = {r1_orig, r2_orig};
-      if (seen_rows.find(current_row) == seen_rows.end()) {
-        out_row_vectors.push_back(Rcpp::IntegerVector::create(r1_orig, r2_orig));
-        seen_rows.insert(std::move(current_row));
+    if (!check) {
+      // Rows: Pair is much faster than Vector in a set
+      if (seen_rows.find({r1, r2}) == seen_rows.end()) {
+        out_row_vectors.push_back(Rcpp::IntegerVector::create(r1, r2));
+        seen_rows.insert({r1, r2});
       }
 
-      // 2. Columns: iterate from c1_orig to c2_orig, respecting order and collecting unique values.
-      if (c1_orig > 0 && c2_orig > 0) {
-        int32_t step = (c1_orig <= c2_orig) ? 1 : -1;
-        int32_t current_c = c1_orig;
-
-        while (true) {
-          // Check if column is new
-          if (seen_cols_globally.find(current_c) == seen_cols_globally.end()) {
-            ordered_unique_cols.push_back(current_c);
-            seen_cols_globally.insert(current_c);
+      // Columns: Sequential collection
+      if (c1 > 0 && c2 > 0) {
+        int32_t step = (c1 <= c2) ? 1 : -1;
+        for (int32_t curr_c = c1;; curr_c += step) {
+          if (seen_cols_globally.find(curr_c) == seen_cols_globally.end()) {
+            ordered_unique_cols.push_back(curr_c);
+            seen_cols_globally.insert(curr_c);
           }
-
-            // Break condition
-            if (current_c == c2_orig) break;
-
-          current_c += step;
+          if (curr_c == c2)
+            break;
         }
       }
     }
-  }  // End of dims loop
-
-  if (check) {
-    return Rcpp::wrap(true);
   }
 
-  Rcpp::List result_list = Rcpp::List::create(
-    Rcpp::Named("rows") = Rcpp::wrap(out_row_vectors),
-    Rcpp::Named("cols") = Rcpp::wrap(ordered_unique_cols)
-  );
+  if (check)
+    return Rcpp::wrap(true);
 
-  return result_list;
+  Rcpp::List res = Rcpp::List::create(Rcpp::Named("rows") = Rcpp::wrap(out_row_vectors),
+                                      Rcpp::Named("cols") = Rcpp::wrap(ordered_unique_cols));
+
+  // Attach the check result as an attribute so R can use it
+  res.attr("is_equal_sized") = !check_failed;
+  return res;
 }
 
 // [[Rcpp::export]]
 SEXP dims_to_row_col_fill(Rcpp::CharacterVector dims, bool fills = false) {
-  R_xlen_t n = dims.size();
+  R_xlen_t n = Rf_xlength(dims);
 
   std::vector<int32_t> ordered_rows_final;
   std::vector<int32_t> ordered_cols_final;
@@ -525,65 +508,61 @@ SEXP dims_to_df(Rcpp::IntegerVector rows,
                 Rcpp::Nullable<Rcpp::CharacterVector> filled,
                 bool fill,
                 Rcpp::Nullable<Rcpp::IntegerVector> fcols) {
-  R_xlen_t kk = static_cast<R_xlen_t>(cols.size());
-  R_xlen_t nn = static_cast<R_xlen_t>(rows.size());
+  R_xlen_t kk = Rf_xlength(cols);
+  R_xlen_t nn = Rf_xlength(rows);
 
   bool has_fcols = fcols.isNotNull();
   bool has_filled = filled.isNotNull();
 
-  // precompute strings for rows and cols
   std::vector<std::string> row_strs(static_cast<size_t>(nn));
-  for (R_xlen_t j = 0; j < nn; ++j)
+  for (R_xlen_t j = 0; j < nn; ++j) {
     row_strs[static_cast<size_t>(j)] = std::to_string(rows[j]);
-
-  std::vector<std::string> col_strs(static_cast<size_t>(kk));
-  for (R_xlen_t i = 0; i < kk; ++i)
-    col_strs[static_cast<size_t>(i)] = Rcpp::as<std::string>(cols[i]);
-
-  // prepare filtering sets if needed
-  std::unordered_set<std::string> flls;
-  if (has_filled) {
-    std::vector<std::string> flld = Rcpp::as<std::vector<std::string>>(filled.get());
-    flls.reserve(flld.size() * 2);
-    flls.insert(flld.begin(), flld.end());
   }
 
-  std::unordered_set<R_xlen_t> allowed_cols;
+  std::vector<bool> col_mask(static_cast<size_t>(kk), !has_fcols);
   if (has_fcols) {
-    std::vector<R_xlen_t> fcls = Rcpp::as<std::vector<R_xlen_t>>(fcols.get());
-    allowed_cols.insert(fcls.begin(), fcls.end());
-  }
-
-  SEXP default_val = fill ? Rf_mkChar("") : NA_STRING;
-
-  Rcpp::List df(kk);
-  for (R_xlen_t i = 0; i < kk; ++i) {
-    SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(nn, default_val));
-  }
-
-  if (fill) {
-    for (R_xlen_t i = 0; i < kk; ++i) {
-      if (has_fcols && !allowed_cols.count(i))
-        continue;
-
-      Rcpp::CharacterVector cvec = df[i];
-      const std::string& coli = col_strs[static_cast<size_t>(i)];
-
-      for (R_xlen_t j = 0; j < nn; ++j) {
-        const std::string& row_str = row_strs[static_cast<size_t>(j)];
-
-        std::string cell = coli;
-        cell += row_str;
-
-        // Check against the set
-        if (!has_filled || flls.count(cell)) {
-          cvec[j] = cell;
-        }
+    Rcpp::IntegerVector fcls(fcols.get());
+    for (int idx : fcls) {
+      if (idx >= 0 && idx < kk) {
+        col_mask[static_cast<size_t>(idx)] = true;
       }
     }
   }
 
-  // set df attributes
+  std::unordered_set<std::string> filled_set;
+  if (has_filled) {
+    Rcpp::CharacterVector flld(filled.get());
+    filled_set.reserve(static_cast<size_t>(flld.size()));
+    for (R_xlen_t i = 0; i < flld.size(); ++i) {
+      filled_set.insert(Rcpp::as<std::string>(flld[i]));
+    }
+  }
+
+  Rcpp::List df(kk);
+  SEXP default_val = fill ? Rf_mkChar("") : NA_STRING;
+
+  for (R_xlen_t i = 0; i < kk; ++i) {
+    Rcpp::CharacterVector cvec(nn, default_val);
+
+    if (fill && col_mask[static_cast<size_t>(i)]) {
+      const char* col_name = CHAR(STRING_ELT(cols, i));
+      size_t col_len = strlen(col_name);
+
+      for (R_xlen_t j = 0; j < nn; ++j) {
+        const std::string& row_str = row_strs[static_cast<size_t>(j)];
+
+        char buffer[32];
+        memcpy(buffer, col_name, col_len);
+        memcpy(buffer + col_len, row_str.c_str(), row_str.size() + 1);
+
+        if (!has_filled || filled_set.count(buffer)) {
+          cvec[j] = Rf_mkChar(buffer);
+        }
+      }
+    }
+    df[i] = cvec;
+  }
+
   df.attr("row.names") = rows;
   df.attr("names") = cols;
   df.attr("class") = "data.frame";
@@ -834,12 +813,12 @@ void wide_to_long(
 //' @noRd
 // [[Rcpp::export]]
 Rcpp::DataFrame create_char_dataframe(Rcpp::CharacterVector colnames, R_xlen_t n) {
-  R_xlen_t kk = static_cast<R_xlen_t>(colnames.size());
+  R_xlen_t kk = Rf_xlength(colnames);
 
   // 1. create the list
   Rcpp::List df(kk);
   for (R_xlen_t i = 0; i < kk; ++i) {
-    SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(Rcpp::no_init(n)));
+    SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(n));
   }
 
   Rcpp::IntegerVector rvec = Rcpp::IntegerVector::create(NA_INTEGER, n);
@@ -854,7 +833,7 @@ Rcpp::DataFrame create_char_dataframe(Rcpp::CharacterVector colnames, R_xlen_t n
 
 // [[Rcpp::export]]
 Rcpp::DataFrame create_int_dataframe(const Rcpp::DataFrame& char_df) {
-  int32_t n_rows = char_df.nrow();
+  R_xlen_t n_rows = char_df.nrow();
   int32_t n_cols = static_cast<int32_t>(char_df.ncol());
 
   Rcpp::CharacterVector col_names = char_df.names();
@@ -900,7 +879,7 @@ Rcpp::DataFrame read_xml2df(XPtrXML xml, std::string vec_name, std::vector<std::
   // 1. create the list
   Rcpp::List df(kk);
   for (R_xlen_t i = 0; i < kk; ++i) {
-    SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(Rcpp::no_init(nn)));
+    SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(nn));
   }
 
   // 2. fill the list

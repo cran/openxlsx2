@@ -44,8 +44,10 @@ test_that("wb_to_df() is a wrapper", {
 
 test_that("wb_load() is a wrapper", {
   tmp_xlsx <- temp_xlsx()
+  on.exit(unlink(tmp_xlsx), add = TRUE)
+
   wb_workbook()$add_worksheet()$add_data(x = iris)$save(tmp_xlsx)
-  expect_wrapper("load", params = list(file = tmp_xlsx), ignore_wb = TRUE)
+  expect_wrapper("load", params = list(file = tmp_xlsx), ignore_wb = TRUE, ignore_fields = "tmpDir")
 })
 
 # wb_save() ---------------------------------------------------------------

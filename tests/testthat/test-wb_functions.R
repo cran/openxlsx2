@@ -292,6 +292,7 @@ test_that("skip hidden columns and rows works", {
 
 test_that("test that skip_hidden_cols works with data_only", {
   tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
 
   mm <- matrix(1, 3, 3)
   mm[2, ] <- 2
@@ -579,4 +580,33 @@ test_that("dims order is respected", {
   rc <- dims_to_rowcol("C3:A1")
   expect_equal(rc$col, c("C", "B", "A"))
   expect_equal(rc$row, c("3", "2", "1"))
+})
+
+test_that("convert works", {
+
+  df <- data.frame(
+    is_active  = c(TRUE, FALSE, TRUE, NA, FALSE),
+    count      = c(10L, 25L, NA, 7L, 15L),
+    measure    = c(1.23, NA, 4.56, 7.89, 0.01),
+    event_date = as.Date(c("2023-01-01", "2023-02-15", NA, "2023-05-20", "2023-12-31")),
+    timestamp  = as.POSIXct(c("2023-01-01 10:00:00", NA, "2023-03-10 14:30:00",
+                              "2023-06-01 08:15:00", "2023-12-25 12:00:00"), tz = "UTC"),
+    daily_time = structure(c(30600, 35100, NA, 40500, 43200), units = "secs", class = c("hms", "difftime")),
+    category   = c("A", "B", "C", NA, "E"),
+    stringsAsFactors = FALSE
+  )
+
+  wb <- write_xlsx(x = df)
+
+  df_u <- wb_to_df(wb, convert = FALSE)
+  df_c <- wb_to_df(wb, convert = TRUE)
+
+  expect_equal(dim(df_u), dim(df_c))
+  expect_equal(is.na(df_u), is.na(df_c))
+
+  df_u <- wb_to_df(wb, convert = FALSE, col_names = TRUE, rows = 2)
+  df_c <- wb_to_df(wb, convert = TRUE, col_names = TRUE, rows = 2)
+
+  expect_equal(dim(df_u), dim(df_c))
+
 })

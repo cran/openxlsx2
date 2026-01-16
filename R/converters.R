@@ -11,11 +11,18 @@
 #' @examples
 #' int2col(1:10)
 int2col <- function(x) {
+  if (is.null(x)) return(NULL)
+
   if (!is.numeric(x) || any(is.infinite(x))) {
     stop("x must be finite and numeric.")
   }
 
   ox_int_to_col(x)
+}
+
+check_range <- function(x) {
+  r <- suppressWarnings(range(as.numeric(x), na.rm = TRUE))
+  any(r < 1 | r > 16384)
 }
 
 #' Convert spreadsheet column to integer
@@ -30,12 +37,15 @@ int2col <- function(x) {
 #' col2int(LETTERS)
 col2int <- function(x) {
   if (is.null(x)) return(NULL)
-
-  if (is.numeric(x) || is.factor(x))
-    return(as.integer(x))
-
-  if (!is.character(x)) {
+  if (!is.atomic(x)) {
     stop("x must be character")
+  }
+  if (length(x) == 0) return(integer())
+
+  if (is.numeric(x) || is.factor(x)) {
+    if (check_range(x))
+      stop("Column exceeds valid range", call. = FALSE)
+    return(as.integer(x))
   }
 
   if (anyNA(x)) stop("x contains NA")
@@ -51,6 +61,31 @@ col2int <- function(x) {
   }
 
   col_to_int(x)
+}
+
+#' Converter spreadsheet row to integer
+#'
+#' Converts character row to integer and checks that the range is valid
+#' @param x a dimension
+#' @noRd
+#' @examples
+#' row2int("A1")
+row2int <- function(x) {
+
+  if (is.null(x)) return(NULL)
+  if (length(x) == 0) return(integer())
+
+  rows <- as.integer(chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                            "                          ", x))
+
+  if (anyNA(rows)) stop("missings not allowed in rows", call. = FALSE)
+
+  rr <- range(rows, na.rm = TRUE)
+
+  if (any(rr < 1L | rr > 1048576L))
+    stop("Row exceeds valid range", call. = FALSE)
+
+  rows
 }
 
 

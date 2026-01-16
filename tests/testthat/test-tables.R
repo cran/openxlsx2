@@ -52,7 +52,7 @@ test_that("zero row data table works", {
 
   expect_warning(
     wb$add_data_table(x = data.frame(a = NA, b = NA)[0, ]),
-    "Found data table with zero rows, adding one. Modify na with na.strings"
+    "Found data table with zero rows, adding one. Modify na with `na`"
   )
 
   exp <- "A1:B2"
@@ -258,6 +258,7 @@ test_that("tables cannot have duplicated column names", {
 test_that("make sure that table id is unique", {
 
   tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
 
   wb <- write_xlsx(x = list(head(mtcars), head(iris)), as_table = TRUE)
 
@@ -292,6 +293,8 @@ test_that("wb_get_named_regions, works with removed tables", {
 
 test_that("reading tables from file works", {
   tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
+
   exp <- head(mtcars)
   write_xlsx(x = exp, file = tmp, as_table = TRUE)
 

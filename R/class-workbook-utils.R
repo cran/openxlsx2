@@ -120,27 +120,32 @@ wb_check_overwrite_tables <- function(
   invisible(wb)
 }
 
-
 validate_cf_params <- function(params) {
-  bad <- names(params) %out% c("border", "gradient", "iconSet", "percent", "rank", "reverse", "showValue")
+  allowed <- c(
+    "border", "gradient", "iconSet", "percent", "rank", "reverse", "showValue",
+    "axisPosition", "axisColor", "direction", "minLength", "maxLength",
+    "negativeBarColorSameAsPositive", "negativeBarBorderColorSameAsPositive",
+    "borderColor", "negFillColor", "negBorderColor"
+  ) # "fillColor" is currently not supported
+
+  bad <- !names(params) %in% allowed
   if (any(bad)) {
-    stop("Invalid parameters: ", toString(names(params)[bad]))
+    stop("Invalid parameters: ", toString(names(params)[bad]), call. = FALSE)
   }
 
   # assign default values
-  params$showValue <- if (is.null(params$showValue)) 1L else as_binary(params$showValue)
-  params$gradient  <- if (is.null(params$gradient))  1L else as_binary(params$gradient)
-  params$border    <- if (is.null(params$border))    1L else as_binary(params$border)
-  params$percent   <- if (is.null(params$percent))   0L else as_binary(params$percent)
+  params$showValue    <- if (is.null(params$showValue)) 1L else as_binary(params$showValue)
+  params$gradient     <- if (is.null(params$gradient))  1L else as_binary(params$gradient)
+  params$border       <- if (is.null(params$border))    1L else as_binary(params$border)
+  params$percent      <- if (is.null(params$percent))   0L else as_binary(params$percent)
+  params$reverse      <- if (is.null(params$reverse))   0L else as_binary(params$reverse)
 
-  # special check for rank
-  params$rank <- params$rank %||% 5L
+  params$rank      <- as.integer(params$rank      %||% 5L)
+  params$minLength <- as.integer(params$minLength %||% 0L)   # Could not make this work
+  params$maxLength <- as.integer(params$maxLength %||% 100L) # Could not make this work
 
-  if (!is_integer_ish(params$rank)) {
-    stop("params$rank must be an integer")
-  }
-
-  params$rank <- as.integer(params$rank)
+  params$axisPosition <- params$axisPosition %||% "automatic"
+  params$direction    <- params$direction    %||% "context"
 
   params
 }
@@ -154,17 +159,22 @@ wb_create_columns <- function(wb, sheet, cols) {
 
   col_df <- wb$worksheets[[sheet]]$unfold_cols()
 
-  # create empty cols
-  if (NROW(col_df) == 0)
-    col_df <- col_to_df(read_xml(wb$createCols(sheet, n = max(cols))))
+  needed_cols <- setdiff(cols, as.numeric(col_df$min))
 
   # found a few cols, but not all required cols. create the missing columns
-  if (!all(cols %in% as.numeric(col_df$min))) {
-    beg <- max(as.numeric(col_df$min)) + 1
-    end <- max(cols)
+  if (length(needed_cols)) {
 
-    # new columns
-    new_cols <- col_to_df(read_xml(wb$createCols(sheet, beg = beg, end = end)))
+    if (NROW(col_df) == 0) {
+      new_cols <- col_to_df(read_xml(wb$createCols(sheet, n = max(cols))))
+    } else {
+      rr <- range(union(cols, as.numeric(col_df$min)))
+      beg <- rr[1]
+      end <- rr[2]
+
+      # new columns
+      new_cols <- col_to_df(read_xml(wb$createCols(sheet, beg = beg, end = end)))
+    }
+    new_cols <- new_cols[as.numeric(new_cols$min) %in% needed_cols, ]
 
     # rbind only the missing columns. avoiding dups
     sel <- !new_cols$min %in% col_df$min

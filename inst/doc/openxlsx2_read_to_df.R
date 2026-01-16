@@ -68,5 +68,5 @@ wb_to_df(file, start_row = 5, col_names = FALSE)
 
 ## -----------------------------------------------------------------------------
 # na strings
-wb_to_df(file, na.strings = "")
+wb_to_df(file, na = "")
 

@@ -158,6 +158,8 @@ worksheet names.}
 
 \item{\code{path}}{path}
 
+\item{\code{tmpDir}}{tmpDir}
+
 \item{\code{namedSheetViews}}{namedSheetViews}
 }
 \if{html}{\out{</div>}}
@@ -539,7 +541,7 @@ add data
   sep = ", ",
   apply_cell_style = TRUE,
   remove_cell_style = FALSE,
-  na.strings = na_strings(),
+  na = na_strings(),
   inline_strings = TRUE,
   enforce = FALSE,
   ...
@@ -575,7 +577,7 @@ add data
 
 \item{\code{remove_cell_style}}{if writing into existing cells, should the cell style be removed?}
 
-\item{\code{na.strings}}{Value used for replacing \code{NA} values from \code{x}. Default
+\item{\code{na}}{Value used for replacing \code{NA} values from \code{x}. Default
 \code{na_strings()} uses the special \verb{#N/A} value within the workbook.}
 
 \item{\code{inline_strings}}{write characters as inline strings}
@@ -613,7 +615,7 @@ add a data table
   banded_cols = FALSE,
   apply_cell_style = TRUE,
   remove_cell_style = FALSE,
-  na.strings = na_strings(),
+  na = na_strings(),
   inline_strings = TRUE,
   total_row = FALSE,
   ...
@@ -657,7 +659,7 @@ add a data table
 
 \item{\code{remove_cell_style}}{if writing into existing cells, should the cell style be removed?}
 
-\item{\code{na.strings}}{Value used for replacing \code{NA} values from \code{x}. Default
+\item{\code{na}}{Value used for replacing \code{NA} values from \code{x}. Default
 \code{na_strings()} uses the special \verb{#N/A} value within the workbook.}
 
 \item{\code{inline_strings}}{write characters as inline strings}
@@ -1004,8 +1006,7 @@ to_df
   rows = NULL,
   cols = NULL,
   detect_dates = TRUE,
-  na.strings = "#N/A",
-  na.numbers = NA,
+  na = "#N/A",
   fill_merged_cells = FALSE,
   dims,
   show_formula = FALSE,
@@ -1015,6 +1016,7 @@ to_df
   keep_attributes = FALSE,
   check_names = FALSE,
   show_hyperlinks = FALSE,
+  apply_numfmts = FALSE,
   ...
 )}\if{html}{\out{</div>}}
 }
@@ -1046,9 +1048,8 @@ to_df
 
 \item{\code{detect_dates}}{If TRUE, attempt to recognize dates and perform conversion.}
 
-\item{\code{na.strings}}{A character vector of strings which are to be interpreted as NA. Blank cells will be returned as NA.}
-
-\item{\code{na.numbers}}{A numeric vector of digits which are to be interpreted as NA. Blank cells will be returned as NA.}
+\item{\code{na}}{Defines values to be treated as NA. Can be a character vector of strings
+or a named list: list(strings = ..., numbers = ...). Blank cells are always converted to \code{NA}.}
 
 \item{\code{fill_merged_cells}}{If TRUE, the value in a merged cell is given to all cells within the merge.}
 
@@ -1067,6 +1068,8 @@ to_df
 \item{\code{check_names}}{If TRUE then the names of the variables in the data frame are checked to ensure that they are syntactically valid variable names.}
 
 \item{\code{show_hyperlinks}}{If \code{TRUE} instead of the displayed text, hyperlink targets are shown.}
+
+\item{\code{apply_numfmts}}{If \code{TRUE} numeric formats are applied if detected.}
 
 \item{\code{...}}{additional arguments}
 }
@@ -2103,7 +2106,7 @@ Add conditional formatting
     "notContainsBlanks", "containsText", "notContainsText", "beginsWith", "endsWith",
     "between", "topN", "bottomN"),
   params = list(showValue = TRUE, gradient = TRUE, border = TRUE, percent = FALSE, rank =
-    5L),
+    5L, axisPosition = "automatic"),
   ...
 )}\if{html}{\out{</div>}}
 }

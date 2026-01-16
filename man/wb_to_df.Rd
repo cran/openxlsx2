@@ -20,8 +20,7 @@ wb_to_df(
   rows = NULL,
   cols = NULL,
   detect_dates = TRUE,
-  na.strings = "#N/A",
-  na.numbers = NA,
+  na = "#N/A",
   fill_merged_cells = FALSE,
   dims,
   show_formula = FALSE,
@@ -31,6 +30,7 @@ wb_to_df(
   keep_attributes = FALSE,
   check_names = FALSE,
   show_hyperlinks = FALSE,
+  apply_numfmts = FALSE,
   ...
 )
 
@@ -47,8 +47,7 @@ read_xlsx(
   cols = NULL,
   detect_dates = TRUE,
   named_region,
-  na.strings = "#N/A",
-  na.numbers = NA,
+  na = "#N/A",
   fill_merged_cells = FALSE,
   check_names = FALSE,
   show_hyperlinks = FALSE,
@@ -68,8 +67,7 @@ wb_read(
   cols = NULL,
   detect_dates = TRUE,
   named_region,
-  na.strings = "NA",
-  na.numbers = NA,
+  na = "NA",
   check_names = FALSE,
   show_hyperlinks = FALSE,
   ...
@@ -104,11 +102,8 @@ If \code{NULL}, all columns are read.}
 
 \item{detect_dates}{If \code{TRUE}, attempt to recognize dates and perform conversion.}
 
-\item{na.strings}{A character vector of strings which are to be interpreted as \code{NA}.
-Blank cells will be returned as \code{NA}.}
-
-\item{na.numbers}{A numeric vector of digits which are to be interpreted as \code{NA}.
-Blank cells will be returned as \code{NA}.}
+\item{na}{Defines values to be treated as NA. Can be a character vector of strings
+or a named list: list(strings = ..., numbers = ...). Blank cells are always converted to \code{NA}.}
 
 \item{fill_merged_cells}{If \code{TRUE}, the value in a merged cell is given to all cells within the merge.}
 
@@ -130,6 +125,8 @@ If no sheet is selected, the first appearance will be selected. See \code{\link[
 \item{check_names}{If \code{TRUE} then the names of the variables in the data frame are checked to ensure that they are syntactically valid variable names.}
 
 \item{show_hyperlinks}{If \code{TRUE} instead of the displayed text, hyperlink targets are shown.}
+
+\item{apply_numfmts}{If \code{TRUE} numeric formats are applied if detected.}
 
 \item{...}{additional arguments}
 }
@@ -187,6 +184,10 @@ You can use wildcards for all available columns or rows in \code{dims} by using
 first row in column A through the last column in row 9. This makes it
 unnecessary to update dimensions when working with files whose sizes change
 frequently.
+
+The function to apply numeric formats was not extensively tested for numeric
+equality with spreadsheet software. There might be differences and the function
+has limited support for builtin styles.
 }
 \examples{
 ###########################################################################
@@ -234,7 +235,7 @@ wb_to_df(wb1, cols = c(2, 5), types = c("Var1" = 0, "Var3" = 1))
 wb_to_df(wb1, start_row = 5, col_names = FALSE)
 
 # na string
-wb_to_df(wb1, na.strings = "a")
+wb_to_df(wb1, na = "a")
 
 # read names from row two and data starting from row 4
 wb_to_df(wb1, dims = "B2:C2,B4:C+")

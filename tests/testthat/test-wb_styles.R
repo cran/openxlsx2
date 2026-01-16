@@ -56,9 +56,7 @@ test_that("test add_border()", {
 
   # check xf
   exp <- c("<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>",
-           "<xf applyBorder=\"1\" borderId=\"1\" fillId=\"0\" fontId=\"0\" numFmtId=\"0\" xfId=\"0\"/>",
-           "<xf applyBorder=\"1\" borderId=\"2\" fillId=\"0\" fontId=\"0\" numFmtId=\"0\" xfId=\"0\"/>",
-           "<xf applyBorder=\"1\" borderId=\"3\" fillId=\"0\" fontId=\"0\" numFmtId=\"0\" xfId=\"0\"/>"
+           "<xf applyBorder=\"1\" borderId=\"1\" fillId=\"0\" fontId=\"0\" numFmtId=\"0\" xfId=\"0\"/>"
   )
   got <- wb$styles_mgr$styles$cellXfs
 
@@ -66,8 +64,6 @@ test_that("test add_border()", {
 
   # check borders
   exp <- c("<border><left/><right/><top/><bottom/><diagonal/></border>",
-           "<border><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>",
-           "<border><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>",
            "<border><bottom style=\"double\"><color rgb=\"FF000000\"/></bottom></border>"
   )
   got <- wb$styles_mgr$styles$borders
@@ -78,8 +74,8 @@ test_that("test add_border()", {
   wb <- wb_workbook()
   wb$add_worksheet("S1")$add_border(1, dims = "A1:K1", left_border = NULL, right_border = NULL, top_border = NULL, bottom_border = "double")
 
-  exp <- c("1", "3", "3", "3", "3", "3", "3", "3", "3", "3", "2")
-  got <- wb$worksheets[[1]]$sheet_data$cc$c_s
+  exp <- "1"
+  got <- unique(wb$worksheets[[1]]$sheet_data$cc$c_s)
   expect_equal(exp, got)
 
 })
@@ -284,6 +280,14 @@ test_that("test add_cell_style()", {
 })
 
 test_that("add_style", {
+
+  exp <- "<numFmt numFmtId=\"200\" formatCode=\"hh:mm:ss AM/PM\"/>"
+  got <- create_numfmt(numFmtId = 200, formatCode = "hh:mm:ss AM/PM")
+  expect_equal(got, exp)
+
+  exp <- "<numFmt numFmtId=\"200\" formatCode=\"hh:mm:ss A/P\"/>"
+  got <- create_numfmt(numFmtId = 200, formatCode = "hh:mm:ss A/P")
+  expect_equal(got, exp)
 
   # without name
   num <- create_numfmt(numFmtId = "165", formatCode = "#.#")
@@ -829,6 +833,8 @@ test_that("initialized styles remain available", {
   expect_equal(exp, got)
 
   tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
+
   wb$save(tmp)
   wb <- wb_load(tmp)
 
@@ -846,7 +852,6 @@ test_that("apply styles across columns and rows", {
     set_cell_style_across(style = "C3", cols = "C:D", rows = 3:4)
 
   exp <- c(
-    "<col min=\"1\" max=\"2\" width=\"8.43\"/>",
     "<col min=\"3\" max=\"4\" style=\"1\" width=\"8.43\"/>"
   )
   got <- wb$worksheets[[1]]$cols_attr
@@ -866,7 +871,6 @@ test_that("apply styles across columns and rows", {
   wb$set_cell_style_across(style = wb_get_cell_style(wb, sheet = 1, dims = "C3"), cols = "C:D", rows = 3:4)
 
   exp <- c(
-    "<col min=\"1\" max=\"2\" width=\"8.43\"/>",
     "<col min=\"3\" max=\"4\" style=\"1\" width=\"8.43\"/>"
   )
   got <- wb$worksheets[[1]]$cols_attr
@@ -960,7 +964,7 @@ test_that("adding bg_color and diagonal borders work", {
       diagonal_down = "thin",
       diagonal_color = wb_color("red")
     ),
-    "there can be only a single diagonal style per cell"
+    "Only a single diagonal style per cell allowed"
   )
 
   exp <- "<border diagonalDown=\"1\" diagonalUp=\"1\"><start><color rgb=\"FFFF0000\"/></start><end><color rgb=\"FFFF0000\"/></end><left style=\"thin\"><color rgb=\"FF000000\"/></left><top style=\"thin\"><color rgb=\"FF000000\"/></top><diagonal style=\"dashed\"><color rgb=\"FFFF0000\"/></diagonal></border>"
@@ -997,21 +1001,572 @@ test_that("adding borders works", {
   expect_equal(exp, got)
 
   wb$add_border(dims = "A1:H10")
-  exp <- c(A1 = "5", B1 = "13", C1 = "13", D1 = "13", E1 = "14", F1 = "14",
-           G1 = "14", H1 = "6", A2 = "9", B2 = "17", C2 = "17", D2 = "17",
-           E2 = "18", F2 = "18", G2 = "18", H2 = "11", A3 = "9", B3 = "17",
-           C3 = "17", D3 = "17", E3 = "18", F3 = "18", G3 = "18", H3 = "11",
-           A4 = "9", B4 = "17", C4 = "17", D4 = "17", E4 = "18", F4 = "18",
-           G4 = "18", H4 = "11", A5 = "9", B5 = "17", C5 = "17", D5 = "17",
-           E5 = "18", F5 = "18", G5 = "18", H5 = "11", A6 = "10", B6 = "19",
-           C6 = "19", D6 = "19", E6 = "20", F6 = "20", G6 = "20", H6 = "12",
-           A7 = "10", B7 = "19", C7 = "19", D7 = "19", E7 = "20", F7 = "20",
-           G7 = "20", H7 = "12", A8 = "10", B8 = "19", C8 = "19", D8 = "19",
-           E8 = "20", F8 = "20", G8 = "20", H8 = "12", A9 = "10", B9 = "19",
-           C9 = "19", D9 = "19", E9 = "20", F9 = "20", G9 = "20", H9 = "12",
-           A10 = "7", B10 = "15", C10 = "15", D10 = "15", E10 = "16", F10 = "16",
-           G10 = "16", H10 = "8")
+  exp <- c(A1 = "5", B1 = "6", C1 = "6", D1 = "6", E1 = "7", F1 = "7",
+           G1 = "7", H1 = "8", A2 = "9", B2 = "11", C2 = "11", D2 = "11",
+           E2 = "12", F2 = "12", G2 = "12", H2 = "15", A3 = "9", B3 = "11",
+           C3 = "11", D3 = "11", E3 = "12", F3 = "12", G3 = "12", H3 = "15",
+           A4 = "9", B4 = "11", C4 = "11", D4 = "11", E4 = "12", F4 = "12",
+           G4 = "12", H4 = "15", A5 = "9", B5 = "11", C5 = "11", D5 = "11",
+           E5 = "12", F5 = "12", G5 = "12", H5 = "15", A6 = "10", B6 = "13",
+           C6 = "13", D6 = "13", E6 = "14", F6 = "14", G6 = "14", H6 = "16",
+           A7 = "10", B7 = "13", C7 = "13", D7 = "13", E7 = "14", F7 = "14",
+           G7 = "14", H7 = "16", A8 = "10", B8 = "13", C8 = "13", D8 = "13",
+           E8 = "14", F8 = "14", G8 = "14", H8 = "16", A9 = "10", B9 = "13",
+           C9 = "13", D9 = "13", E9 = "14", F9 = "14", G9 = "14", H9 = "16",
+           A10 = "17", B10 = "18", C10 = "18", D10 = "18", E10 = "19", F10 = "19",
+           G10 = "19", H10 = "20")
   got <- wb$get_cell_style(dims = "A1:H10")
   expect_equal(exp, got)
 
+})
+
+# Formatting a number
+test_that("number formatting works", {
+
+  got <- apply_numfmt(1234.5678, "#,##0.00")
+  expect_identical(got, "1,234.57")
+
+  got <- apply_numfmt(pi, "#,##0")
+  expect_identical(got, "3")
+
+  got <- apply_numfmt(123456, "$#,##0")
+  expect_identical(got, "$123,456")
+
+  got <- apply_numfmt(pi, "0,000")
+  expect_identical(got, "0,003")
+
+  got <- apply_numfmt(123456789, "#,###,,")
+  expect_identical(got, "123")
+
+})
+
+test_that("date and time formatting works", {
+
+  got <- apply_numfmt("2025-01-05", "yyyy-mm-dd")
+  expect_identical(got, "2025-01-05")
+
+  got <- apply_numfmt("2025-01-05", "m/d/yyyy")
+  expect_identical(got, "1/5/2025")
+
+  got <- apply_numfmt("2025-01-05", "mm/dd/yy")
+  expect_identical(got, "01/05/25")
+
+  # Formatting a time
+  got <- apply_numfmt("2025-01-05 13:45:30", "hh:mm:ss AM/PM")
+  expect_identical(got, "01:45:30 PM")
+
+  got <- apply_numfmt("2025-01-05 13:45:30", "hh:mm:ss")
+  expect_identical(got, "13:45:30")
+
+  got <- apply_numfmt("13:45:30", "hh:mm:ss AM/PM")
+  expect_identical(got, "01:45:30 PM")
+
+  got <- apply_numfmt("13:45:30", "hh:mm:ss")
+  expect_identical(got, "13:45:30")
+
+  x <- structure(42.5, class = c("hms", "difftime"))
+  got <- apply_numfmt(x, "hh:mm:ss")
+  expect_identical(got, "12:00:00")
+
+  got <- apply_numfmt(x, "YYYY-MM-DD hh:mm:ss")
+  expect_identical(got, "1900-02-11 12:00:00")
+
+  # Formatting combined date and time
+  got <- apply_numfmt("2025-01-05 13:45:30", "yy-mmm-dd HH:mm:ss")
+  expect_identical(got, "25-Jan-05 13:45:30")
+
+  got <- apply_numfmt(as.POSIXct("1900-01-12 08:17:47", "UTC"), "[h]:mm:ss")
+  expect_equal(got, "296:17:47")
+
+  got <- apply_numfmt("1900-01-12 08:17:47", "[h]:mm:ss")
+  expect_equal(got, "296:17:47")
+
+})
+
+testthat::test_that("comprehensive duration works", {
+  # The original 296 hours test
+  val <- as.POSIXct("1900-01-12 08:17:47", tz = "UTC")
+
+  # Total Hours
+  expect_equal(apply_numfmt(val, "[h]:mm:ss"), "296:17:47")
+
+  # Total Minutes
+  # (12 days * 1440) + (8 * 60) + 17 = 17777
+  expect_equal(apply_numfmt(val, "[m]:ss"), "17777:47")
+
+  # Total Seconds
+  # (17777 * 60) + 47 = 1066667
+  expect_equal(apply_numfmt(val, "[s]"), "1066667")
+
+  # Mixed format (Excel supports this)
+  expect_equal(apply_numfmt(val, "[h] \"hours and\" m \"minutes\""), "296 hours and 17 minutes")
+
+  expect_equal(apply_numfmt("1900-01-12 08:17:47", "[h] \"hours and\" m \"minutes\""), "296 hours and 17 minutes")
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = as.POSIXct("1900-01-12 08:17:47"))$
+    add_numfmt(numfmt = "[h] \"hours and\" m \"minutes\"")
+
+  exp <- "296 hours and 17 minutes"
+  got <- wb$to_df(apply_numfmts = TRUE, col_names = FALSE)$A
+  expect_equal(got, exp)
+
+})
+
+test_that("special formatting works", {
+
+  # Formatting a fraction
+  got <- apply_numfmt(0.75, "# ?/?")
+  expect_identical(got, "3/4")
+
+  got <- apply_numfmt(1.75, "# ?/?")
+  expect_identical(got, "1 3/4")
+
+  got <- apply_numfmt(-1234.56, "(#,###.00)")
+  expect_identical(got, "(1,234.56)")
+
+  fmt <- '#,###.00_);[Red](#,###.00);0.00;"gross receipts for "@'
+  exp <- "<numFmt numFmtId=\"164\" formatCode=\"#,###.00_);[Red](#,###.00);0.00;&quot;gross receipts for &quot;@\"/>"
+  got <- create_numfmt(formatCode = fmt)
+  expect_identical(got, exp)
+
+  got <- apply_numfmt(1234.5678, fmt)
+  expect_identical(got, "1,234.57")
+
+  got <- apply_numfmt(-1234.5678, fmt)
+  expect_identical(got, "(1,234.57)")
+
+  got <- apply_numfmt(0, fmt)
+  expect_identical(got, "0.00")
+
+  got <- apply_numfmt("a", fmt)
+  expect_identical(got, "gross receipts for a")
+
+  # Formatting a text
+  got <- apply_numfmt("Hello", "Hello @")
+  expect_identical(got, "Hello Hello")
+
+  fmt <- "_-[$£-809]* #,##0.00_-;\\-[$£-809]* #,##0.00_-;_-[$£-809]* &quot;-&quot;??_-;_-@_-"
+  got <- apply_numfmt(1234.5678, fmt) # currency symbol is tabbed into the front, so at least one whitespace after currency symbol
+  expect_identical(got, "£ 1,234.57")
+
+  got <- apply_numfmt(-1234.5678, fmt)
+  expect_identical(got, "-£ 1,234.57")
+
+  fmt <- "_- [$£-809]* #,##0.00_-;\\- [$£-809]* #,##0.00_-; [Red]-[$£-809]* &quot;-&quot;??_-;_-@_-"
+
+  got <- apply_numfmt(12345.13456, fmt) # same tabbed currency
+  expect_identical(got, "£ 12,345.13")
+
+  got <- apply_numfmt(-12345.13456, fmt)
+  expect_identical(got, "- £ 12,345.13")
+
+  got <- apply_numfmt(0, fmt) # no leading minus here
+  expect_identical(got, "-£ -")
+
+  fmt <- "[$€-2] #,##0.00_);[Red]([$€-2] #,##0.00)"
+  got <- apply_numfmt(12345.13456, fmt)
+  expect_identical(got, "€ 12,345.13")
+
+  got <- apply_numfmt(-12345.13456, fmt)
+  expect_identical(got, "(€ 12,345.13)")
+
+  got <- apply_numfmt(0, fmt)
+  expect_identical(got, "€ 0.00")
+
+  got <- apply_numfmt(0.5, "#.##%")
+  expect_identical(got, "50%")
+
+  got <- apply_numfmt(1.75, "#%")
+  expect_identical(got, "175%")
+
+  got <- apply_numfmt(-1234.57, "$ #,##0")
+  expect_identical(got, "-$ 1,235")
+
+  got <- apply_numfmt(.POSIXct(72901, "UTC"), "hh:mm:ss A/P")
+  expect_identical(got, "08:15:01 P")
+
+  got <- apply_numfmt(0, "#,##0; -#,##0; \"Nil\"")
+  expect_equal(got, "Nil")
+
+  got <- apply_numfmt(5, "# ?/?")
+  expect_equal(got, "5")
+
+  got <- apply_numfmt(1.25, "?/?")
+  expect_equal(got, "5/4")
+
+  got <- apply_numfmt(0.66, "?/?")
+  expect_equal(got, "2/3")
+
+  got <- apply_numfmt(123456789, "0.00E+00")
+  expect_equal(got, "1.23E+08")
+
+})
+
+test_that("", {
+  exp <- c(
+    "4.00", "4.00", "7.00", "7.00", "8.00", "9.00", "10.00", "10.00",
+    "10.00", "11.00", "11.00", "12.00", "12.00", "12.00", "12.00",
+    "13.00", "13.00", "13.00", "13.00", "14.00", "14.00", "14.00",
+    "14.00", "15.00", "15.00", "15.00", "16.00", "16.00", "17.00",
+    "17.00", "17.00", "18.00", "18.00", "18.00", "18.00", "19.00",
+    "19.00", "19.00", "20.00", "20.00", "20.00", "20.00", "20.00",
+    "22.00", "23.00", "24.00", "24.00", "24.00", "24.00", "25.00"
+  )
+  got <- apply_numfmt(cars$speed, "#,##0.00")
+  expect_identical(got, exp)
+
+  got <- apply_numfmt(cars$speed, rep_len("#,##0.00", nrow(cars)))
+  expect_identical(got, exp)
+})
+
+test_that("apply_numfmts works", {
+  df <- data.frame(
+    is_active  = c(TRUE, FALSE, TRUE, NA, FALSE),
+    count      = c(10L, 25L, NA, 7L, 15L),
+    measure    = c(1.23, NA, 4.56, 7.89, 0.01),
+    event_date = as.Date(c("2023-01-01", "2023-02-15", NA, "2023-05-20", "2023-12-31")),
+    timestamp  = as.POSIXct(c("2023-01-01 10:00:00", NA, "2023-03-10 14:30:00",
+                              "2023-06-01 08:15:00", "2023-12-25 12:00:00"), tz = "UTC"),
+    # Manual hms without loading the library:
+    daily_time = structure(c(30600, 35100, NA, 40500, 43200), units = "secs", class = c("hms", "difftime")),
+    category   = c("A", "B", "C", NA, "E"),
+    stringsAsFactors = FALSE
+  )
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = df)$
+    set_col_widths(cols = seq_along(df), widths = "auto")
+
+  wb$add_numfmt(dims = wb_dims(x = df, cols = "count"), numfmt = "$0")
+  wb$add_numfmt(dims = wb_dims(x = df, cols = "measure"), numfmt = "0.0")
+  wb$add_numfmt(dims = wb_dims(x = df, cols = "event_date"), numfmt = "m/d/yyyy")
+  wb$add_numfmt(dims = wb_dims(x = df, cols = "timestamp"), numfmt = "yy-mmm-dd HH:mm:ss")
+  wb$add_numfmt(dims = wb_dims(x = df, cols = "daily_time"), numfmt = "hh:mm:ss AM/PM")
+  wb$add_numfmt(dims = wb_dims(x = df, cols = "category"), numfmt = "cat: @")
+
+  wb$
+    set_col_widths(cols = seq_along(df), widths = "auto")
+
+  exp <- structure(
+    list(
+      is_active = c("TRUE", "FALSE", "TRUE", NA, "FALSE"),
+      count = c("$10", "$25", NA, "$7", "$15"),
+      measure = c("1.2", NA, "4.6", "7.9", "0.0"),
+      event_date = c("1/1/2023", "2/15/2023", NA, "5/20/2023", "12/31/2023"),
+      timestamp = c("23-Jan-01 10:00:00", NA, "23-Mar-10 14:30:00", "23-Jun-01 08:15:00", "23-Dec-25 12:00:00"),
+      daily_time = c("08:30:00 AM", "09:45:00 AM", NA, "11:15:00 AM", "12:00:00 PM"),
+      category = c("cat: A", "cat: B", "cat: C", NA, "cat: E")
+    ),
+    row.names = 2:6,
+    class = "data.frame"
+  )
+  got <- wb$to_df(apply_numfmts = TRUE)
+  expect_equal(got, exp)
+})
+
+test_that("escaped numfmt works", {
+
+  fmt  <- "_- [$£-809]* #,##0.00_-;\\- [$£-809]* #,##0.00_-; [Red]-[$£-809]* &quot;-&quot;??_-;_-@_-"
+  fmt2 <- "_-[$£-809]* #,##0.00_-;\\-[$£-809]* #,##0.00_-;_-[$£-809]* &quot;-&quot;??_-;_-@_-"
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(dims = "A1", x = -1234.5678)$
+    add_data(dims = "A2", x = -1234.5678)$
+    add_data(dims = "A3", x = 0)$
+    add_numfmt(dims = "A1", numfmt = fmt)$
+    add_numfmt(dims = "A2", numfmt = fmt2)$
+    add_numfmt(dims = "A3", numfmt = fmt)
+
+  exp <- structure(
+    list(
+      A = c("- £ 1,234.57", "-£ 1,234.57", "-£ -")
+    ),
+    row.names = c(NA, 3L),
+    class = "data.frame"
+  )
+  got <- wb_to_df(wb, apply_numfmts = TRUE, col_names = FALSE)
+  expect_equal(got, exp)
+
+})
+
+test_that("day names work", {
+  val <- "2025-01-05" # This is a Sunday
+  expect_identical(apply_numfmt(val, "ddd"), "Sun")
+  expect_identical(apply_numfmt(val, "dddd"), "Sunday")
+})
+
+test_that("zero vs placeholder difference", {
+  expect_identical(apply_numfmt(5, "0.00"), "5.00")
+  expect_identical(apply_numfmt(5, "#.##"), "5")
+  expect_identical(apply_numfmt(5.4, "#.00"), "5.40")
+  expect_identical(apply_numfmt(0.4, "#.00"), ".40")
+  expect_identical(apply_numfmt(0.4, "0.00"), "0.40")
+})
+
+test_that("escaped literals", {
+  # The 'm' should be a literal 'm', not a month
+  expect_identical(apply_numfmt(123, "\\m#"), "m123")
+})
+
+test_that("padded durations", {
+  expect_equal(apply_numfmt(1 / 24, "[hh]:mm"), "01:00")
+  expect_equal(apply_numfmt("1899-12-31 01:00:00", "[hh]:mm"), "01:00")
+  expect_equal(apply_numfmt(pi, "[hh]:mm"), "75:23")
+})
+
+test_that("duration minute ambiguity", {
+  # In a standard date, 'm' is a month
+  expect_identical(apply_numfmt("2025-01-05", "yyyy m d"), "2025 1 5")
+
+  # Inside a duration context, 'm' must be minutes
+  # 1900-01-12 08:17:47 is 296 hours and 17 minutes
+  val <- "1900-01-12 08:17:47"
+  expect_equal(apply_numfmt(val, "[h] m"), "296 17")
+  expect_equal(apply_numfmt(val, "[h] mm"), "296 17")
+})
+
+test_that("conditional bracket formatting", {
+  # Format: if < 1000, show as is; if >= 1000, show in thousands with a 'k'
+  fmt <- "[<1000]#,##0;[>=1000]#,##0,\"k\""
+
+  expect_identical(apply_numfmt(500, fmt), "500")
+  expect_identical(apply_numfmt(1500, fmt), "2k")
+
+  # Color-based conditionals (the colors are usually stripped or ignored in text output)
+  fmt_color <- "[Red][<100]0;[Blue][>=100]0"
+  expect_identical(apply_numfmt(50, fmt_color), "50")
+  expect_identical(apply_numfmt(150, fmt_color), "150")
+
+
+  fmt <- "[<1000]#,##0;[>=1000]#,##0,\"k\""
+  fmt_color <- "[Red][<100]0;[Blue][>=100]0"
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data(x = c(500, 1500, 50, 150))$
+    add_numfmt(dims = "A1:A2", numfmt = fmt)$
+    add_numfmt(dims = "A3:A4", numfmt = fmt_color)
+
+  exp <- c("500", "2k", "50", "150")
+  got <- wb$to_df(apply_numfmts = TRUE, col_names = FALSE)$A
+
+  expect_equal(got, exp)
+
+})
+
+test_that("mandatory and optional fractional zeros", {
+  # Trigger: num_parts > 1 and nchar(frac_str) > mandatory_frac_len
+  # Format '0.0#' has 1 mandatory zero.
+  # Value 5.40 -> should trim the trailing 0 because it's in a '#' position.
+  expect_identical(apply_numfmt(5.4, "0.0#"), "5.4")
+
+  # Value 5.45 -> should keep the 5 because it's not a zero.
+  expect_identical(apply_numfmt(5.45, "0.0#"), "5.45")
+
+  # Value 5.00 -> should keep one zero because of the '0' in '0.0#'
+  expect_identical(apply_numfmt(5, "0.0#"), "5.0")
+})
+
+test_that("conditional else branch", {
+  # Format: If <100, show 'Small'; If <200, show 'Medium'; otherwise show the number.
+  # The last section "0.00" has no brackets and triggers the 'else' logic.
+  fmt <- "[<100]\"Small\";[<200]\"Medium\";0.00"
+
+  # Hits the 'else' section (target_fmt <- sec)
+  expect_identical(apply_numfmt(250, fmt), "250.00")
+})
+
+test_that("rounding works similar to R", {
+  exp <- sprintf("%.1f", round(seq(from = 0, to = 1, by = .05), digits = 1))
+  got <- apply_numfmt(seq(from = 0, to = 1, by = .05), "0.0")
+  expect_equal(got, exp)
+
+  got <- apply_numfmt(-0.05, "0.0")
+  expect_equal(got, "-0.0")
+})
+
+test_that("extensive hms works", {
+  df <- data.frame(
+    daily_time = structure(c(3061200, 3511200, NA, 4051200, 4321200), units = "secs", class = c("hms", "difftime")),
+    stringsAsFactors = FALSE
+  )
+
+  wb <- wb_workbook()$
+    add_worksheet(zoom = 130)$
+    add_data(x = df)
+
+  wb$add_numfmt(dims = wb_dims(x = df, cols = "daily_time"), numfmt = "hh:mm:ss")
+
+  exp <- structure(
+    list(
+      daily_time = structure(c(-2206014000, -2205564000, NA, -2205024000, -2204754000), class = c("POSIXct", "POSIXt"), tzone = "UTC")
+    ),
+    row.names = 2:6,
+    class = "data.frame"
+  )
+  got <- wb$to_df()
+  expect_equal(got, exp)
+
+  exp <- structure(
+    list(
+      daily_time = c("10:20:00", "15:20:00", NA, "21:20:00", "00:20:00")
+    ),
+    row.names = 2:6,
+    class = "data.frame"
+  )
+  got <- wb$to_df(apply_numfmts = TRUE)
+  expect_equal(got, exp)
+
+})
+
+test_that("removing fill works", {
+  wb <- wb_workbook()$add_worksheet()$add_data(x = head(mtcars))
+  wb$add_border(dims = wb_dims(x = head(mtcars), select = "data"))
+
+  wb$add_fill(dims = "A1:B2", color = wb_color("blue"))
+  wb$add_fill(dims = "A2:B2", color = NULL)
+
+  styles <- wb$get_cell_style(dims = "A2:B2")
+  xml <- wb$styles_mgr$styles$cellXfs[as.numeric(styles) + 1]
+
+  xml_df <- rbindlist(xml_attr(xml, "xf"))
+  expect_true(is.null(xml_df$applyFill))
+  expect_equal(unique(xml_df$fillId), "0")
+})
+
+test_that("removing numfmt works", {
+  ddims <- wb_dims(x = head(mtcars), select = "data")
+  wb <- wb_workbook()$add_worksheet()$add_data(x = head(mtcars))
+  wb$add_border(dims = ddims)
+
+  wb$add_fill(dims = ddims, color = wb_color("yellow"))
+  wb$add_numfmt(dims = ddims, numfmt = "0.00%")
+  wb$add_numfmt(dims = "A2:B2", numfmt = NULL)
+
+  styles <- wb$get_cell_style(dims = "A2:B2")
+  xml <- wb$styles_mgr$styles$cellXfs[as.numeric(styles) + 1]
+
+  xml_df <- rbindlist(xml_attr(xml, "xf"))
+  expect_true(is.null(xml_df$applyNumberFormat))
+  expect_equal(unique(xml_df$numFmtId), "0")
+})
+
+test_that("removing font works", {
+  ddims <- wb_dims(x = head(mtcars), select = "data")
+  wb <- wb_workbook()$add_worksheet()$add_data(x = head(mtcars))
+
+  wb$add_border(dims = ddims)
+  wb$add_fill(dims = ddims, color = wb_color("yellow"))
+  wb$add_font(dims = ddims, name = "Arial", size = 16)
+  wb$add_font(dims = "A2:B2", update = NULL)
+
+  styles <- wb$get_cell_style(dims = "A2:B2")
+  xml <- wb$styles_mgr$styles$cellXfs[as.numeric(styles) + 1]
+
+  xml_df <- rbindlist(xml_attr(xml, "xf"))
+  expect_true(is.null(xml_df$applyFont))
+  expect_equal(unique(xml_df$fontId), "0")
+})
+
+test_that("removing border works", {
+  ddims <- wb_dims(x = head(mtcars), select = "data")
+  wb <- wb_workbook()$add_worksheet()$add_data(x = head(mtcars))
+
+  wb$add_border(dims = ddims)
+  wb$add_fill(dims = ddims, color = wb_color("yellow"))
+  wb$add_font(dims = ddims, name = "Arial", size = 16)
+  wb$add_border(dims = "A2:B2", update = NULL)
+
+  styles <- wb$get_cell_style(dims = "A2:B2")
+  xml <- wb$styles_mgr$styles$cellXfs[as.numeric(styles) + 1]
+
+  xml_df <- rbindlist(xml_attr(xml, "xf"))
+  expect_true(is.null(xml_df$applyBorder))
+  expect_equal(unique(xml_df$borderId), "0")
+})
+
+test_that("wb_set_col_widths() works", {
+  wb <- wb_workbook()$add_worksheet()$
+    set_col_widths(cols = 2:7, width = "auto")
+  exp <- character()
+  got <- wb$worksheets[[1]]$cols_attr
+  expect_equal(got, exp)
+
+
+  wb$add_data(x = cars, dims = "B2")$
+    set_col_widths(cols = 1:4, width = "auto")
+
+  exp <- c(
+    "<col min=\"2\" max=\"2\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"5.711\"/>",
+    "<col min=\"3\" max=\"3\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"4.711\"/>"
+  )
+  got <- wb$worksheets[[1]]$cols_attr
+  expect_equal(got, exp)
+
+
+  wb <- wb_workbook()$add_worksheet()$
+    set_col_widths(cols = 2:3, width = 6)
+
+  exp <- "<col min=\"2\" max=\"3\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"6.711\"/>"
+  got <- wb$worksheets[[1]]$cols_attr
+  expect_equal(got, exp)
+
+
+  wb <- wb_workbook()$add_worksheet()
+  wb$set_col_widths(cols = 1:4, width = 4)
+  wb$set_col_widths(cols = 7:8, width = 4)
+
+  exp <- c(
+    "<col min=\"1\" max=\"4\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"4.711\"/>",
+    "<col min=\"7\" max=\"8\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"4.711\"/>"
+  )
+  got <- wb$worksheets[[1]]$cols_attr
+  expect_equal(got, exp)
+
+  wb <- wb_workbook()$add_worksheet()
+  wb$set_col_widths(cols = 3:7, width = 5)
+  wb$set_col_widths(cols = 2:8, width = 4)
+
+  exp <- "<col min=\"2\" max=\"8\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"4.711\"/>"
+  got <- wb$worksheets[[1]]$cols_attr
+  expect_equal(got, exp)
+
+})
+
+test_that("adding the same numfmts twice works", {
+  wb1 <- wb_workbook()$add_worksheet()
+  wb1$styles_mgr$add("<numFmt numFmtId=\"900\" formatCode=\"0.0\"/>", "foo")
+  wb1$styles_mgr$add("<numFmt numFmtId=\"900\" formatCode=\"0.0\"/>", "foo")
+
+  exp <- "<numFmt numFmtId=\"900\" formatCode=\"0.0\"/>"
+  got <- wb1$styles_mgr$styles$numFmts
+  expect_equal(got, exp)
+
+  got <- nrow(wb1$styles_mgr$numfmt)
+  expect_equal(got, 1L)
+})
+
+test_that("checking  the same numfmts twice works", {
+  wb <- wb_workbook()$add_worksheet()
+  expect_warning(
+    wb$styles_mgr$get_xf_id(name = "my_awesome_style"),
+    "Could not find style\\(s\\): my_awesome_style"
+  )
+  wb$styles_mgr$add("<numFmt numFmtId=\"900\" formatCode=\"0.0\"/>", "foo")
+  wb$styles_mgr$get_numfmt_id(name = "foo")
+  expect_warning(
+    wb$styles_mgr$get_numfmt_id(name = c("foo", "my_awesome_style")),
+    "Could not find style\\(s\\): my_awesome_style"
+  )
+
+})
+
+test_that("applying styles works", {
+  xl <- system.file("extdata", "oxlsx2_sheet.xlsx", package = "openxlsx2")
+  exp <- "96.55\u00a0%"
+  got <- wb_to_df(xl, apply_numfmts = TRUE, dims = "I7", col_names = FALSE)[["I"]]
+  expect_equal(got, exp)
 })

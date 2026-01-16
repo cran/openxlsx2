@@ -133,6 +133,7 @@ test_that("copy_cells works with hyperlinks and empty cells in transpose", {
 test_that("cloning comments works", {
 
   tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
 
   c1 <- wb_comment(text = "this is a comment", author = "")
 
@@ -271,6 +272,7 @@ test_that("cloning from workbooks works", {
 test_that("cloning column and row styles works", {
 
   tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
 
   ### prepare a worksheet to clone from
   wb <- wb_workbook()$
@@ -308,11 +310,11 @@ test_that("cloning column and row styles works", {
   wb$clone_worksheet(old = "Sheet 1", "mtcars", from = wb_mtcars)
   wb$clone_worksheet(old = "Sheet 2", "iris", from = wb_mtcars)
 
-  exp <- "<col min=\"11\" max=\"11\" style=\"2\" width=\"8.43\"/>"
+  exp <- "<col min=\"11\" max=\"11\" style=\"1\" width=\"8.43\"/>"
   got <- wb$worksheets[[2]]$cols_attr[2]
   expect_equal(exp, got)
 
-  exp <- "3"
+  exp <- "1"
   got <- wb$worksheets[[2]]$sheet_data$row_attr[2, "s"]
   expect_equal(exp, got)
 

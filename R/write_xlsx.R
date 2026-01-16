@@ -11,8 +11,8 @@
 #' @param as_table If `TRUE`, will write as a data table, instead of data.
 #' @inheritDotParams wb_workbook creator
 #' @inheritDotParams wb_add_worksheet sheet grid_lines tab_color zoom
-#' @inheritDotParams wb_add_data_table start_col start_row col_names row_names na.strings total_row
-#' @inheritDotParams wb_add_data start_col start_row col_names row_names na.strings
+#' @inheritDotParams wb_add_data_table start_col start_row col_names row_names na total_row
+#' @inheritDotParams wb_add_data start_col start_row col_names row_names na
 #' @inheritDotParams wb_freeze_pane first_active_row first_active_col first_row first_col
 #' @inheritDotParams wb_set_col_widths widths
 #' @inheritDotParams wb_save overwrite
@@ -56,7 +56,7 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
     "first_footer", "start_col", "start_row", "total_row",
     "col.names", "row.names", "col_names", "row_names", "table_style",
     "table_name", "with_filter", "first_active_row", "first_active_col",
-    "first_row", "first_col", "col_widths", "na.strings",
+    "first_row", "first_col", "col_widths", "na.strings", "na",
     "overwrite", "title", "subject", "category",
     "font_size", "font_color", "font_name",
     "flush", "widths"
@@ -153,7 +153,7 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
     sheetName <- as.character(params$sheet_name %||% params$sheet)
 
     if (any(nchar(params$sheet_name) > 31)) {
-      stop("sheet_name too long! Max length is 31 characters.")
+      stop("sheet_name to long! Max length is 31 characters.")
     }
 
     if (inherits(x, "list") && (length(sheetName) == length(x))) {
@@ -194,8 +194,11 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
     }
   }
 
+  # withFilter was broken for non table output, but worked in table output
+  # Now we add it for tables and disable it otherwise
+  withFilter <- FALSE
+  if (any(as_table)) withFilter <- as_table
 
-  withFilter <- TRUE
   if ("with_filter" %in% names(params)) {
     if (is.logical(params$with_filter)) {
       withFilter <- params$with_filter
@@ -239,7 +242,6 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
       stop("Argument col.names must be TRUE or FALSE")
     }
   }
-
 
   rowNames <- FALSE
   if ("row_names" %in% names(params)) {
@@ -286,9 +288,13 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
     totalRow <- params$total_row
   }
 
-  na.strings <-
+  na <-
     if ("na.strings" %in% names(params)) {
       params$na.strings
+    } else if ("na" %in% names(params)) {
+      params$na
+    } else if (!is.null(getOption("openxlsx2.na"))) {
+      getOption("openxlsx2.na")
     } else if (!is.null(getOption("openxlsx2.na.strings"))) {
       getOption("openxlsx2.na.strings")
     } else {
@@ -414,20 +420,21 @@ write_xlsx <- function(x, file, as_table = FALSE, ...) {
         table_style = tableStyle[[i]],
         table_name  = table_name[[i]],
         with_filter = withFilter[[i]],
-        na.strings  = na.strings,
+        na          = na,
         total_row   = totalRow
       )
     } else {
       # TODO add_data()?
       do_write_data(
-        wb = wb,
-        sheet = i,
-        x = x[[i]],
-        start_col  = startCol[[i]],
-        start_row  = startRow[[i]],
-        col_names  = colNames[[i]],
-        row_names  = rowNames[[i]],
-        na.strings = na.strings
+        wb          = wb,
+        sheet       = i,
+        x           = x[[i]],
+        start_col   = startCol[[i]],
+        start_row   = startRow[[i]],
+        col_names   = colNames[[i]],
+        row_names   = rowNames[[i]],
+        with_filter = withFilter[[i]],
+        na          = na
       )
     }
 

@@ -738,13 +738,13 @@ independently of the cell containing the string.</p>
 <span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> txt)</span></code></pre></div>
 <p>As shown above it is possible to combine multiple styles together
 into a longer string. It is even possible to use <code>fmt_txt()</code>
-as <code>na.strings</code>:</p>
+as <code>na</code>:</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>df <span class="ot">&lt;-</span> mtcars</span>
 <span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>df[df <span class="sc">&lt;</span> <span class="dv">4</span>] <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
 <span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a></span>
 <span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>na_red <span class="ot">&lt;-</span> <span class="fu">fmt_txt</span>(<span class="st">&quot;N/A&quot;</span>, <span class="at">color =</span> <span class="fu">wb_color</span>(<span class="st">&quot;red&quot;</span>), <span class="at">italic =</span> <span class="cn">TRUE</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a></span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> df, <span class="at">na.strings =</span> na_red)</span></code></pre></div>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>wb <span class="ot">&lt;-</span> <span class="fu">wb_workbook</span>()<span class="sc">$</span><span class="fu">add_worksheet</span>()<span class="sc">$</span><span class="fu">add_data</span>(<span class="at">x =</span> df, <span class="at">na =</span> na_red)</span></code></pre></div>
 </div>
 <div id="create-custom-table-styles" class="section level1">
 <h1>Create custom table styles</h1>

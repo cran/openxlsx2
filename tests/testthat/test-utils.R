@@ -53,6 +53,22 @@ test_that("dims to col & row and back", {
 
 })
 
+test_that("validate_dims() works", {
+  expect_error(validate_dims(1), "must be class character")
+  expect_true(validate_dims("$A1:B3"))
+  expect_true(validate_dims("A1:B3,$A$1:$B2"))
+  expect_true(validate_dims("A1:B3;$A$1:$B2"))
+  expect_true(validate_dims("A:B"))
+  expect_true(validate_dims("1:2"))
+  expect_error(validate_dims(""), "Unexpected blank strings in dims validation detected")
+  expect_error(validate_dims("A1:B3,A1:B2,A1500000"), "Row exceeds valid range")
+  expect_error(validate_dims("ZZZ1:B3"), "Column exceeds valid range")
+  expect_true(validate_dims(c("A1", "B1:C2")))
+  expect_true(validate_dims("$A$1,B$5"))
+  expect_error(validate_dims("a1:b10"), "dims contains invalid character")
+  expect_error(validate_dims("A1-B10"), "dims contains invalid character")
+})
+
 test_that("`wb_dims()` works/errors as expected with unnamed arguments", {
 
   # Acceptable inputs
@@ -305,7 +321,7 @@ test_that("`wb_dims()` works when Supplying an object `x`.", {
   # using non-existing character column doesn't work
   expect_error(wb_dims(x = mtcars, cols = "A"), "`cols` must be an integer or an existing column name of `x`.")
   expect_equal(wb_dims(x = mtcars, cols = c("hp", "vs")), "D2:D33,H2:H33")
-  expect_error(expect_warning(wb_dims(x = mtcars, rows = "hp")), "`rows` is character and contains nothing that can be interpreted as number.")
+  expect_error(expect_warning(wb_dims(x = mtcars, rows = "hp")), "`rows` is the incorrect argument in this case\nUse `cols` instead. Subsetting rows by name is not supported.")
   # Access only row / col name
   expect_no_message(wb_dims(x = mtcars, select = "col_names"))
   # to write without column names, specify `from_row = 0` (or -1 of what you wanted)
@@ -350,7 +366,7 @@ test_that("`wb_dims()` handles row_names = TRUE consistenly.", {
 })
 
 test_that("wb_dims() errors clearly with bad `select`.", {
-  expect_error(wb_dims(x = mtcars, select = c("bad", "col_names")), "accepts a single")
+  expect_error(wb_dims(x = mtcars, select = c("bad", "col_names")), "is an invalid value for")
   expect_error(wb_dims(2, 10, select = "col_names"), "Can't supply `select` when `x` is absent")
 
   expect_error(wb_dims(x = mtcars, col_names = FALSE, select = "col_names"), "col_names = TRUE")
@@ -483,6 +499,8 @@ test_that("test random_string", {
 test_that("temp_dir works", {
 
   out <- temp_dir("temp_dir_works")
+  on.exit(unlink(out, recursive = TRUE), add = TRUE)
+
   expect_true(dir.exists(out))
 
 })
@@ -566,7 +584,7 @@ test_that("outdec = \",\" works", {
     widths = c(16, 15, 12, 18, 33)
   )
 
-  exp <- c("16.711", "8.43", "15.711", "8.43", "12.711", "18.711", "8.43", "33.711")
+  exp <- c("16.711", "15.711", "12.711", "18.711", "33.711")
   got <- rbindlist(xml_attr(wb$worksheets[[1]]$cols_attr, "col"))$width
   expect_equal(exp, got)
 
@@ -845,4 +863,81 @@ test_that("wb_dims() type works", {
   expect_equal("$A1:K33", wb_dims(x = mtcars, fix = c("col", "none")))
   expect_equal("A1:$K33", wb_dims(x = mtcars, fix = c("none", "col")))
   expect_equal("$A1:K$33", wb_dims(x = mtcars, fix = c("col", "row")))
+})
+
+test_that("fuzzing wb_dims", {
+
+  expect_error(wb_dims(cols = list(1), rows = 2), "Input must be a vector type")
+  expect_error(wb_dims(cols = 2, rows = list(1)), "Input must be a vector type")
+  expect_error(wb_dims(cols = NA, rows = 2), "NAs are not supported in wb_dims()")
+  expect_error(wb_dims(cols = 2, rows = NA), "NAs are not supported in wb_dims()")
+  expect_error(wb_dims(cols = as.factor(2), rows = 1), "factors are not supported in wb_dims()")
+  expect_error(wb_dims(cols = 1, rows = as.factor(2)), "factors are not supported in wb_dims()")
+  expect_error(wb_dims(rows = 2e6, cols = 1), "Row exceeds valid range")
+  expect_error(wb_dims(rows = 1, cols = 2e5), "Column exceeds valid range")
+  expect_error(
+    wb_dims(x = data.frame(A = 1:3, B = 4:6), rows = "A"),
+    regexp = "Subsetting rows by name is not supported"
+  )
+  expect_error(
+    wb_dims(x = data.frame(A = 1:3, B = 4:6), rows = "Z"),
+    regexp = "contains nothing that can be interpreted as number"
+  )
+  expect_error(
+    wb_dims(x = mtcars, left = 1, below = 1),
+    regexp = "can only be one direction"
+  )
+  expect_error(
+    wb_dims(x = data.frame(A = 1:3, B = 4:6), cols = c("A", "Z")),
+    regexp = "The following were not found: `Z`"
+  )
+
+  res <- wb_dims(x = mtcars[1:3, 1:3], row_names = TRUE, select = "data")
+  expect_equal(res, "B2:D4")
+  expect_equal(wb_dims(cols = c(1, 3), rows = 1), c("A1,C1"))
+  expect_error(wb_dims(list(1, 2), from_row = 1), "The first argument must either be named or be a vector.")
+  expect_equal(wb_dims(x = mtcars, row_names = TRUE, select = "data"), "B2:L33")
+  expect_equal(wb_dims(x = mtcars, row_names = TRUE, select = "col_names"), "B1:L1")
+  expect_equal(wb_dims(x = mtcars, row_names = TRUE, cols = c(1, 3), select = "data"), "B2:B33,D2:D33")
+  expect_equal(wb_dims(rows = c(1, 3), cols = c(1, 3)), "A1,C1,A3,C3")
+  expect_equal(wb_dims(rows = 1:2, cols = c(1, 3)), "A1:A2,C1:C2")
+  expect_equal(wb_dims(rows = c(1, 3), cols = 1:2), "A1:B1,A3:B3")
+  expect_equal(wb_dims(rows = 1:2, cols = 1:2), "A1:B2")
+  expect_equal(wb_dims(rows = 2:3, cols = 2:3), "B2:C3")
+})
+
+test_that("wb_dims warns when coordinates are out of bounds", {
+
+  expect_silent(wb_dims(from_row = integer(0)))
+  expect_silent(wb_dims(from_col = character(0)))
+
+  # Start at Column B (2), but move 5 columns to the left.
+  # Result: 2 - 5 = -3. This triggers the (fcol < 1) check.
+  expect_warning(
+    wb_dims(from_col = 2, left = 5),
+    regexp = "columns cannot be left of column A"
+  )
+
+  # Similarly for rows:
+  expect_warning(
+    wb_dims(from_row = 2, above = 5),
+    regexp = "rows cannot be above of row 1"
+  )
+})
+
+test_that("as_binary", {
+  expect_error(as_binary(7), "must be 0, 1, FALSE, or TRUE")
+  expect_error(as_binary("-7"), "must be 0, 1, FALSE, or TRUE")
+})
+
+test_that("wb_dims with vectors is no long slow", {
+  sidx <- function(n) {
+    cbind(
+      row = round(rbeta(n, 2, 2) * 99 + 1),
+      col = round(rbeta(n, 1.5, 1.5) * 99 + 1)
+    )
+  }
+  idx <- sidx(10000)
+
+  expect_silent(wb_dims(rows = idx[, "row"], cols = idx[, "col"]))
 })
