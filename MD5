@@ -1,7 +1,7 @@
-5006f40aa3c2efba3ae34a84de1d4873 *DESCRIPTION
+1240471dd3b8992e0f2a6c78dcb0ebf9 *DESCRIPTION
 d950efdf82e122722141afb8a626be11 *LICENSE
 2c4f37f14b59a3a90570b3b141f9ba02 *NAMESPACE
-54d0353000f82a5df2b0cc3a257bf666 *NEWS.md
+a8112aae23da6ff637ce2517d1ceabdc *NEWS.md
 9d6850bb3b428159182390e1eb86b203 *R/RcppExports.R
 d662efc4e4f75b2573b8758da9bd8fe3 *R/asserts.R
 a710893b8611d254911baa481c2837c1 *R/baseXML.R
@@ -30,7 +30,7 @@ a0f52302c8f425027eea63cdf4d93453 *R/read.R
 08dafcdc57342b9ba30a8414fe8806b4 *R/utils.R
 27b980779d16b06d4bbe9630d274daff *R/wb_functions.R
 ebf6237085381cb09b092c8bb60cc414 *R/wb_load.R
-50139ea44e76ff16fe109850d80e767f *R/wb_styles.R
+3a15f8ea7e6c548eb996ea268a78a65d *R/wb_styles.R
 595cabd7d9cd62dada8a29d05dc7c831 *R/write.R
 74db48e3665178a890b207adc58fd27a *R/write_xlsx.R
 df4b8dfac1a1efe0900a13d0a665798d *R/xl_open.R
@@ -202,9 +202,9 @@ b486b724376224a1b15fa5d682d2cb4c *man/xml_rm_child.Rd
 48d5f791a2658713e9a33099fb065248 *src/Makevars
 be653e1931aec925ee2665cb9c9e453d *src/RcppExports.cpp
 e790f0207236389f7288f3dd25892dc7 *src/date.cpp
-5db22fd7591353e8b8c811b229cfc818 *src/helper_functions.cpp
+d9b20ea081d0541169d0811f48cbf9ca *src/helper_functions.cpp
 c469d06731f21dae1869ffe25a2d4da5 *src/load_workbook.cpp
-730b7c82c49347d21800213685ca92c3 *src/openxlsx2.h
+56b2400863b6f5c933a70cd9dc58f4e2 *src/openxlsx2.h
 40b3d26a442d92f37ec1d43edd8c4da2 *src/openxlsx2_types.h
 d99541ca6d8f99b0c95e6b443db45a0e *src/pugi.cpp
 060d30f09bd8e1be95d7748a4dd16fd0 *src/strings_xml.cpp
@@ -239,7 +239,7 @@ c5ecbb3db1fde3b87aeb613030df6381 *tests/testthat/test-date_time_conversion.R
 0dd5a555c395d2d5b19638df87955808 *tests/testthat/test-form_control.R
 88c918cfe158085f59d94fa226713c40 *tests/testthat/test-formulas.R
 7394a7421756f752275acf6a4e37044b *tests/testthat/test-freeze_pane.R
-ca91be2b2b6ca45ea16e077e9280d918 *tests/testthat/test-helper-functions.R
+5c536ed69cab2ba081524817ebba5905 *tests/testthat/test-helper-functions.R
 c19d6cf5b5cddb2a1cf927b326b9e703 *tests/testthat/test-illegal-characters.R
 d661410a3441fb128011b4f156c8b83f *tests/testthat/test-loading_workbook.R
 8ed64e39f588a81a942d8e7e3e5f987a *tests/testthat/test-loading_workbook_tables.R
@@ -266,7 +266,7 @@ b2b22fa3a818a5d27f5e4a2527cdeb2c *tests/testthat/test-styles_xml.R
 339b77e8500f22a679895669c9e630da *tests/testthat/test-tables.R
 a7801a6c721f86ab66d55e853edafc7f *tests/testthat/test-utils.R
 11ac1d6352696ae293aae95619659436 *tests/testthat/test-wb_functions.R
-546ab9e826a25ec4fa49b509b6c89ce4 *tests/testthat/test-wb_styles.R
+bc46485f5157bc4280f37f242e7aecc6 *tests/testthat/test-wb_styles.R
 0d7b3f0fb47004821903ac1b01473665 *tests/testthat/test-write.R
 4d03ccec0db63704a71c15946d313f1b *tests/testthat/test-writing_posixct.R
 0ed0f465c0ef47c7529002a2c4e09a78 *tests/testthat/test-xl_open.R
