@@ -455,10 +455,10 @@ underlying functions to see what is going on in the sheet. Using
 </div>
 <div id="dims---read-specific-dimension" class="section level3">
 <h3><code>dims</code> - read specific dimension</h3>
-<p>Sometimes the entire worksheet contains to much data, in such case we
-provide functions to read only a selected dimension range. Such a range
-consists of either a specific cell like “A1” or a cell range in the
-notion used in the <code>openxml</code> standard</p>
+<p>Sometimes the entire worksheet contains too much data, in such case
+we provide functions to read only a selected dimension range. Such a
+range consists of either a specific cell like “A1” or a cell range in
+the notion used in the openxml standard</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># read dimension without column names</span></span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">dims =</span> <span class="st">&quot;A2:C5&quot;</span>, <span class="at">col_names =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt;    A    B    C</span></span>
@@ -538,9 +538,9 @@ above.</p>
 <h3><code>skip_empty_rows</code> - remove empty rows</h3>
 <p>Even though <code>openxlsx2</code> imports everything as requested,
 sometimes it might be helpful to remove empty lines from the data. These
-might be either left empty intentional or empty because they are were
+might be either left empty intentionally or empty because they are were
 formatted, but the cell value was removed afterwards. This was added
-mostly for backward comparability, but the default has been changed to
+mostly for backward compatibility, but the default has been changed to
 <code>FALSE</code>. The behavior has changed a bit as well. Previously
 empty cells were removed prior to the conversion to R data frames, now
 they are removed after the conversion and are removed only if they are
@@ -575,7 +575,7 @@ completely empty</p>
 <div id="row_names---keep-rownames-from-input" class="section level3">
 <h3><code>row_names</code> - keep rownames from input</h3>
 <p>Sometimes the data source might provide rownames as well. In such a
-case you can <code>openxlsx2</code> to treat the first column as
+case you can tell <code>openxlsx2</code> to treat the first column as
 rowname</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># convert first row to rownames</span></span>
 <span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">wb_to_df</span>(file, <span class="at">sheet =</span> <span class="dv">2</span>, <span class="at">dims =</span> <span class="st">&quot;C6:G9&quot;</span>, <span class="at">row_names =</span> <span class="cn">TRUE</span>)</span>

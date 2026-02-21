@@ -52,7 +52,8 @@ enum celltype {
   cm_formula     = 14,
   hms_time       = 15,
   currency       = 16,
-  list           = 17
+  list           = 17,
+  CELLTYPE_MAX  // always the last
 };
 
 // check for 1.0.8.0
@@ -63,21 +64,19 @@ enum celltype {
 #endif
 
 // custom wrap function
-// Converts the imported values from c++ std::vector<xml_col> to an R dataframe.
-// Whenever new fields are spotted they have to be added here
+// Converts the imported values from c++ std::vector<xml_col> to an R vector.
 namespace Rcpp {
 
 template <>
 inline SEXP wrap(const vec_string& x) {
   R_xlen_t n = static_cast<R_xlen_t>(x.size());
-
   Rcpp::CharacterVector z(n);
 
   for (R_xlen_t i = 0; i < n; ++i) {
     z[i] = Rcpp::String(x[static_cast<size_t>(i)]);
   }
 
-  return Rcpp::wrap(z);
+  return z;
 }
 
 }  // namespace Rcpp

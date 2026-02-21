@@ -1,6 +1,11 @@
 # Internal function to convert data frame from character to whatever is required
 convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_character = FALSE, col_names = FALSE) {
-  sel <- !is.na(names(types))
+
+  type_vals <- types[!is.na(names(types))]
+  if (length(type_vals) == 0) {
+    warning("could not convert. All missing in row used for variable names")
+    return(z)
+  }
 
   if (col_names) {
     # avoid scientific notation in column names
@@ -8,40 +13,31 @@ convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_characte
     on.exit(options(op), add = TRUE)
   }
 
-  if (any(sel)) {
-    nums <- names(which(types[sel] == 1))
-    dtes <- names(which(types[sel] == 2))
-    poxs <- names(which(types[sel] == 3))
-    logs <- names(which(types[sel] == 4))
-    difs <- names(which(types[sel] == 5))
-    fmls <- names(which(types[sel] == 6))
-    # convert "#NUM!" to "NaN" -- then converts to NaN
-    # maybe consider this an option to instead return NA?
+  nums <- which(type_vals == 1)
+  dtes <- which(type_vals == 2)
+  poxs <- which(type_vals == 3)
+  logs <- which(type_vals == 4)
+  difs <- which(type_vals == 5)
+  fmls <- which(type_vals == 6)
 
-    if (as_character) {
-      date_conv_c     <- function(...) as.character(date_conv(...))
-      datetime_conv_c <- function(...) as.character(datetime_conv(...))
-      hms_conv_c      <- function(...) as.character(hms_conv(...))
-
-      if (length(nums)) z[nums] <- lapply(z[nums], function(i) as.character(as.numeric(replace(i, i == "#NUM!", "NaN"))))
-      if (length(dtes)) z[dtes] <- lapply(z[dtes], date_conv_c)
-      if (length(poxs)) z[poxs] <- lapply(z[poxs], datetime_conv_c)
-      if (length(logs)) z[logs] <- lapply(z[logs], function(i) as.character(as.logical(i)))
-      if (length(difs)) z[difs] <- lapply(z[difs], hms_conv_c)
-    } else {
-      if (length(nums)) z[nums] <- lapply(z[nums], function(i) as.numeric(replace(i, i == "#NUM!", "NaN")))
-      if (length(dtes)) z[dtes] <- lapply(z[dtes], date_conv)
-      if (length(poxs)) z[poxs] <- lapply(z[poxs], datetime_conv)
-      if (length(logs)) z[logs] <- lapply(z[logs], as.logical)
-      if (length(difs)) z[difs] <- lapply(z[difs], hms_conv)
-    }
-
-    for (i in seq_along(z)) { # convert df to class formula
-      if (names(z)[i] %in% fmls) class(z[[i]]) <- c(class(z[[i]]), "formula")
-    }
-
+  if (as_character) {
+    if (length(nums)) z[nums] <- lapply(z[nums], function(i) as.character(convert_num(i)))
+    if (length(dtes)) z[dtes] <- lapply(z[dtes], function(i) as.character(date_conv(i)))
+    if (length(poxs)) z[poxs] <- lapply(z[poxs], function(i) as.character(datetime_conv(i)))
+    if (length(logs)) z[logs] <- lapply(z[logs], function(i) as.character(as.logical(i)))
+    if (length(difs)) z[difs] <- lapply(z[difs], function(i) as.character(hms_conv(i)))
   } else {
-    warning("could not convert. All missing in row used for variable names")
+    if (length(nums)) z[nums] <- lapply(z[nums], convert_num)
+    if (length(dtes)) z[dtes] <- lapply(z[dtes], date_conv)
+    if (length(poxs)) z[poxs] <- lapply(z[poxs], datetime_conv)
+    if (length(logs)) z[logs] <- lapply(z[logs], as.logical)
+    if (length(difs)) z[difs] <- lapply(z[difs], hms_conv)
+  }
+
+  if (length(fmls)) {
+    for (i in fmls) {
+      class(z[[i]]) <- c(class(z[[i]]), "formula")
+    }
   }
 
   z
@@ -50,95 +46,110 @@ convert_df <- function(z, types, date_conv, datetime_conv, hms_conv, as_characte
 # `wb_to_df()` ----------------------------------------
 #' Create a data frame from a Workbook
 #'
-#' Simple function to create a `data.frame` from a sheet in workbook. Simple as
-#' in it was simply written down. `read_xlsx()` and `wb_read()` are just
-#' internal wrappers of `wb_to_df()` intended for people coming from other
-#' packages.
+#' @description
+#' The `wb_to_df()` function is the primary interface for extracting data from
+#' spreadsheet files into R. It interprets the underlying XML structure of a
+#' worksheet to reconstruct a data frame, handling cell types, dimensions, and
+#' formatting according to user specification. While `read_xlsx()` and
+#' `wb_read()` are available as streamlined internal wrappers for users
+#' accustomed to other spreadsheet packages, wb_to_df() serves as the
+#' foundational function and provides the most comprehensive access to the
+#' package's data extraction and configuration parameters.
 #'
 #' @details
-#' The returned data frame will have named rows matching the rows of the
-#' worksheet. With `col_names = FALSE` the returned data frame will have
-#' column names matching the columns of the worksheet. Otherwise the first
-#' row is selected as column name.
+#' The function extracts data based on a defined range or the total data extent
+#' of a worksheet. If `col_names = TRUE`, the first row of the selection is
+#' treated as the header; otherwise, spreadsheet column letters are used. If
+#' `row_names = TRUE`, the first column of the selected range is assigned to
+#' the data frame's row names.
 #'
-#' Depending if the R package `hms` is loaded, `wb_to_df()` returns
-#' `hms` variables or string variables in the `hh:mm:ss` format.
+#' Dimension selection is highly flexible. The `dims` argument supports standard
+#' "A1:B2" notation as well as dynamic wildcards for rows and columns. Using
+#' `++` or `--` allows ranges to adapt to the spreadsheet's content. For
+#' instance, `dims = "A2:C+"` reads from A2 to the last available row in
+#' column C, while `dims = "A-:+9"` reads from the first populated row in
+#' column A to the last column in row 9. If neither `dims` nor `named_region`
+#' is provided, the function automatically calculates the range based on the
+#' minimum and maximum populated cells, modified by `start_row` and `start_col`.
 #'
-#' The `types` argument can be a named numeric or a character string of the
-#' matching R variable type. Either `c(foo = 1)` or `c(foo = "numeric")`.
-#' * 0: character
-#' * 1: numeric
-#' * 2: Date
-#' * 3: POSIXct (datetime)
-#' * 4: logical
+#' Type conversion is governed by an internal guessing engine. If `detect_dates`
+#' is enabled, serial dates are converted to R Date or POSIXct objects. All
+#' datetimes are standardized to UTC. The function's handling of time variables
+#' depends on the presence of the `hms` package; if loaded, `wb_to_df()` returns
+#' `hms` variables. Otherwise, they are returned as string variables in
+#' `hh:mm:ss` format. Users can provide explicit column types via the `types`
+#' argument using numeric codes: 0 (character), 1 (numeric), 2 (Date), 3 (POSIXct),
+#' 4 (logical), 5 (hms), and 6 (formula).
 #'
-#' If no type is specified, the column types are derived based on all cells
-#' in a column within the selected data range, excluding potential column
-#' names. If `keep_attr` is `TRUE`, the derived column types can be inspected
-#' as an attribute of the data frame.
+#' Regarding formulas, it is important to note that `wb_to_df()` will not
+#' automatically evaluate formulas added to a workbook object via
+#' [wb_add_formula()]. In the underlying spreadsheet XML, only the formula
+#' expression is written; the resulting value is typically generated by the
+#' spreadsheet software's calculation engine when the file is opened and saved.
+#' Consequently, reading a newly added formula cell without prior evaluation in
+#' external software will result in an empty value unless `show_formula = TRUE`
+#' is used to retrieve the formula string itself.
 #'
-#' `wb_to_df()` will not pick up formulas added to a workbook object
-#' via [wb_add_formula()]. This is because only the formula is written and left
-#' to be evaluated when the file is opened in a spreadsheet software.
-#' Opening, saving and closing the file in a spreadsheet software will resolve
-#' this.
+#' If `keep_attributes` is TRUE, the data frame is returned with additional
+#' metadata. This includes the internal type-guessing table (`tt`), which
+#' identifies the derived type for every cell in the range, and the specific
+#' `types` vector used for conversion. These attributes are useful for
+#' debugging or for applications requiring precise knowledge of the
+#' spreadsheet's original cell metadata.
 #'
-#' Before release 1.15, datetime variables (in 'yyyy-mm-dd hh:mm:ss' format)
-#' were imported using the user's local system timezone (`Sys.timezone()`).
-#' This behavior has been updated. Now, all datetime variables are imported
-#' with the timezone set to "UTC".
-#' If automatic date detection and conversion are enabled but the conversion
-#' is unsuccessful (for instance, in a column containing a mix of data types
-#' like strings, numbers, and dates) dates might be displayed as a Unix
-#' timestamp. Usually they are converted to character for character columns.
-#' If date detection is disabled, dates will show up as a spreadsheet date
-#' format. To convert these, you can use the functions [convert_date()],
-#' [convert_datetime()], or [convert_hms()]. If types are specified, date
-#' detection is disabled.
+#' Specialized spreadsheet features include the ability to extract hyperlink
+#' targets (`show_hyperlinks = TRUE`) instead of display text. For complex
+#' layouts, `fill_merged_cells` propagates the value of a top-left merged cell
+#' to all cells within the merge range. The `na` argument supports sophisticated
+#' missing value definitions, accepting either a character vector or a named
+#' list to differentiate between string and numeric `NA` types.
 #'
-#' You can use wildcards for all available columns or rows in `dims` by using
-#' `+` and `-`. For example, `dims = "A-:+9"` will read everything from the
-#' first row in column A through the last column in row 9. This makes it
-#' unnecessary to update dimensions when working with files whose sizes change
-#' frequently.
+#' @section Notes:
+#' Recent versions of `openxlsx2` have introduced several changes to the
+#' `wb_to_df()` API:
+#' * Legacy arguments such as `na.strings` and `na.numbers` are no longer part
+#'     of the public API and have been consolidated into the `na` argument.
+#' * As of version 1.15, all datetime variables are imported with the
+#'     timezone set to "UTC" to prevent system-specific local timezone shifts.
+#' * The function now supports reverse-order or specific-order imports when
+#'     a numeric vector is passed to the `rows` argument.
 #'
-#' The function to apply numeric formats was not extensively tested for numeric
-#' equality with spreadsheet software. There might be differences and the function
-#' has limited support for builtin styles.
+#' For extensive real-world examples and advanced usage patterns, consult
+#' the package vignettes—specifically "openxlsx2 read to data frame"—and
+#' the dedicated chapter in the `openxlsx2` book for real-life case studies.
 #'
-#' @seealso [wb_get_named_regions()], \link[openxlsx2:openxlsx2-package]{openxlsx2}
-#'
-#' @param file An xlsx file, [wbWorkbook] object or URL to xlsx file.
-#' @param sheet Either sheet name or index. When missing the first sheet in the workbook is selected.
-#' @param col_names If `TRUE`, the first row of data will be used as column names.
-#' @param row_names If `TRUE`, the first col of data will be used as row names.
-#' @param dims Character string of type "A1:B2" as optional dimensions to be imported.
-#' @param detect_dates If `TRUE`, attempt to recognize dates and perform conversion.
-#' @param show_formula If `TRUE`, the underlying spreadsheet formulas are shown.
-#' @param convert If `TRUE`, a conversion to dates and numerics is attempted.
-#' @param skip_empty_cols If `TRUE`, empty columns are skipped.
-#' @param skip_empty_rows If `TRUE`, empty rows are skipped.
-#' @param skip_hidden_cols If `TRUE`, hidden columns are skipped.
-#' @param skip_hidden_rows If `TRUE`, hidden rows are skipped.
-#' @param start_row first row to begin looking for data.
-#' @param start_col first column to begin looking for data.
-#' @param rows A numeric vector specifying which rows in the xlsx file to read.
-#'   If `NULL`, all rows are read.
-#' @param cols A numeric vector specifying which columns in the xlsx file to read.
-#'   If `NULL`, all columns are read.
-#' @param named_region Character string with a `named_region` (defined name or table).
-#'   If no sheet is selected, the first appearance will be selected. See [wb_get_named_regions()]
-#' @param types A named numeric indicating, the type of the data.
-#'   Names must match the returned data. See **Details** for more.
-#' @param na Defines values to be treated as NA. Can be a character vector of strings
-#' or a named list: list(strings = ..., numbers = ...). Blank cells are always converted to `NA`.
-#' @param fill_merged_cells If `TRUE`, the value in a merged cell is given to all cells within the merge.
-#' @param keep_attributes If `TRUE` additional attributes are returned.
-#'   (These are used internally to define a cell type.)
-#' @param check_names If `TRUE` then the names of the variables in the data frame are checked to ensure that they are syntactically valid variable names.
-#' @param show_hyperlinks If `TRUE` instead of the displayed text, hyperlink targets are shown.
-#' @param apply_numfmts If `TRUE` numeric formats are applied if detected.
-#' @param ... additional arguments
+#' @param file A workbook file path, a [wbWorkbook] object, or a valid URL.
+#' @param sheet The name or index of the worksheet to read. Defaults to the first sheet.
+#' @param start_row,start_col Optional numeric values specifying the first row or column
+#'   to begin data discovery.
+#' @param row_names Logical; if TRUE, uses the first column of the selection as row names.
+#' @param col_names Logical; if TRUE, uses the first row of the selection as column headers.
+#' @param skip_empty_rows,skip_empty_cols Logical; if TRUE, filters out rows or
+#'   columns containing only missing values.
+#' @param skip_hidden_rows,skip_hidden_cols Logical; if TRUE, excludes rows or
+#'   columns marked as hidden in the worksheet metadata.
+#' @param rows,cols Optional numeric vectors specifying the exact indices to read.
+#' @param detect_dates Logical; if TRUE, identifies date and datetime styles for conversion.
+#' @param na A character vector or a named list (e.g., `list(strings = "", numbers = -99)`)
+#'   defining values to treat as `NA`.
+#' @param fill_merged_cells Logical; if TRUE, propagates the top-left value of a
+#'   merged range to all cells in that range.
+#' @param dims A character string defining the range. Supports wildcards
+#'   (e.g., "A1:++" or "A-:+5").
+#' @param named_region A character string referring to a defined name or spreadsheet Table.
+#' @param show_formula Logical; if TRUE, returns the formula strings instead of
+#'   calculated values.
+#' @param convert Logical; if TRUE, attempts to coerce columns to appropriate R classes.
+#' @param types A named vector (numeric or character) to explicitly define column types.
+#' @param keep_attributes Logical; if TRUE, attaches metadata such as the internal
+#'   type table (tt) and types as attributes to the output.
+#' @param check_names Logical; if TRUE, ensures column names are syntactically
+#'   valid R names via [make.names()].
+#' @param show_hyperlinks Logical; if TRUE, replaces cell values with their
+#'   underlying hyperlink targets.
+#' @param apply_numfmts Logical; if TRUE, applies spreadsheet number formatting
+#'   and returns strings.
+#' @param ... Additional arguments passed to internal methods.
 #'
 #' @examples
 #' ###########################################################################
@@ -325,9 +336,11 @@ wb_to_df <- function(
     stop("sheet not found. available sheets are: \n", paste0(wb$get_sheet_names(), collapse = ", "))
   }
 
+  ws <- wb$worksheets[[sheet]]
+
   # the sheet has no data
-  if (is.null(wb$worksheets[[sheet]]$sheet_data$cc) ||
-      nrow(wb$worksheets[[sheet]]$sheet_data$cc) == 0) {
+  if (is.null(ws$sheet_data$cc) ||
+      nrow(ws$sheet_data$cc) == 0) {
     # TODO do we need more checks or do we need to initialize a new cc object?
     message("sheet found, but contains no data")
     return(NULL)
@@ -337,7 +350,7 @@ wb_to_df <- function(
   # # third party applications are known to require it. Maybe make using
   # # dimensions an optional parameter?
   # if (missing(dims))
-  #   dims <- getXML1attr_one(wb$worksheets[[sheet]]$dimension,
+  #   dims <- getXML1attr_one(ws$dimension,
   #                           "dimension",
   #                           "ref")
 
@@ -348,7 +361,7 @@ wb_to_df <- function(
   if (missing(named_region) && missing(dims)) {
     has_dims <- FALSE
 
-    sd <- wb$worksheets[[sheet]]$sheet_data$cc[c("row_r", "c_r")]
+    sd <- ws$sheet_data$cc[c("row_r", "c_r")]
     row <- range(as.integer(unique(sd$row_r)))
     col <- range(col2int(unique(sd$c_r)))
 
@@ -366,8 +379,8 @@ wb_to_df <- function(
 
   }
 
-  row_attr  <- wb$worksheets[[sheet]]$sheet_data$row_attr
-  cc  <- wb$worksheets[[sheet]]$sheet_data$cc
+  row_attr  <- ws$sheet_data$row_attr
+  cc  <- ws$sheet_data$cc
   sst <- wb$sharedStrings
 
   rnams <- row_attr$r
@@ -482,13 +495,13 @@ wb_to_df <- function(
     cc$typ[sel] <- 0L
   }
   # text in t
-  if (any(cc_tab %in% c("inlineStr"))) {
+  if (any(cc_tab == "inlineStr")) {
     sel <- cc$c_t %in% c("inlineStr")
     cc$val[sel] <- is_to_txt(cc$is[sel])
     cc$typ[sel] <- 0L
   }
   # test is sst
-  if (any(cc_tab %in% c("s"))) {
+  if (any(cc_tab == "s")) {
     sel <- cc$c_t %in% c("s")
     cc$val[sel] <- si_to_txt(sst[as.numeric(cc$v[sel]) + 1])
     cc$typ[sel] <- 0L
@@ -521,45 +534,55 @@ wb_to_df <- function(
   origin <- get_date_origin(wb)
 
   # dates
-  if (!is.null(cc$c_s)) {
+  if (NROW(cc) && !is.null(cc$c_s)) {
 
     # if a cell is t="s" the content is a sst and not da date
-    if (detect_dates && missing(types)) {
+
+    all_styles <- c(xlsx_date_style, xlsx_hms_style, xlsx_posix_style)
+    if (detect_dates && missing(types) && length(all_styles)) {
+
       uccs <- unique(cc$c_s)
-      ucct <- unique(cc$c_t)
 
-      cc$is_string <- FALSE
-      strings <-  c("s", "str", "b", "inlineStr")
-      if (!is.null(cc$c_t) && any(ucct %in% strings))
-        cc$is_string <- cc$c_t %in% strings
+      if (any(uccs %in% all_styles)) {
 
-      if (any(uccs %in% xlsx_date_style)) {
-        sel <- cc$c_s %in% xlsx_date_style & !cc$is_string & cc$v != "" & cc$c_t != "e"
-        if (convert)
-          cc$val[sel] <- date_to_unix(cc$v[sel], origin = origin)
-        else
-          cc$val[sel] <- as.character(convert_date(cc$v[sel], origin = origin))
-        cc$typ[sel]  <- 2L
-      }
+        strings <- c("s", "str", "b", "inlineStr")
+        is_string <- !is.null(cc$c_t) & (cc$c_t %in% strings)
 
-      if (any(uccs %in% xlsx_hms_style)) {
-        sel <- cc$c_s %in% xlsx_hms_style & !cc$is_string & cc$v != "" & cc$c_t != "e"
-        if (convert) {
-          # if hms is loaded, we have to avoid applying convert_hms() twice
-          cc$val[sel] <- cc$v[sel]
-        } else {
-          cc$val[sel] <- as.character(convert_hms(cc$v[sel]))
+        is_valid_val <- !is_string & cc$v != "" & (cc$c_t != "e" | is.na(cc$c_t))
+
+        if (any(uccs %in% xlsx_date_style)) {
+          sel <- is_valid_val & (cc$c_s %in% xlsx_date_style)
+          if (any(sel)) { # Only run if there are actual matches
+            if (convert)
+              cc$val[sel] <- date_to_unix(cc$v[sel], origin = origin)
+            else
+              cc$val[sel] <- as.character(convert_date(cc$v[sel], origin = origin))
+            cc$typ[sel]  <- 2L
+          }
         }
-        cc$typ[sel]  <- 5L
-      }
 
-      if (any(uccs %in% xlsx_posix_style)) {
-        sel <- cc$c_s %in% xlsx_posix_style & !cc$is_string & cc$v != "" & cc$c_t != "e"
-        if (convert)
-          cc$val[sel] <- date_to_unix(cc$v[sel], origin = origin, datetime = TRUE)
-        else
-          cc$val[sel] <- as.character(convert_datetime(cc$v[sel], origin = origin))
-        cc$typ[sel]  <- 3L
+        if (any(uccs %in% xlsx_hms_style)) {
+          sel <- is_valid_val & (cc$c_s %in% xlsx_hms_style)
+          if (any(sel)) {
+            if (convert) {
+              cc$val[sel] <- cc$v[sel]
+            } else {
+              cc$val[sel] <- as.character(convert_hms(cc$v[sel]))
+            }
+            cc$typ[sel]  <- 5L
+          }
+        }
+
+        if (any(uccs %in% xlsx_posix_style)) {
+          sel <- is_valid_val & (cc$c_s %in% xlsx_posix_style)
+          if (any(sel)) {
+            if (convert)
+              cc$val[sel] <- date_to_unix(cc$v[sel], origin = origin, datetime = TRUE)
+            else
+              cc$val[sel] <- as.character(convert_datetime(cc$v[sel], origin = origin))
+            cc$typ[sel]  <- 3L
+          }
+        }
       }
     }
   }
@@ -578,7 +601,7 @@ wb_to_df <- function(
       # depending on the sheet, this might require updates to many cells
       # TODO reduce this to cells, that are part of `cc`. Currently we
       # might waste time, updating cells that are not visible to the user
-      cc_shared <- wb$worksheets[[sheet]]$sheet_data$cc
+      cc_shared <- ws$sheet_data$cc
       cc_shared$shared_fml <- rbindlist(xml_attr(paste0("<f ", cc_shared$f_attr, "/>"), "f"))$t
       cc_shared <- cc_shared[cc_shared$shared_fml == "shared", ]
 
@@ -593,7 +616,7 @@ wb_to_df <- function(
 
   if (show_hyperlinks) {
 
-    if (length(wb$worksheets[[sheet]]$hyperlinks)) {
+    if (length(ws$hyperlinks)) {
 
       hls <- wb_to_hyperlink(wb, sheet)
       hyprlnks <- as.data.frame(
@@ -616,14 +639,17 @@ wb_to_df <- function(
   if (apply_numfmts) {
 
     cc <- get_numfmt_style(wb, cc)
+    kc <- if (!is.null(cols)) cc$c_r %in% col2int(cols) else TRUE
+
+    not_blank_or_bool_error <- cc$num_fmt != "" & !cc$c_t %in% c("b", "e") & kc
 
     # apply_numfmt expects numeric, character or date/posixct
-    sel <- cc$num_fmt != "" & cc$typ %in% c(1L, 4L) & !cc$c_t %in% c("b", "e")
+    sel <- not_blank_or_bool_error & cc$typ %in% c(1L, 4L)
     if (any(sel)) {
       cc$val[sel] <- apply_numfmt(as.numeric(cc$val[sel]), cc$num_fmt[sel])
       cc$typ[sel] <- 0L
     }
-    sel <- cc$num_fmt != "" & cc$typ %in% c(0L, 2L, 3L, 5L) & !cc$c_t %in% c("b", "e")
+    sel <- not_blank_or_bool_error & cc$typ %in% c(0L, 2L, 3L, 5L)
     if (any(sel)) {
       cc$val[sel] <- apply_numfmt(cc$val[sel], cc$num_fmt[sel])
       cc$typ[sel] <- 0L
@@ -631,14 +657,16 @@ wb_to_df <- function(
   }
 
   # prepare to create output object z
-  zz <- cc[c("val", "typ")]
-  zz$cols <- NA_integer_
-  zz$rows <- NA_integer_
   # we need to create the correct col and row position as integer starting at 0. Because we allow
   # to select specific rows and columns, we must make sure that our zz cols and rows matches the
   # z data frame.
-  zz$cols <- match(cc$c_r, colnames(z)) - 1L
-  zz$rows <- match(cc$row_r, rownames(z)) - 1L
+  zz <- data.frame(
+    val  = cc$val,
+    typ  = cc$typ,
+    cols = match(cc$c_r, colnames(z)) - 1L,
+    rows = match(cc$row_r, rownames(z)) - 1L,
+    stringsAsFactors = FALSE
+  )
 
   # zz <- zz[order(zz[, "cols"], zz[, "rows"]), ]
   if (any(zz$val == "", na.rm = TRUE)) zz <- zz[zz$val != "", ]
@@ -647,7 +675,7 @@ wb_to_df <- function(
   # backward compatible option. get the mergedCells dimension and fill it with
   # the value of the first cell in the range. do the same for tt.
   if (fill_merged_cells) {
-    mc <- wb$worksheets[[sheet]]$mergeCells
+    mc <- ws$mergeCells
     if (length(mc)) {
 
       mc <- unlist(xml_attr(mc, "mergeCell"))
@@ -701,7 +729,7 @@ wb_to_df <- function(
   }
 
   if (skip_hidden_cols) {
-    col_attr <- wb$worksheets[[sheet]]$unfold_cols()
+    col_attr <- ws$unfold_cols()
     sel <- col_attr$hidden == "1" | col_attr$hidden == "true"
     if (any(sel)) {
       hide     <- col2int(keep_cols) %in% as.integer(col_attr$min[sel])
@@ -747,11 +775,14 @@ wb_to_df <- function(
     # missing values and if assigned, convert below might break with unambiguous
     # names.
 
+    z_head  <- df_1(z)
+    tt_head <- df_1(tt)
+
     nams <- names(xlsx_cols_names)
-    if (convert)
-      xlsx_cols_names <- convert_df(z[1, , drop = FALSE], guess_col_type(tt[1, , drop = FALSE]), date_conv, datetime_conv, hms_conv, as_character = TRUE, col_names = TRUE)
+    if (convert && ncol(z))
+      xlsx_cols_names <- convert_df(z_head, guess_col_type(tt_head), date_conv, datetime_conv, hms_conv, as_character = TRUE, col_names = TRUE)
     else
-      xlsx_cols_names <- z[1, , drop = FALSE]
+      xlsx_cols_names <- z_head
     names(xlsx_cols_names) <- nams
 
     z  <- z[-1, , drop = FALSE]
@@ -799,7 +830,7 @@ wb_to_df <- function(
   }
 
   # could make it optional or explicit
-  if (convert) {
+  if (convert && ncol(z)) {
     z <- convert_df(z, types, date_conv, datetime_conv, hms_conv)
 
     ## this reduces the difference to releases < 1.15. If in mixed columns
@@ -815,17 +846,18 @@ wb_to_df <- function(
       chrs <- names(which(types[sel] == 0))
 
       for (chr in chrs) {
-        sel <- tt[[chr]] == 2L & !is.na(z[[chr]])
+        not_na_chr <- !is.na(z[[chr]])
+        sel <- tt[[chr]] == 2L & not_na_chr
         if (length(sel)) {
           z[[chr]][sel] <- vapply(z[[chr]][sel], date_conv_c, NA_character_)
         }
 
-        sel <- tt[[chr]] == 3L & !is.na(z[[chr]])
+        sel <- tt[[chr]] == 3L & not_na_chr
         if (length(sel)) {
           z[[chr]][sel] <- vapply(z[[chr]][sel], datetime_conv_c, NA_character_)
         }
 
-        sel <- tt[[chr]] == 5L & !is.na(z[[chr]])
+        sel <- tt[[chr]] == 5L & not_na_chr
         if (length(sel)) {
           z[[chr]][sel] <- vapply(z[[chr]][sel], hms_conv_c, NA_character_)
         }

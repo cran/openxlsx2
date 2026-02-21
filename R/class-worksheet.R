@@ -466,8 +466,9 @@ wbWorksheet <- R6::R6Class(
     #' @return The `wbWorksheetObject`, invisibly
     fold_cols = function(col_df) {
 
-      col_df <- col_df[order(as.numeric(col_df$min)), ]
+      if (nrow(col_df) == 0) return(invisible(self))
 
+      col_df <- col_df[order(as.numeric(col_df$min)), ]
       prop_cols <- setdiff(names(col_df), c("min", "max"))
       col_df$string <- apply(col_df[prop_cols], 1, paste, collapse = "|")
 
@@ -669,6 +670,7 @@ wbWorksheet <- R6::R6Class(
         if (!is.numeric(row)) stop("`row` must be numeric")
         self$append("rowBreaks", sprintf('<brk id="%i" max="16383" man="1"/>', round(row)))
       } else if (!is.null(col)) {
+        col <- col2int(col)
         if (!is.numeric(col)) stop("`col` must be numeric")
         self$append("colBreaks", sprintf('<brk id="%i" max="1048575" man="1"/>', round(col)))
       }
@@ -708,7 +710,10 @@ wbWorksheet <- R6::R6Class(
     #' @param value a new value
     #' @return The `wbWorksheetObject`, invisibly
     append = function(field, value = NULL) {
-      self[[field]] <- c(self[[field]], value)
+      current <- self[[field]]
+
+      self[[field]] <- c(current, value)
+
       invisible(self)
     },
 

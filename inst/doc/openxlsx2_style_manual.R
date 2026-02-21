@@ -35,7 +35,7 @@ border_sty <- "thin"
 # using ) to avoid counting manually which `dims` are spanned.
 dims_mat_header <- wb_dims(rows = 1, cols = seq_len(ncol(mat)))
 # returns "A1:AB1"
-# prepare workbook with data and formated first row
+# prepare workbook with data and formatted first row
 wb <- wb_workbook()$
   add_worksheet("test")$
   add_data(x = mat)$

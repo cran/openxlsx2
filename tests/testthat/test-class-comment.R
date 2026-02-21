@@ -161,7 +161,7 @@ test_that("print comment", {
   c2 <- wb_comment(text = "this is another comment",
                    author = "Marco Polo")
   got <- capture_output(print(c2), print = TRUE)
-  exp <- "Author: Marco Polo\nText:\n Marco Polo:\nthis is another comment\n\nStyle:\n\n\n\n\nFont name: Aptos Narrow\nFont size: 11\nFont color: #000000\n\n"
+  exp <- "Author: Marco Polo\nText:\n Marco Polo:\nthis is another comment\n\nStyle:\nFont name: Aptos Narrow\nFont size: 11\nFont color: #000000"
   expect_equal(got, exp)
 
 })
@@ -265,6 +265,9 @@ test_that("threaded comments work", {
   )
   got <- wb_get_thread(wb, dims = "A1")[, -1]
   expect_equal(exp, got)
+
+  wb <- wb_workbook()$add_worksheet()
+  expect_equal(wb$get_thread(), NULL)
 
 })
 
@@ -426,4 +429,44 @@ test_that("removing comment from second sheet works", {
   expect_equal(list(), wb$comments)
   expect_equal(list(), wb$vml)
 
+})
+
+test_that("get_comment works", {
+
+  c1 <- wb_comment(text = "this is a comment", author = "")
+  c2 <- wb_comment(text = "this too", author = "")
+
+  wb <- wb_workbook()$
+    add_worksheet("s1")$
+    add_comment(dims = "A1", comment = c1)$
+    add_worksheet("s2")$
+    add_comment(dims = "A1", comment = c2)
+
+  exp <- data.frame(
+    ref = "A1", author = "", comment = "this is a comment", cmmt_id = 1L,
+    stringsAsFactors = FALSE
+  )
+  got <- wb$get_comment(sheet = "s1", dims = "A1")
+  expect_equal(got, exp)
+
+  exp <- data.frame(
+    ref = "A1", author = "", comment = "this too", cmmt_id = 2L,
+    stringsAsFactors = FALSE
+  )
+  got <- wb$get_comment(sheet = "s2", dims = "A1")
+  expect_equal(got, exp)
+
+})
+
+test_that("threaded comment: excaping XML works", {
+  wb <- wb_workbook(creator = "John Doe")
+  wb <- wb_add_worksheet(wb)
+  wb <- wb_add_person(wb, name = "John Doe")
+  pid <- wb$get_person("John Doe")$id
+
+  cmt <- 'Five is < Twenty'
+  wb <- wb_add_thread(wb, sheet = 1, dims = "A1", person_id = pid, comment = cmt)
+
+  expect_equal(wb$get_thread()$text, cmt)
+  expect_true(grepl(cmt, wb$get_comment()$comment))
 })

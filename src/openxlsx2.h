@@ -6,6 +6,12 @@
 #define MAX_OOXML_COL_INT 16384
 #define MAX_OOXML_ROW_INT 1048576
 
+struct xml_string_writer : pugi::xml_writer {
+    std::string result;
+    void write(const void* data, size_t size) override {
+        result.append(static_cast<const char*>(data), size);
+    }
+};
 
 inline void check_xptr_validity(XPtrXML doc) {
   if (doc.get() == nullptr) {
@@ -18,12 +24,23 @@ Rcpp::IntegerVector col_to_int(Rcpp::CharacterVector x);
 SEXP si_to_txt(XPtrXML doc);
 SEXP is_to_txt(Rcpp::CharacterVector is_vec);
 
+std::string txt_to_xml(
+    const std::string& text,
+    bool no_escapes,
+    bool raw,
+    bool skip_control,
+    const std::string& type
+);
 std::string txt_to_is(std::string txt, bool no_escapes, bool raw, bool skip_control);
 std::string txt_to_si(std::string txt, bool no_escapes, bool raw, bool skip_control);
 
 // helper function to access element from Rcpp::Character Vector as string
 inline std::string to_string(Rcpp::Vector<16>::Proxy x) {
   return Rcpp::String(x);
+}
+
+inline bool sexp_str_less(SEXP a, SEXP b) {
+  return std::strcmp(CHAR(a), CHAR(b)) < 0;
 }
 
 inline void checkInterrupt(R_xlen_t& iteration, R_xlen_t frequency = 10000) {
@@ -91,24 +108,35 @@ static inline uint32_t uint_col_to_int(std::string& a) {
   return sum;
 }
 
-static inline std::string rm_rownum(const std::string& str) {
-  std::string result;
-  for (char c : str) {
-    if (!std::isdigit(c)) {
-      result += c;
+
+// lookup table using 256 for all possible unsigned char values
+static const std::array<char, 256> DIGIT_MASK = [] {
+  std::array<char, 256> m = {{0}};
+  m['0'] = 1; m['1'] = 1; m['2'] = 1; m['3'] = 1; m['4'] = 1;
+  m['5'] = 1; m['6'] = 1; m['7'] = 1; m['8'] = 1; m['9'] = 1;
+  return m;
+}();
+
+static inline std::string filter_digits(const char* s, bool keep_digits) {
+    if (!s) return "";
+
+    std::string buffer;
+    while (*s) {
+        bool is_dig = DIGIT_MASK[static_cast<unsigned char>(*s)];
+        if (is_dig == keep_digits) {
+            buffer.push_back(*s);
+        }
+        s++;
     }
-  }
-  return result;
+    return buffer;
+}
+
+static inline std::string rm_rownum(const std::string& str) {
+  return filter_digits(str.c_str(), false);
 }
 
 static inline std::string rm_colnum(const std::string& str) {
-  std::string result;
-  for (char c : str) {
-    if (std::isdigit(c)) {
-      result += c;
-    }
-  }
-  return result;
+  return filter_digits(str.c_str(), true);
 }
 
 // Function to keep only digits in a string

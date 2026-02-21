@@ -56,7 +56,7 @@ test_that("wb_set_col_widths works", {
     "<col min=\"10\" max=\"10\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"18.211\"/>"
   )
   got <- wb$worksheets[[1]]$cols_attr
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   wb <- wb_workbook()$add_worksheet()
   wb$worksheets[[1]]$cols_attr <- c(
@@ -90,7 +90,7 @@ test_that("merged cells are excluded from col width `auto` calculation", {
     "<col min=\"2\" max=\"2\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"4.711\"/>"
   )
   got <- wb$worksheets[[1]]$cols_attr
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 })
 
 test_that("option maxWidth works", {
@@ -105,7 +105,7 @@ test_that("option maxWidth works", {
 
   exp <- "<col min=\"1\" max=\"2\" bestFit=\"1\" customWidth=\"1\" hidden=\"false\" width=\"6\"/>"
   got <- wb$worksheets[[1]]$cols_attr
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -157,7 +157,7 @@ test_that("$set_sheet_names() and $get_sheet_names() work", {
 
   exp <- c(`Sheet 1` = "Sheet 1")
   got <- wb$get_sheet_names()
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 })
 
 # data validation ---------------------------------------------------------
@@ -208,7 +208,7 @@ test_that("data validation", {
     "<dataValidation type=\"textLength\" operator=\"between\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"E2:E151\"><formula1>7</formula1><formula2>9</formula2></dataValidation>"
   )
   got <- wb$worksheets[[1]]$dataValidations
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 
   exp <- c(
@@ -216,14 +216,14 @@ test_that("data validation", {
     "<dataValidation type=\"time\" operator=\"between\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"B2:B12\"><formula1>42369.7685185185</formula1><formula2>42370.2314814815</formula2></dataValidation>"
   )
   got <- wb$worksheets[[2]]$dataValidations
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 
   exp <- c(
     "<dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A2:A31\"><formula1>'Sheet 4'!$A$1:$A$10</formula1></dataValidation>"
   )
   got <- wb$worksheets[[3]]$dataValidations
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   wb$save(temp)
 
@@ -259,7 +259,7 @@ test_that("data validation", {
     "<dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"B2:B31\"><formula1>'Sheet 4'!$A$1:$A$10</formula1></dataValidation>"
   )
   got <- wb2$worksheets[[3]]$dataValidations
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   ### tests if conditions
 
@@ -277,7 +277,7 @@ test_that("data validation", {
 
   exp <- "<dataValidation type=\"whole\" operator=\"between\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A2:A151\"><formula1>1</formula1><formula2>9</formula2></dataValidation>"
   got <- wb$worksheets[[1]]$dataValidations
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 
   # to many values
@@ -353,7 +353,7 @@ test_that("data validation", {
 
   exp <- "<dataValidation type=\"whole\" operator=\"greaterThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1:A3\" errorStyle=\"information\" errorTitle=\"ERROR!\" error=\"Some error ocurred!\" promptTitle=\"PROMPT!\" prompt=\"Choose something!\"><formula1>0</formula1></dataValidation>"
   got <- wb$worksheets[[1]]$dataValidations
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   # add custom data
   wb <- wb_workbook()$
@@ -364,7 +364,7 @@ test_that("data validation", {
 
   exp <- "<dataValidation type=\"custom\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1:A3\"><formula1>A1=B1</formula1></dataValidation>"
   got <- wb$worksheets[[1]]$dataValidations
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -393,7 +393,7 @@ test_that("clone worksheet", {
     "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing5.xml\"/>"
   )
   got <- wb$worksheets_rels[[5]]
-  expect_equal(exp, got)
+  expect_equal(got, exp)
   # wb$open()
 
   # clone drawing ---------------------------------------------------------
@@ -445,11 +445,11 @@ test_that("set and remove row heights work", {
       ht = c("24", "42", "28", "33", "32"),
       r = c("1", "2", "4", "19", "22")
     ),
-    row.names = c(1L, 2L, 4L, 19L, 22L),
+    row.names = c(1L, 4L, 2L, 5L, 3L),
     class = "data.frame"
   )
-  got <- wb$worksheets[[1]]$sheet_data$row_attr[c(1, 2, 4, 19, 22), c("customHeight", "ht", "r")]
-  expect_equal(exp, got)
+  got <- wb$worksheets[[1]]$sheet_data$row_attr[1:5, c("customHeight", "ht", "r")]
+  expect_equal(got, exp)
 
   ## remove row heights
   wb$remove_row_heights(rows = 1:21)
@@ -459,11 +459,11 @@ test_that("set and remove row heights work", {
       ht = c("", "", "", "", "32"),
       r = c("1", "2", "4", "19", "22")
     ),
-    row.names = c(1L, 2L, 4L, 19L, 22L),
+    row.names = c(1L, 4L, 2L, 5L, 3L),
     class = "data.frame"
   )
-  got <- wb$worksheets[[1]]$sheet_data$row_attr[c(1, 2, 4, 19, 22), c("customHeight", "ht", "r")]
-  expect_equal(exp, got)
+  got <- wb$worksheets[[1]]$sheet_data$row_attr[1:5, c("customHeight", "ht", "r")]
+  expect_equal(got, exp)
 
   expect_warning(
     wb$add_worksheet()$remove_row_heights(rows = 1:3),
@@ -488,7 +488,7 @@ test_that("set and remove row heights work", {
   )
   got <- table(wb$worksheets[[1]]$sheet_data$row_attr$hidden)
 
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -506,7 +506,7 @@ test_that("set and remove row heights work", {
 
   exp <- c("99999", "100000", "100001")
   got <- wb$worksheets[[1]]$sheet_data$row_attr$r
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   wb$remove_row_heights(rows = rows)
 
@@ -544,6 +544,29 @@ test_that("add_drawing works", {
   img <- system.file("extdata", "einstein.jpg", package = "openxlsx2")
 
   expect_silent(wb$add_image(file = img))
+
+  skip_if_not_installed("rvg", minimum_version = "0.4.1")
+
+  tmp <- tempfile(fileext = ".xml")
+
+  rvg::dml_xlsx(file = tmp, width = 6, height = 5, offx = 0, offy = 0)
+  print(
+    ggplot2::ggplot(
+      ggplot2::faithfuld, ggplot2::aes(waiting, eruptions, fill = density)
+    ) +
+      ggplot2::geom_raster() +
+      ggplot2::scale_fill_viridis_c()
+  )
+  dev.off()
+
+  wb <- wb_workbook()$
+    add_worksheet("raster")$
+    add_drawing(xml = tmp, dims = "A1")
+
+  expect_equal(length(wb$drawings_rels[[1]]), 2L)
+  expect_equal(length(wb$media), 2L)
+
+  unlink(tmp, recursive = TRUE)
 
 })
 
@@ -617,7 +640,7 @@ test_that("add_drawing works", {
     "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart\" Target=\"../charts/chart2.xml\"/>"
   )
   got <- wb$drawings_rels
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 
   # write data starting at B2
@@ -636,7 +659,7 @@ test_that("add_drawing works", {
     character(0)
   )
   got <- wb$worksheets_rels
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   ## write different anchors
   wb <- wb_workbook()$
@@ -702,7 +725,7 @@ test_that("add_chartsheet works", {
 
   exp <- "xdr:absoluteAnchor"
   got <- xml_node_name(unlist(wb$drawings), "xdr:wsDr")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -729,10 +752,10 @@ test_that("multiple charts on a sheet work as expected", {
 
   exp <- c(TRUE, TRUE)
   got <- grepl(pattern = "<c:chart xmlns:c=\"http://schemas.openxmlformats.org/drawingml/2006/chart\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"rId1\"/>", wb$drawings)
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   got <- grepl(pattern = "<c:chart xmlns:c=\"http://schemas.openxmlformats.org/drawingml/2006/chart\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"rId2\"/>", wb$drawings)
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -750,19 +773,19 @@ test_that("various image functions work as expected", {
 
   exp <- c("xdr:absoluteAnchor", "xdr:oneCellAnchor", "xdr:twoCellAnchor")
   got <- xml_node_name(wb$drawings, level1 = "xdr:wsDr")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   exp <- "<xdr:from><xdr:col>1</xdr:col><xdr:colOff>90000</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>90000</xdr:rowOff></xdr:from>"
   got <- xml_node(wb$drawings[[2]], "xdr:wsDr", "xdr:oneCellAnchor", "xdr:from")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   exp <- "<xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>"
   got <- xml_node(wb$drawings[[3]], "xdr:wsDr", "xdr:twoCellAnchor", "xdr:from")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   exp <- "<xdr:to><xdr:col>11</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>8</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>"
   got <- xml_node(wb$drawings[[3]], "xdr:wsDr", "xdr:twoCellAnchor", "xdr:to")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   expect_warning(
     wb$add_worksheet()$add_image(file = img, width = 6, height = 5, dims = NULL, start_row = 2, start_col = 2),
@@ -785,7 +808,7 @@ test_that("image relships work with comment", {
 
   exp <- "<drawing r:id=\"rId3\"/>"
   got <- wb$worksheets[[1]]$drawing
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -795,14 +818,14 @@ test_that("start_col/start_row works as expected", {
 
   exp <- "<xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>4</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>"
   got <- xml_node(wb$drawings[[1]], "xdr:wsDr", "xdr:oneCellAnchor", "xdr:from")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   img <- system.file("extdata", "einstein.jpg", package = "openxlsx2")
   expect_warning(wb <- wb_workbook()$add_worksheet()$add_image(file = img, start_row = 5), "'start_col/start_row' is deprecated.")
 
   exp <- "<xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>4</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>"
   got <- xml_node(wb$drawings[[1]], "xdr:wsDr", "xdr:oneCellAnchor", "xdr:from")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 
   img <- system.file("extdata", "einstein.jpg", package = "openxlsx2")
@@ -810,14 +833,14 @@ test_that("start_col/start_row works as expected", {
 
   exp <- "<xdr:from><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>"
   got <- xml_node(wb$drawings[[1]], "xdr:wsDr", "xdr:oneCellAnchor", "xdr:from")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   img <- system.file("extdata", "einstein.jpg", package = "openxlsx2")
   expect_warning(wb <- wb_workbook()$add_worksheet()$add_image(file = img, start_col = 5), "'start_col/start_row' is deprecated.")
 
   exp <- "<xdr:from><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>"
   got <- xml_node(wb$drawings[[1]], "xdr:wsDr", "xdr:oneCellAnchor", "xdr:from")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 
   img <- system.file("extdata", "einstein.jpg", package = "openxlsx2")
@@ -825,7 +848,7 @@ test_that("start_col/start_row works as expected", {
 
   exp <- "<xdr:from><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>4</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>"
   got <- xml_node(wb$drawings[[1]], "xdr:wsDr", "xdr:oneCellAnchor", "xdr:from")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 
   img <- system.file("extdata", "einstein.jpg", package = "openxlsx2")
@@ -833,7 +856,7 @@ test_that("start_col/start_row works as expected", {
 
   exp <- "<xdr:from><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>4</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>"
   got <- xml_node(wb$drawings[[1]], "xdr:wsDr", "xdr:oneCellAnchor", "xdr:from")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 })
 
 test_that("workbook themes work", {
@@ -841,22 +864,22 @@ test_that("workbook themes work", {
   wb <- wb_workbook()$add_worksheet()
   exp <- "Aptos Narrow"
   got <- wb$get_base_font()$name$val
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   wb <- wb_workbook(theme = "Office 2013 - 2022 Theme")$add_worksheet()
   exp <- "Calibri"
   got <- wb$get_base_font()$name$val
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   wb <- wb_workbook(theme = "Old Office Theme")$add_worksheet()
   exp <- "Calibri"
   got <- wb$get_base_font()$name$val
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   wb <- wb_workbook(theme = 1)$add_worksheet()
   exp <- "Rockwell"
   got <- wb$get_base_font()$name$val
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   expect_message(
     wb <- wb_workbook(theme = "Foo")$add_worksheet(),
@@ -864,7 +887,7 @@ test_that("workbook themes work", {
   )
   exp <- "Aptos Narrow"
   got <- wb$get_base_font()$name$val
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -881,7 +904,7 @@ test_that("changing sheet names works with named regions", {
     "<definedName name=\"barref\" localSheetId=\"1\">'new name'!$B$4</definedName>"
   )
   got <- wb$workbook$definedNames[seq_len(2)]
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -918,7 +941,7 @@ test_that("numfmt in pivot tables works", {
     "<dataField name=\"Sum of Units\" fld=\"3\" baseField=\"0\" baseItem=\"0\" numFmtId=\"10\"/>"
   )
   got <- xml_node(wb$pivotTables, "pivotTableDefinition", "dataFields", "dataField")
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   ## sort by column and row
   df <- mtcars
@@ -942,7 +965,7 @@ test_that("numfmt in pivot tables works", {
     "<pivotField axis=\"axisCol\" showAll=\"0\" sortType=\"descending\"><items count=\"4\"><item x=\"1\"/><item x=\"0\"/><item x=\"2\"/><item t=\"default\"/></items><autoSortScope><pivotArea dataOnly=\"0\" outline=\"0\" fieldPosition=\"0\"><references count=\"1\"><reference field=\"4294967294\" count=\"1\" selected=\"0\"><x v=\"1\"/></reference></references></pivotArea></autoSortScope></pivotField>"
   )
   got <- xml_node(wb$pivotTables[1], "pivotTableDefinition", "pivotFields", "pivotField")[c(2, 10)]
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   expect_warning(
     wb$add_pivot_table(df, dims = "A3", rows = "cyl", cols = "gear",
@@ -980,7 +1003,7 @@ test_that("numfmt in pivot tables works", {
 
   exp <- c("", "ascending", "", "", "", "", "", "", "", "descending", "")
   got <- rbindlist(xml_attr(wb$pivotTables, "pivotTableDefinition", "pivotFields", "pivotField"))$sortType
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -1020,7 +1043,7 @@ test_that("wbWorkbook print works", {
            " Sheets: Sheet 1, Sheet 1 (1), Sheet & NoSheet ",
            " Write order: 1, 2, 3")
   got <- capture.output(wb)
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -1057,7 +1080,7 @@ test_that("subsetting wb_data() works", {
 
   exp <- rep("0-39g/day", 3)
   got <- unclass(df1[, 2])
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   exp <- structure(
     list(
@@ -1075,7 +1098,7 @@ test_that("subsetting wb_data() works", {
     sheet = "Sheet 1"
   )
   got <- unclass(df1[1:2, 1:2])
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   expect_null(attributes(df1[c("agegp")]))
 
@@ -1091,7 +1114,7 @@ test_that("subsetting wb_data() works", {
     sheet = "Sheet 1"
   )
   got <- attributes(df1[c("agegp"), drop = FALSE])
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   exp <- list(
     names = c("alcgp", "tobgp", "ncases"),
@@ -1109,7 +1132,7 @@ test_that("subsetting wb_data() works", {
     sheet = "Sheet 1"
   )
   got <- attributes(df1[c("alcgp", "tobgp", "ncases")])
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   exp <- list(
     names = c("agegp", "alcgp", "tobgp", "ncases", "ncontrols"),
@@ -1129,7 +1152,7 @@ test_that("subsetting wb_data() works", {
     sheet = "Sheet 1"
   )
   got <- attributes(df1[-1, ])
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   exp <- list(
     names = c("agegp", "alcgp", "tobgp", "ncases", "ncontrols"),
@@ -1148,7 +1171,7 @@ test_that("subsetting wb_data() works", {
     ),
     sheet = "Sheet 1")
   got <- attributes(df1[-nrow(df1), ])
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -1242,7 +1265,7 @@ test_that("adding mips section works", {
 
   exp <- "3"
   got <- rbindlist(xml_attr(wb$get_mips(single_xml = FALSE)[1], "property"))$pid
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
 })
 
@@ -1272,7 +1295,7 @@ test_that("using and removing secondary bookviews works", {
          xWindow = c("15120", "0"), yWindow = c("760", "760")),
     row.names = c(NA, 2L), class = "data.frame")
   got <- wb$get_bookview()
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   # remove the first view
   exp <- structure(
@@ -1280,7 +1303,7 @@ test_that("using and removing secondary bookviews works", {
          xWindow = c("0"), yWindow = c("760")),
     row.names = c(NA, 1L), class = "data.frame")
   got <- wb_remove_bookview(wb, view = 1)$get_bookview()
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   # keep only the first view
   exp <- structure(
@@ -1288,12 +1311,12 @@ test_that("using and removing secondary bookviews works", {
          xWindow = c("15120"), yWindow = c("760")),
     row.names = c(NA, 1L), class = "data.frame")
   got <- wb_remove_bookview(wb, view = -1)$get_bookview()
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   wb <- wb_workbook()$add_worksheet()
   exp <- structure(list(), row.names = c(NA, 1L), names = character(0), class = "data.frame")
   got <- wb_remove_bookview(wb, view = 1)$get_bookview()
-  expect_equal(exp, got)
+  expect_equal(got, exp)
 
   expect_error(
     wb <- wb_workbook()$add_worksheet()$set_bookview(view = 3),
@@ -1494,4 +1517,16 @@ test_that("standardize warning works", {
     ),
     "unused arguments"
   )
+})
+
+test_that("warn on duplicated names", {
+
+  wb <- wb_workbook()
+  wb <- wb_add_worksheet(wb, sheet = 'Sheet name')
+
+  expect_warning(
+    wb_add_worksheet(wb, sheet = 'Sheet name'),
+    "Fixing: a sheet with name \"Sheet name\" already exists. Creating a unique sheetname"
+  )
+
 })

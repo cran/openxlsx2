@@ -1,4 +1,5 @@
 #include <algorithm>
+
 #include "openxlsx2.h"
 
 // For R-devel 4.3 character length on Windows was modified. This caused an
@@ -175,72 +176,74 @@ Rcpp::CharacterVector ox_int_to_col(Rcpp::NumericVector x) {
 SEXP rbindlist(Rcpp::List x) {
   R_xlen_t nn = Rf_xlength(x);
 
-  // --- 1. Collect all unique names ---
-  std::set<std::string> unique_names_set;
+  std::vector<SEXP> col_names_tmp;
+  col_names_tmp.reserve(16);
+
+  std::unordered_set<SEXP> seen;
+  seen.reserve(16);
+
   for (R_xlen_t i = 0; i < nn; ++i) {
     if (Rf_isNull(x[i])) continue;
 
-    // Check if the SEXP has names attribute before casting to CharacterVector
-    if (!Rf_isNewList(x[i]) && !Rf_isVector(x[i])) continue;
-    if (Rcpp::as<Rcpp::List>(x[i]).hasAttribute("names")) {
-      Rcpp::CharacterVector names_i = Rcpp::as<Rcpp::List>(x[i]).attr("names");
-      for (R_xlen_t j = 0; j < Rf_xlength(names_i); ++j) {
-        unique_names_set.insert(Rcpp::as<std::string>(names_i[j]));
+    SEXP vec = x[i];
+    SEXP names = Rf_getAttrib(vec, R_NamesSymbol);
+    if (names == R_NilValue) continue;
+
+    R_xlen_t k = Rf_xlength(names);
+    for (R_xlen_t j = 0; j < k; ++j) {
+      SEXP nm = STRING_ELT(names, j);
+      if (seen.insert(nm).second) {
+        col_names_tmp.push_back(nm);
       }
     }
   }
 
-  // --- 2. Map names to final column index ---
-  std::vector<std::string> final_names(unique_names_set.begin(), unique_names_set.end());
-  R_xlen_t kk = static_cast<R_xlen_t>(final_names.size());
+  std::sort(col_names_tmp.begin(), col_names_tmp.end(), sexp_str_less);
 
-  std::unordered_map<std::string, R_xlen_t> name_to_idx;
-  name_to_idx.reserve(static_cast<uint64_t>(kk));
-  for (R_xlen_t i = 0; i < kk; ++i) {
-    name_to_idx[final_names[static_cast<uint64_t>(i)]] = i;
+  R_xlen_t kk = static_cast<R_xlen_t>(col_names_tmp.size());
+
+  std::unordered_map<SEXP, R_xlen_t> name_to_idx;
+  name_to_idx.reserve(static_cast<size_t>(kk));
+
+  for (R_xlen_t j = 0; j < kk; ++j) {
+    name_to_idx[col_names_tmp[static_cast<size_t>(j)]] = j;
   }
 
-  // --- 3. Allocate final DataFrame list ---
   Rcpp::List df(kk);
-  for (R_xlen_t i = 0; i < kk; ++i) {
-    SET_VECTOR_ELT(df, i, Rcpp::CharacterVector(nn));
+  Rcpp::CharacterVector col_names(kk);
+  std::vector<SEXP> cols(static_cast<size_t>(kk));
+
+  for (R_xlen_t j = 0; j < kk; ++j) {
+    SEXP col = Rf_allocVector(STRSXP, nn);
+    SET_VECTOR_ELT(df, j, col);
+    cols[static_cast<size_t>(j)] = col;
+    col_names[j] = col_names_tmp[static_cast<size_t>(j)];
   }
 
-  // Pre-fetch references to the output vectors for fast assignment
-  std::vector<Rcpp::CharacterVector> output_cols;
-  output_cols.reserve(static_cast<size_t>(kk));
-  for (R_xlen_t i = 0; i < kk; ++i) {
-    output_cols.push_back(Rcpp::as<Rcpp::CharacterVector>(df[i]));
-  }
-
-  // --- 4. Fill the final columns row by row ---
   for (R_xlen_t i = 0; i < nn; ++i) {
     if (Rf_isNull(x[i])) continue;
 
-    Rcpp::CharacterVector current_vec = x[i];
+    SEXP vec = x[i];
+    SEXP names = Rf_getAttrib(vec, R_NamesSymbol);
+    if (names == R_NilValue) continue;
 
-    // Check for names before accessing the attribute
-    if (!current_vec.hasAttribute("names")) continue;
+    R_xlen_t k = Rf_xlength(vec);
 
-    Rcpp::CharacterVector current_names = current_vec.attr("names");
-
-    for (R_xlen_t j = 0; j < Rf_xlength(current_vec); ++j) {
-      // Get the column name and find its index (O(1) average lookup)
-      std::string current_name = Rcpp::as<std::string>(current_names[j]);
-      auto it = name_to_idx.find(current_name);
-
+    for (R_xlen_t j = 0; j < k; ++j) {
+      SEXP nm = STRING_ELT(names, j);
+      auto it = name_to_idx.find(nm);
       if (it != name_to_idx.end()) {
-        R_xlen_t col_idx = it->second;
-
-        // Optimized assignment using pre-fetched vector reference
-        output_cols[static_cast<size_t>(col_idx)][i] = current_vec[j];
+        SET_STRING_ELT(
+          cols[static_cast<size_t>(it->second)],
+          i,
+          STRING_ELT(vec, j)
+        );
       }
     }
   }
 
-  // --- 5. Finalize DataFrame attributes ---
   df.attr("row.names") = Rcpp::IntegerVector::create(NA_INTEGER, -nn);
-  df.attr("names") = Rcpp::CharacterVector(final_names.begin(), final_names.end());
+  df.attr("names") = col_names;
   df.attr("class") = "data.frame";
 
   return df;
@@ -581,12 +584,13 @@ void long_to_wide(Rcpp::DataFrame z, Rcpp::DataFrame tt, Rcpp::DataFrame zz) {
   Rcpp::IntegerVector typs = zz["typ"];
 
   // Cache all column vectors to avoid repeated coercion
-  std::vector<Rcpp::CharacterVector> z_cols(static_cast<size_t>(z.size()));
-  std::vector<Rcpp::IntegerVector> tt_cols(static_cast<size_t>(tt.size()));
+  R_xlen_t num_cols = z.size();
+  std::vector<SEXP> z_cols(static_cast<size_t>(num_cols));
+  std::vector<int*> tt_cols(static_cast<size_t>(num_cols));
 
-  for (R_xlen_t j = 0; j < z.size(); ++j) {
+  for (R_xlen_t j = 0; j < num_cols; ++j) {
     z_cols[static_cast<size_t>(j)] = z[j];
-    tt_cols[static_cast<size_t>(j)] = tt[j];
+    tt_cols[static_cast<size_t>(j)] = INTEGER(SEXP(tt[j]));
   }
 
   for (R_xlen_t i = 0; i < n; ++i) {
@@ -594,8 +598,11 @@ void long_to_wide(Rcpp::DataFrame z, Rcpp::DataFrame tt, Rcpp::DataFrame zz) {
     int32_t row = rows[i];
 
     if (row != NA_INTEGER && col != NA_INTEGER) {
-      SET_STRING_ELT(z_cols[static_cast<size_t>(col)], row, STRING_ELT(vals, i));
-      INTEGER(tt_cols[static_cast<size_t>(col)])[row] = INTEGER(typs)[i];
+      R_xlen_t col_idx = static_cast<R_xlen_t>(col);
+      R_xlen_t row_idx = static_cast<R_xlen_t>(row);
+
+      SET_STRING_ELT(z_cols[static_cast<size_t>(col_idx)], row_idx, STRING_ELT(vals, i));
+      tt_cols[static_cast<size_t>(col_idx)][row_idx] = typs[i];
     }
   }
 }
@@ -682,6 +689,11 @@ void wide_to_long(
   SEXP c_cm_sexp_const = Rf_mkChar(c_cm.c_str());
 
   R_xlen_t iter_count = 0;
+  const int MAX_VTYP_ID = CELLTYPE_MAX;  // enum celltype
+  Rcpp::CharacterVector vtyp_sexp_cache(MAX_VTYP_ID + 1);
+  for (int type_id = 0; type_id <= MAX_VTYP_ID; ++type_id) {
+    vtyp_sexp_cache[type_id] = std::to_string(type_id);
+  }
 
   // --- 4. Main Wide-to-Long Loop ---
   for (R_xlen_t i = 0; i < m; ++i) {
@@ -801,9 +813,7 @@ void wide_to_long(
         SET_STRING_ELT(zz_c_t, pos, expr_sexp);
       }
 
-      if (has_typ) {
-        SET_STRING_ELT(zz_typ, pos, Rf_mkChar(std::to_string(vtyp).c_str()));
-      }
+      if (has_typ) SET_STRING_ELT(zz_typ, pos, vtyp_sexp_cache[vtyp]);
     }
   }
 }
@@ -909,9 +919,9 @@ Rcpp::DataFrame read_xml2df(XPtrXML xml, std::string vec_name, std::vector<std::
       if (nams.count(cld_name) == 0) {
         Rcpp::warning("%s: not found in %s name table", cld_name, vec_name);
       } else {
-        std::ostringstream oss;
-        cld.print(oss, " ", pugi_format_flags);
-        std::string cld_value = oss.str();
+        xml_string_writer writer;
+        cld.print(writer, " ", pugi_format_flags);
+        std::string cld_value = std::move(writer.result);
 
         R_xlen_t mtc = std::distance(nams.begin(), find_res);
         Rcpp::as<Rcpp::CharacterVector>(df[mtc])[itr] = cld_value;
@@ -993,9 +1003,9 @@ Rcpp::CharacterVector write_df2xml(Rcpp::DataFrame df, std::string vec_name, std
         Rcpp::warning("%s: not found in %s name table", attr_j, vec_name);
     }
 
-    std::ostringstream oss;
-    doc.print(oss, " ", pugi_format_flags);
-    z[i] = oss.str();
+    xml_string_writer writer;
+    doc.print(writer, " ", pugi_format_flags);
+    z[i] = std::move(writer.result);
   }
 
   return z;
@@ -1024,11 +1034,38 @@ Rcpp::CharacterVector df_to_xml(std::string name, Rcpp::DataFrame df_col) {
       }
     }
 
-    std::ostringstream oss;
-    doc.print(oss, " ", pugi::format_raw);
-
-    z[i] = oss.str();
+    xml_string_writer writer;
+    doc.print(writer, " ", pugi::format_raw);
+    z[i] = std::move(writer.result);
   }
 
   return z;
+}
+
+// [[Rcpp::export]]
+SEXP cdigit(Rcpp::CharacterVector x, bool as_integer = false) {
+  R_xlen_t n = Rf_xlength(x);
+
+  if (as_integer) {
+    Rcpp::IntegerVector res(n);
+    for (R_xlen_t i = 0; i < n; ++i) {
+      if (Rcpp::CharacterVector::is_na(x[i])) {
+        res[i] = NA_INTEGER;
+        continue;
+      }
+      std::string cleaned = filter_digits(CHAR(STRING_ELT(x, i)), true);
+      res[i] = (cleaned.empty()) ? NA_INTEGER : std::stoi(cleaned);
+    }
+    return res;
+  } else {
+    Rcpp::CharacterVector res(n);
+    for (R_xlen_t i = 0; i < n; ++i) {
+      if (Rcpp::CharacterVector::is_na(x[i])) {
+        res[i] = NA_STRING;
+        continue;
+      }
+      res[i] = filter_digits(CHAR(STRING_ELT(x, i)), true);
+    }
+    return res;
+  }
 }

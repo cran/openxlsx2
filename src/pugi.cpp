@@ -36,9 +36,9 @@ SEXP readXML(std::string path, bool isfile, bool escapes, bool declaration, bool
     return ptr;
   }
 
-  std::ostringstream oss;
-  doc->print(oss, " ", pugi_format_flags);
-  return Rcpp::wrap(Rcpp::String(oss.str()));
+  xml_string_writer writer;
+  doc->print(writer, " ", pugi_format_flags);
+  return Rcpp::wrap(Rcpp::String(writer.result));
 }
 
 inline uint32_t pugi_format(XPtrXML doc) {
@@ -104,207 +104,113 @@ SEXP getXMLXPtrNamePath(XPtrXML doc, std::vector<std::string> path) {
   return Rcpp::wrap(res);
 }
 
-// [[Rcpp::export]]
-SEXP getXMLXPtrPath(XPtrXML doc, std::vector<std::string> path) {
-
-  check_xptr_validity(doc);
-
-  vec_string res;
-  uint32_t pugi_format_flags = pugi_format(doc);
-
-  // Validate tag names: no empty strings allowed
-  for (const std::string& tag : path) {
-    if (tag.empty()) {
-      Rcpp::stop("Tag names cannot be empty strings");
-    }
-  }
-
-  // Return whole document if no path is specified
-  if (path.empty()) {
-    std::ostringstream oss;
-    doc->print(oss, " ", pugi_format_flags);
-    res.push_back(Rcpp::String(oss.str()));
-    return Rcpp::wrap(res);
-  }
-
-  // Step 1: start from top-level nodes that match path[0] or wildcard
+// helper for path-finding
+std::vector<pugi::xml_node> find_nodes_by_path(pugi::xml_document* doc, const std::vector<std::string>& path) {
   std::vector<pugi::xml_node> current_nodes;
-  if (path[0] == "*") {
-    for (pugi::xml_node node : doc->children()) {
-      current_nodes.push_back(node);
-    }
-  } else {
-    for (pugi::xml_node node : doc->children(path[0].c_str())) {
+
+  const std::string& first_tag = path[0];
+  for (pugi::xml_node node : doc->children()) {
+    if (first_tag == "*" || (node.type() == pugi::node_element && first_tag == node.name())) {
       current_nodes.push_back(node);
     }
   }
 
-  // Step 2: traverse remaining path
   for (size_t i = 1; i < path.size(); ++i) {
-    const std::string& tag = path[i];
-    std::vector<pugi::xml_node> next_nodes;
+    if (current_nodes.empty()) break;
 
-    for (const pugi::xml_node& node : current_nodes) {
-      if (tag == "*") {
-        for (pugi::xml_node child : node.children()) {
-          next_nodes.push_back(child);
-        }
-      } else {
-        for (pugi::xml_node child : node.children(tag.c_str())) {
+    const std::string& tag = path[i];
+    if (tag.empty()) Rcpp::stop("Tag names cannot be empty strings");
+
+    std::vector<pugi::xml_node> next_nodes;
+    next_nodes.reserve(current_nodes.size());
+
+    for (const auto& node : current_nodes) {
+      for (pugi::xml_node child : node.children()) {
+        if (tag == "*" || (child.type() == pugi::node_element && tag == child.name())) {
           next_nodes.push_back(child);
         }
       }
     }
-
     current_nodes = std::move(next_nodes);
   }
 
-  // Step 3: serialize final result
-  for (const pugi::xml_node& node : current_nodes) {
-    std::ostringstream oss;
-    node.print(oss, " ", pugi_format_flags);
-    res.push_back(Rcpp::String(oss.str()));
+  return current_nodes;
+}
+
+// [[Rcpp::export]]
+SEXP getXMLXPtrPath(XPtrXML doc, std::vector<std::string> path) {
+  check_xptr_validity(doc);
+  uint32_t pugi_format_flags = pugi_format(doc);
+
+  // If no path, return empty vector — or optionally, entire document text
+  if (path.empty()) {
+    xml_string_writer writer;
+    doc->print(writer, " ", pugi_format_flags);
+    return Rcpp::CharacterVector::create(writer.result);
   }
 
-  return Rcpp::wrap(res);
+  std::vector<pugi::xml_node> target_nodes = find_nodes_by_path(doc.get(), path);
+  Rcpp::CharacterVector res(static_cast<R_xlen_t>(target_nodes.size()));
+
+  for (R_xlen_t i = 0; i < res.size(); ++i) {
+    xml_string_writer writer;
+    target_nodes[static_cast<size_t>(i)].print(writer, " ", pugi_format_flags);
+    res[i] = Rcpp::String(writer.result);
+  }
+
+  return res;
 }
 
 // [[Rcpp::export]]
 SEXP getXMLXPtrValPath(XPtrXML doc, std::vector<std::string> path) {
-
   check_xptr_validity(doc);
 
-  std::vector<std::string> values;
+  if (path.empty()) return Rcpp::CharacterVector::create();
 
-  // Validate: no empty tag names
-  for (const std::string& tag : path) {
-    if (tag.empty()) {
-      Rcpp::stop("Tag names cannot be empty strings");
-    }
+  std::vector<pugi::xml_node> target_nodes = find_nodes_by_path(doc.get(), path);
+  Rcpp::CharacterVector res(static_cast<R_xlen_t>(target_nodes.size()));
+
+  for (R_xlen_t i = 0; i < res.size(); ++i) {
+    res[i] = Rcpp::String(target_nodes[static_cast<size_t>(i)].text().get());
   }
 
-  // If no path, return empty vector — or optionally, entire document text
-  if (path.empty()) {
-    return Rcpp::wrap(values);
-  }
-
-  // Step 1: start from top-level nodes matching path[0] or wildcard
-  std::vector<pugi::xml_node> current_nodes;
-  if (path[0] == "*") {
-    for (pugi::xml_node node : doc->children()) {
-      current_nodes.push_back(node);
-    }
-  } else {
-    for (pugi::xml_node node : doc->children(path[0].c_str())) {
-      current_nodes.push_back(node);
-    }
-  }
-
-  // Step 2: traverse the path
-  for (size_t i = 1; i < path.size(); ++i) {
-    const std::string& tag = path[i];
-    std::vector<pugi::xml_node> next_nodes;
-
-    for (const pugi::xml_node& node : current_nodes) {
-      if (tag == "*") {
-        for (pugi::xml_node child : node.children()) {
-          next_nodes.push_back(child);
-        }
-      } else {
-        for (pugi::xml_node child : node.children(tag.c_str())) {
-          next_nodes.push_back(child);
-        }
-      }
-    }
-
-    current_nodes = std::move(next_nodes);
-  }
-
-  // Step 3: extract .text().get() values
-  for (const pugi::xml_node& node : current_nodes) {
-    const char* text = node.text().get();
-    values.push_back(std::string(text));
-  }
-
-  return Rcpp::wrap(values);
+  return res;
 }
 
 // [[Rcpp::export]]
 SEXP getXMLXPtrAttrPath(XPtrXML doc, std::vector<std::string> path) {
-
   check_xptr_validity(doc);
+  std::vector<pugi::xml_node> target_nodes;
 
-  std::vector<pugi::xml_node> current_nodes;
-
-  // Validate: no empty tag names
-  for (const std::string& tag : path) {
-    if (tag.empty()) {
-      Rcpp::stop("Tag names cannot be empty strings");
-    }
-  }
-
-  // Handle root case (like getXMLXPtr1attr with no children)
   if (path.empty()) {
     for (pugi::xml_node node : doc->children()) {
-      current_nodes.push_back(node);
+      if (node.type() == pugi::node_element) {
+        target_nodes.push_back(node);
+      }
     }
   } else {
-    // First level
-    if (path[0] == "*") {
-      for (pugi::xml_node node : doc->children()) {
-        current_nodes.push_back(node);
-      }
-    } else {
-      for (pugi::xml_node node : doc->children(path[0].c_str())) {
-        current_nodes.push_back(node);
-      }
-    }
-
-    // Traverse further
-    for (size_t i = 1; i < path.size(); ++i) {
-      const std::string& tag = path[i];
-      std::vector<pugi::xml_node> next_nodes;
-
-      for (const auto& node : current_nodes) {
-        if (tag == "*") {
-          for (pugi::xml_node child : node.children()) {
-            next_nodes.push_back(child);
-          }
-        } else {
-          for (pugi::xml_node child : node.children(tag.c_str())) {
-            next_nodes.push_back(child);
-          }
-        }
-      }
-
-      current_nodes = std::move(next_nodes);
-    }
+    target_nodes = find_nodes_by_path(doc.get(), path);
   }
 
-  // Prepare result list
-  R_xlen_t n = std::max(static_cast<R_xlen_t>(1), static_cast<R_xlen_t>(current_nodes.size()));
-  Rcpp::List out(n);
-  R_xlen_t i = 0;
+  if (target_nodes.empty()) return Rcpp::List::create();
 
-  for (const auto& node : current_nodes) {
-    R_xlen_t attr_count = std::distance(node.attributes_begin(), node.attributes_end());
+  Rcpp::List out(static_cast<R_xlen_t>(target_nodes.size()));
+  for (R_xlen_t i = 0; i < out.size(); ++i) {
+    const auto& node = target_nodes[static_cast<size_t>(i)];
 
+    R_xlen_t attr_count = static_cast<R_xlen_t>(std::distance(node.attributes_begin(), node.attributes_end()));
+    Rcpp::CharacterVector attr_vals(attr_count);
     Rcpp::CharacterVector attr_names(attr_count);
-    Rcpp::CharacterVector attr_values(attr_count);
 
     R_xlen_t j = 0;
-    for (auto attr = node.attributes_begin(); attr != node.attributes_end(); ++attr, ++j) {
-      attr_names[j] = Rcpp::String(attr->name());
-      attr_values[j] = Rcpp::String(attr->value());
+    for (auto attr : node.attributes()) {
+      attr_names[j] = Rcpp::String(attr.name());
+      attr_vals[j] = Rcpp::String(attr.value());
+      j++;
     }
 
-    attr_values.attr("names") = attr_names;
-    out[i++] = attr_values;
-  }
-
-  // If no nodes matched, return empty list
-  if (current_nodes.empty()) {
-    return Rcpp::List();
+    attr_vals.attr("names") = attr_names;
+    out[i] = attr_vals;
   }
 
   return out;
@@ -324,10 +230,9 @@ SEXP printXPtr(XPtrXML doc, std::string indent, bool raw, bool attr_indent) {
   }
   if (attr_indent) pugi_format_flags |= pugi::format_indent_attributes;
 
-  std::ostringstream oss;
-  doc->print(oss, indent.c_str(), pugi_format_flags);
-
-  return Rcpp::wrap(Rcpp::String(oss.str()));
+  xml_string_writer writer;
+  doc->print(writer, indent.c_str(), pugi_format_flags);
+  return Rcpp::wrap(Rcpp::String(writer.result));
 }
 
 // [[Rcpp::export]]
@@ -369,6 +274,7 @@ XPtrXML write_xml_file(std::string xml_content, bool escapes) {
 //'
 //' @param xml_content some valid xml_node
 //' @param xml_attributes R vector of named attributes
+//' @param path optional path
 //' @param escapes bool if escapes should be used
 //' @param declaration bool if declaration should be imported
 //' @param remove_empty_attr bool remove empty attributes or ignore them
@@ -396,6 +302,7 @@ XPtrXML write_xml_file(std::string xml_content, bool escapes) {
 Rcpp::CharacterVector xml_attr_mod(
   std::string xml_content,
   Rcpp::CharacterVector xml_attributes,
+  Rcpp::Nullable<std::vector<std::string>> path = R_NilValue,
   bool escapes = false,
   bool declaration = false,
   bool remove_empty_attr = true
@@ -416,31 +323,43 @@ Rcpp::CharacterVector xml_attr_mod(
     if (!result) Rcpp::stop("Loading xml_content node failed: \n %s ", xml_content);
   }
 
-  std::vector<std::string> new_attr_nam = xml_attributes.names();
-  std::vector<std::string> new_attr_val = Rcpp::as<std::vector<std::string>>(xml_attributes);
+  std::vector<pugi::xml_node> target_nodes;
 
-  for (auto cld : doc.children()) {
-    for (size_t i = 0; i < static_cast<size_t>(xml_attributes.length()); ++i) {
-      // check if attribute_val is empty. if yes, remove the attribute.
-      // otherwise add or update the attribute
-      if (new_attr_val[i].empty()) {
-        if (remove_empty_attr)
-          cld.remove_attribute(new_attr_nam[i].c_str());
-      } else {
-        // update attribute if found else add attribute
-        if (cld.attribute(new_attr_nam[i].c_str())) {
-          cld.attribute(new_attr_nam[i].c_str()).set_value(new_attr_val[i].c_str());
+  if (path.isNotNull()) {
+    std::vector<std::string> p = Rcpp::as<std::vector<std::string>>(path);
+    target_nodes = find_nodes_by_path(&doc, p);
+  } else {
+    // Default behavior: targets immediate children of the document
+    for (auto cld : doc.children()) {
+      target_nodes.push_back(cld);
+    }
+  }
+
+  if (!target_nodes.empty()) {
+    std::vector<std::string> new_attr_nam = xml_attributes.names();
+    std::vector<std::string> new_attr_val = Rcpp::as<std::vector<std::string>>(xml_attributes);
+
+    for (auto& node : target_nodes) {
+      for (size_t i = 0; i < static_cast<size_t>(xml_attributes.length()); ++i) {
+        if (new_attr_val[i].empty()) {
+          if (remove_empty_attr)
+            node.remove_attribute(new_attr_nam[i].c_str());
         } else {
-          cld.append_attribute(new_attr_nam[i].c_str()) = new_attr_val[i].c_str();
+          // Update attribute if found, else append
+          pugi::xml_attribute attr = node.attribute(new_attr_nam[i].c_str());
+          if (attr) {
+            attr.set_value(new_attr_val[i].c_str());
+          } else {
+            node.append_attribute(new_attr_nam[i].c_str()) = new_attr_val[i].c_str();
+          }
         }
       }
     }
   }
 
-  std::ostringstream oss;
-  doc.print(oss, " ", pugi_format_flags);
-
-  return Rcpp::wrap(Rcpp::String(oss.str()));
+  xml_string_writer writer;
+  doc.print(writer, " ", pugi_format_flags);
+  return Rcpp::wrap(Rcpp::String(writer.result));
 }
 
 //' create xml_node from R objects
@@ -520,10 +439,9 @@ Rcpp::CharacterVector xml_node_create(
     }
   }
 
-  std::ostringstream oss;
-  doc.print(oss, " ", pugi_format_flags);
-
-  return Rcpp::wrap(Rcpp::String(oss.str()));
+  xml_string_writer writer;
+  doc.print(writer, " ", pugi_format_flags);
+  return Rcpp::wrap(Rcpp::String(writer.result));
 }
 
 // [[Rcpp::export]]
@@ -561,9 +479,9 @@ SEXP xml_append_child_path(XPtrXML node, XPtrXML child, std::vector<std::string>
   if (pointer) {
     return node;
   } else {
-    std::ostringstream oss;
-    node->print(oss, " ", pugi_format_flags);
-    return Rcpp::wrap(Rcpp::String(oss.str()));
+    xml_string_writer writer;
+    node->print(writer, " ", pugi_format_flags);
+    return Rcpp::wrap(Rcpp::String(writer.result));
   }
 }
 
@@ -607,8 +525,8 @@ SEXP xml_remove_child_path(XPtrXML node, std::string child, std::vector<std::str
   if (pointer) {
     return node;
   } else {
-    std::ostringstream oss;
-    node->print(oss, " ", pugi_format_flags);
-    return Rcpp::wrap(Rcpp::String(oss.str()));
+    xml_string_writer writer;
+    node->print(writer, " ", pugi_format_flags);
+    return Rcpp::wrap(Rcpp::String(writer.result));
   }
 }

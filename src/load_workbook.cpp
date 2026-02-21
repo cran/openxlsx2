@@ -1,4 +1,5 @@
 #include <set>
+
 #include "openxlsx2.h"
 
 // [[Rcpp::export]]
@@ -182,11 +183,11 @@ void loadvals(Rcpp::Environment sheet_data, XPtrXML doc) {
           single_xml_col.r = attr.value();
 
           // get col name
-          single_xml_col.c_r = rm_rownum(attr.value());
+          single_xml_col.c_r = filter_digits(attr.value(), false);
           has_colname = true;
 
           // get colnum
-          single_xml_col.row_r = rm_colnum(attr.value());
+          single_xml_col.row_r = filter_digits(attr.value(), true);
 
           // if some cells of the workbook have colnames but other dont,
           // this will increase itr_cols and avoid duplicates in cc
@@ -226,9 +227,9 @@ void loadvals(Rcpp::Environment sheet_data, XPtrXML doc) {
 
           // <is>
           else if (std::strcmp(val.name(), is_str) == 0) {
-            std::ostringstream oss;
-            val.print(oss, " ", pugi::format_raw | pugi::format_no_escapes);
-            single_xml_col.is = oss.str();
+            xml_string_writer writer;
+            val.print(writer, " ", pugi::format_raw | pugi::format_no_escapes);
+            single_xml_col.is = std::move(writer.result);
           }  // </is>
 
           else if (std::strcmp(val.name(), f_str) == 0) {  // <f>

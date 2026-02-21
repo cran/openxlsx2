@@ -27,6 +27,25 @@ if (getRversion() < "4.4.0") {
   `%||%` <- function(x, y) if (is.null(x)) y else x
 }
 
+# exists without inheriting
+exists_local <- function(x) {
+  exists(x, envir = parent.frame(), inherits = FALSE)
+}
+
+df_1 <- function(df) {
+  if (NROW(df) == 0) return(df[1, , drop = FALSE])
+  # faster than df[1, , drop = FALSE]
+  l <- lapply(df, `[[`, 1)
+  class(l) <- "data.frame"
+  attr(l, "row.names") <- c(NA_integer_, -1L)
+  l
+}
+
+convert_num <- function(i) {
+  if (any(i == "#NUM!", na.rm = TRUE)) i <- replace(i, i == "#NUM!", "NaN")
+  as.numeric(i)
+}
+
 #' helper function to create temporary directory for testing purpose
 #' @param name for the temp file
 #' @param macros logical if the file extension is xlsm or xlsx
@@ -1063,7 +1082,7 @@ get_relship_id <- function(obj, x) {
 #' @noRd
 filename_id <- function(x) {
   vapply(X = x,
-         FUN = function(file) as.integer(gsub("\\D+", "", basename(file))),
+         FUN = function(file) cdigit(basename(file), as_integer = TRUE),
          FUN.VALUE = NA_integer_)
 }
 
@@ -1461,6 +1480,11 @@ if (getRversion() < "4.0.0") {
 ## the R solution
 utilszip <- function(zip_path, source_dir, compression_level = 9) {
   if (!is.null(getOption("openxlsx2.debug"))) message("utils::zip")
+  zip_tool <- if (Sys.getenv("R_ZIPCMD", "zip") != "") {
+    Sys.getenv("R_ZIPCMD", "zip")
+  } else {
+    Sys.which("zip")
+  }
   original_wd <- getwd()
   on.exit(setwd(original_wd), add = TRUE)
   abs_zip_path <- normalizePath(zip_path, mustWork = FALSE)
@@ -1469,7 +1493,10 @@ utilszip <- function(zip_path, source_dir, compression_level = 9) {
   opt_flags <- getOption("openxlsx2.zip_flags")
   if (!is.null(opt_flags)) zip_flags <- opt_flags
   source_files <- list.files(source_dir, full.names = FALSE)
-  utils::zip(zipfile = abs_zip_path, files = source_files, flags = zip_flags)
+  utils::zip(
+    zipfile = abs_zip_path, files = source_files,
+    flags = zip_flags, zip = zip_tool
+  )
 }
 
 ## bsdtar seems to be the best fallback solution
@@ -1544,7 +1571,7 @@ zip_output <- function(zip_path, source_dir, compression_level = 9) {
   }
 
   if (!isTRUE(getOption("openxlsx2.no_utils_zip"))) {
-    if (Sys.which("zip") != "" || Sys.getenv("R_ZIPCMD") != "") {
+    if (Sys.which("zip") != "" || Sys.getenv("R_ZIPCMD", "zip") != "") {
       res <- utilszip(
         zip_path = zip_path,
         source_dir = source_dir,

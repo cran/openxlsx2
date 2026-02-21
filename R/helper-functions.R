@@ -176,7 +176,7 @@ write_comment_xml <- function(comment_list, file_name) {
 
   for (i in seq_along(comment_list)) {
     authorInd <- which(authors == comment_list[[i]]$author) - 1L
-    xml <- c(xml, sprintf('<comment ref="%s" authorId="%s" shapeId="0"><text>', comment_list[[i]]$ref, authorInd))
+    xml <- c(xml, sprintf('<comment ref="%s" authorId="%s"><text>', comment_list[[i]]$ref, authorInd)) #  shapeId="0"
 
     ## Comment can have optional authors. Style and text is mandatory
     for (j in seq_along(comment_list[[i]]$comment)) {
@@ -374,27 +374,82 @@ getFile <- function(xlsxFile) {
   xlsxFile
 }
 
-# Rotate the 15-bit integer by n bits to the
-hashPassword <- function(password) {
-  # password limited to 15 characters
-  # TODO add warning about password length
-  chars <- strsplit(substr(password, 1L, 15L), "")[[1]]
+hashPassword <- function(password, sha = 512, spin_count = 100000) {
 
-  # See OpenOffice's documentation of the Excel format: http://www.openoffice.org/sc/excelfileformat.pdf
-  # Start from the last character and for each character
-  # - XOR hash with the ASCII character code
-  # - rotate hash (16 bits) one bit to the left
-  # Finally, XOR hash with 0xCE4B and XOR with password length
-  # Output as hex (uppercase)
-  rotate16bit <- function(hash, n = 1) {
-    bitwOr(bitwAnd(bitwShiftR(hash, 15 - n), 0x01), bitwAnd(bitwShiftL(hash, n), 0x7fff))
+  legacy <- getOption("openxlsx2.legacy_password", FALSE)
+
+  if (!legacy && !is.null(sha) && requireNamespace("openssl", quietly = TRUE)) {
+
+    salt <- openssl::rand_bytes(16)
+
+    password_utf16le_raw <- iconv(
+      enc2utf8(password),
+      to = "UTF-16LE",
+      toRaw = TRUE
+    )[[1]]
+
+    if (sha == 1) {
+      openssl_sha <- function(x) as.raw(openssl::sha1(x))
+      algo <- "SHA-1"
+    } else if (sha == 256) {
+      openssl_sha <- function(x) as.raw(openssl::sha256(x))
+      algo <- "SHA-256"
+    } else if (sha == 384) {
+      openssl_sha <- function(x) as.raw(openssl::sha384(x))
+      algo <- "SHA-384"
+    } else { # sha == 512
+      openssl_sha <- function(x) as.raw(openssl::sha512(x))
+      algo <- "SHA-512"
+    }
+
+    hashed_password <- openssl_sha(c(salt, password_utf16le_raw))
+
+    if (spin_count > 0) {
+      for (i in 0:(spin_count - 1)) {
+        index_bytes <- writeBin(as.integer(i), raw(), size = 4, endian = "little")
+        hashed_password <- openssl_sha(c(hashed_password, index_bytes))
+      }
+    }
+
+    list(
+      hash = openssl::base64_encode(hashed_password),
+      salt = openssl::base64_encode(salt),
+      spin = as.integer(spin_count),
+      algo = algo
+    )
+
+  } else {
+
+    # TODO warn on legacy password usage
+
+    if (nchar(password) > 15) {
+      warning("Excel password protection only uses the first 15 characters.", call. = FALSE)
+      password <- substr(password, 1, 15)
+    }
+
+    chars <- as.integer(charToRaw(password))
+    hash <- 0L
+
+    # Process characters in reverse (per specification)
+    for (char in rev(chars)) {
+      hash <- bitwXor(hash, char)
+      # 16-bit left rotation
+      hash <- bitwOr(
+        bitwAnd(bitwShiftL(hash, 1), 0x7FFF),
+        bitwShiftR(bitwAnd(hash, 0x4000), 14)
+      )
+    }
+
+    hash <- bitwXor(bitwXor(hash, length(chars)), 0xCE4B)
+    hash <- toupper(as.character(as.hexmode(hash)))
+
+    list(
+      hash = hash,
+      salt = "",
+      spin = "",
+      algo = ""
+    )
   }
-  hash <- Reduce(function(char, h) {
-    h <- bitwXor(h, as.integer(charToRaw(char)))
-    rotate16bit(h, 1)
-  }, chars, 0, right = TRUE)
-  hash <- bitwXor(bitwXor(hash, length(chars)), 0xCE4B)
-  format(as.hexmode(hash), upper.case = TRUE)
 }
 
 # Helper to split a cell range into rows or columns
@@ -424,46 +479,65 @@ is_single_cell <- function(dims) {
   all(lengths(dims_to_rowcol(dims)) == 1)
 }
 
-#' Create sparklines object
+#' Create a sparklines object
 #'
-#' Create a sparkline to be added a workbook with [wb_add_sparklines()]
+#' @description
+#' `create_sparklines()` defines a set of sparklines. Compact, word-sized graphics
+#' that reside within a single cell. These are ideal for showing trends in a
+#' series of values, such as seasonal increases or decreases, or economic cycles,
+#' directly alongside the data.
 #'
-#' Colors are all predefined to be rgb. Maybe theme colors can be
-#' used too.
-#' @param sheet sheet
-#' @param dims Cell range of cells used to create the sparklines
-#' @param sqref Cell range of the destination of the sparklines.
-#' @param type Either `NULL`, `stacked` or `column`
-#' @param direction Either `NULL`, `row` (or `1`) or `col` (or `2`). Should
-#' sparklines be created in the row or column direction? Defaults to `NULL`.
-#' When `NULL` the direction is inferred from `dims` in cases where `dims`
-#' spans a single row or column and defaults to `row` otherwise.
-#' @param negative negative
-#' @param display_empty_cells_as Either `gap`, `span` or `zero`
-#' @param markers markers add marker to line
-#' @param high highlight highest value
-#' @param low highlight lowest value
-#' @param first highlight first value
-#' @param last highlight last value
-#' @param color_series colorSeries
-#' @param color_negative colorNegative
-#' @param color_axis colorAxis
-#' @param color_markers colorMarkers
-#' @param color_first colorFirst
-#' @param color_last colorLast
-#' @param color_high colorHigh
-#' @param color_low colorLow
-#' @param manual_max manualMax
-#' @param manual_min manualMin
-#' @param line_weight lineWeight
-#' @param date_axis dateAxis
-#' @param display_x_axis displayXAxis
-#' @param display_hidden displayHidden
-#' @param min_axis_type minAxisType
-#' @param max_axis_type maxAxisType
-#' @param right_to_left rightToLeft
-#' @param ... additional arguments
-#' @return A string containing XML code
+#' @details
+#' Sparklines are added to a workbook in "groups." A group shares the same
+#' visual properties (type, colors, line weight, and axis settings). Within a
+#' group, multiple individual sparklines are defined by pairing a data range
+#' (`dims`) with a destination cell (`sqref`).
+#'
+#' Types of Sparklines:
+#' * `NULL` (Default): A standard line chart.
+#' * `"column"`: A small column chart.
+#' * `"stacked"`: Often referred to as a "Win/Loss" chart, where each data point
+#'     is represented by a block indicating a positive or negative value.
+#'
+#' Directionality:
+#' The `direction` argument determines how the `dims` range is parsed. If you
+#' provide a multi-cell range like "A1:E10" as data for 10 sparklines,
+#' `direction = "row"` will treat each row as a separate data series, while
+#' `direction = "col"` will treat each column as a series.
+#'
+#' @param sheet The name of the worksheet where the data originates.
+#' @param dims A character string defining the source data range (e.g., "A1:E1").
+#' @param sqref A character string defining the destination cell(s) (e.g., "F1").
+#' @param type The type of sparkline: `NULL` (line), `"column"`, or `"stacked"`.
+#' @param direction The data orientation: `"row"` (default) or `"col"`.
+#'   If `NULL`, the function attempts to infer direction from the dimensions.
+#' @param negative Logical; highlight negative data points.
+#' @param markers Logical; highlight all data points (Line type only).
+#' @param high,low,first,last Logical; highlight the maximum, minimum,
+#'   first, or last data points in the series.
+#' @param color_series,color_negative,color_axis,color_markers,color_first [wb_color()]
+#'   objects defining the colors for various sparkline elements.
+#' @param color_last A [wb_color()] object for the color of the last point in the series.
+#' @param color_high A [wb_color()] object for the color of the highest point in the series.
+#' @param color_low A [wb_color()] object for the color of the lowest point in the series.
+#' @param date_axis Logical; if `TRUE`, uses a date axis for the sparklines,
+#'   allowing for irregular time intervals between data points.
+#' @param display_hidden Logical; if `TRUE`, data in hidden rows or columns is
+#'   plotted in the sparkline.
+#' @param min_axis_type,max_axis_type Character; defines the scaling for the
+#'   vertical axis. Options usually include "individual" (default), "group",
+#'   or "custom".
+#' @param right_to_left Logical; if `TRUE`, the sparkline is rendered from
+#'   right to left.
+#' @param display_empty_cells_as How to handle gaps in data: `"gap"`,
+#'   `"span"` (connect points), or `"zero"`.
+#' @param manual_max,manual_min Numeric; optional fixed values for the y-axis.
+#' @param line_weight Numeric; the thickness of the line (Line type only).
+#' @param display_x_axis Logical; show a horizontal axis.
+#' @param ... Additional arguments.
+#'
+#' @return A character string containing the XML structure for the sparkline group.
+#'
 #' @examples
 #' # create multiple sparklines
 #' sparklines <- c(
@@ -638,7 +712,7 @@ read_Content_Types <- function(x) {
 
   sel <- grepl("/sheet[0-9]+.xml$", or$PartName)
   or$sheet_id <- NA
-  or$sheet_id[sel] <- as.integer(gsub("\\D+", "", basename(or$PartName)[sel]))
+  or$sheet_id[sel] <- cdigit(basename(or$PartName)[sel], as_integer = TRUE)
 
 
   list(df, or)
@@ -673,7 +747,7 @@ read_workbook.xml.rels <- function(x) {
 
   sel <- grepl("/sheet[0-9]+.xml$", wxr$Target)
   wxr$sheet_id <- NA
-  wxr$sheet_id[sel] <- as.integer(gsub("\\D+", "", basename(wxr$Target)[sel]))
+  wxr$sheet_id[sel] <- cdigit(basename(wxr$Target)[sel], as_integer = TRUE)
   wxr
 }
 
@@ -738,7 +812,7 @@ to_string <- function(x) {
 get_next_id <- function(x, increase = 1L) {
   if (length(x)) {
     rlshp <- rbindlist(xml_attr(x, "Relationship"))
-    rlshp$id <- as.integer(gsub("\\D+", "", rlshp$Id))
+    rlshp$id <- cdigit(rlshp$Id, as_integer = TRUE)
     next_id <- paste0("rId", max(rlshp$id) + increase)
   } else {
     next_id <- "rId1"
@@ -1531,8 +1605,8 @@ fmt_txt2 <- function(txt, text_color = "", transparency = 0) {
       xml_attributes = c(
         b = as_xml_attr(bold),
         i = as_xml_attr(italic),
-        sz = as_xml_attr(sz),
         strike = as_xml_attr(strike),
+        sz = as_xml_attr(sz),
         u  = as_xml_attr(underline)
       ),
       xml_children = c(color, font)
@@ -1726,12 +1800,13 @@ create_shape <- function(
       %s
       <xdr:sp macro="" textlink="">
        <xdr:nvSpPr>
-        <xdr:cNvPr id="%s" name="%s" />
+        <xdr:cNvPr id="%s" name="%s">
          <a:extLst>
           <a:ext uri="{FF2B5EF4-FFF2-40B4-BE49-F238E27FC236}">
            <a16:creationId xmlns:a16="http://schemas.microsoft.com/office/drawing/2014/main" id="%s" />
           </a:ext>
          </a:extLst>
+        </xdr:cNvPr>
         <xdr:cNvSpPr />
        </xdr:nvSpPr>
        <xdr:spPr>

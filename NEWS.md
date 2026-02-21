@@ -1,3 +1,26 @@
+# openxlsx2 1.24
+
+## New features
+
+* Provide new SHA base password hash based on `openssl`. This will be used if `openssl` is installed, otherwise the legacy implementation will be used. [#1538](https://github.com/JanMarvin/openxlsx2/pull/1538)
+* Add `path` argument to `xml_attr_mod()`. This allows changing the attribute of an XML node nested deeper in code.
+
+## Fixes
+
+* In certain environments a zip tool is available via `Sys.which("zip")`, but `Sys.getenv("R_ZIPCMD")` is not configured. When writing, we would detect the first and continue trying `utils::zip()`, but never passed `Sys.which("zip")`. This has been corrected. [#1533](https://github.com/JanMarvin/openxlsx2/pull/1533)
+* Fix reading uninitialized cells [#1546](https://github.com/JanMarvin/openxlsx2/pull/1546)
+* Various changes to comment and thread handling code
+* Fixed immediate `finalize()` calls after `wb_load()` [#1576](https://github.com/JanMarvin/openxlsx2/pull/1576)
+
+## Internal Changes
+
+* Cleanup and remove `waldo` from `testthat` helper functions
+* Update many manual pages
+* Cleanups for consistency in internal XML handler code
+
+
+***************************************************************************
+
 # openxlsx2 1.23.1
 
 ## Fixes
@@ -643,7 +666,7 @@ They will continue to work for some time, but changing to newer functions is rec
 
 * `wb_get_sheet_names()` gains a `escape` argument to allow special XML characters to be escaped. [252](https://github.com/JanMarvin/openxlsx2/issues/252)
 
-* `wb_color()` now accepts hex colors with leading sharp (e.g. "#FFFFF") [728](https://github.com/JanMarvin/openxlsx2/pull/728).
+* `wb_color()` now accepts hex colors with leading sharp (e.g. "#FFFFFF") [728](https://github.com/JanMarvin/openxlsx2/pull/728).
 
 * `wb_merge_cells()` gains a `solve` argument. This allows to solve cell intersecting regions. [733](https://github.com/JanMarvin/openxlsx2/pull/733)
 

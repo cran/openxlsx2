@@ -250,6 +250,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cdigit
+SEXP cdigit(Rcpp::CharacterVector x, bool as_integer);
+RcppExport SEXP _openxlsx2_cdigit(SEXP xSEXP, SEXP as_integerSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::CharacterVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< bool >::type as_integer(as_integerSEXP);
+    rcpp_result_gen = Rcpp::wrap(cdigit(x, as_integer));
+    return rcpp_result_gen;
+END_RCPP
+}
 // col_to_df
 Rcpp::DataFrame col_to_df(XPtrXML doc);
 RcppExport SEXP _openxlsx2_col_to_df(SEXP docSEXP) {
@@ -376,17 +388,18 @@ BEGIN_RCPP
 END_RCPP
 }
 // xml_attr_mod
-Rcpp::CharacterVector xml_attr_mod(std::string xml_content, Rcpp::CharacterVector xml_attributes, bool escapes, bool declaration, bool remove_empty_attr);
-RcppExport SEXP _openxlsx2_xml_attr_mod(SEXP xml_contentSEXP, SEXP xml_attributesSEXP, SEXP escapesSEXP, SEXP declarationSEXP, SEXP remove_empty_attrSEXP) {
+Rcpp::CharacterVector xml_attr_mod(std::string xml_content, Rcpp::CharacterVector xml_attributes, Rcpp::Nullable<std::vector<std::string>> path, bool escapes, bool declaration, bool remove_empty_attr);
+RcppExport SEXP _openxlsx2_xml_attr_mod(SEXP xml_contentSEXP, SEXP xml_attributesSEXP, SEXP pathSEXP, SEXP escapesSEXP, SEXP declarationSEXP, SEXP remove_empty_attrSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< std::string >::type xml_content(xml_contentSEXP);
     Rcpp::traits::input_parameter< Rcpp::CharacterVector >::type xml_attributes(xml_attributesSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<std::vector<std::string>> >::type path(pathSEXP);
     Rcpp::traits::input_parameter< bool >::type escapes(escapesSEXP);
     Rcpp::traits::input_parameter< bool >::type declaration(declarationSEXP);
     Rcpp::traits::input_parameter< bool >::type remove_empty_attr(remove_empty_attrSEXP);
-    rcpp_result_gen = Rcpp::wrap(xml_attr_mod(xml_content, xml_attributes, escapes, declaration, remove_empty_attr));
+    rcpp_result_gen = Rcpp::wrap(xml_attr_mod(xml_content, xml_attributes, path, escapes, declaration, remove_empty_attr));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -832,6 +845,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_openxlsx2_read_xml2df", (DL_FUNC) &_openxlsx2_read_xml2df, 4},
     {"_openxlsx2_write_df2xml", (DL_FUNC) &_openxlsx2_write_df2xml, 4},
     {"_openxlsx2_df_to_xml", (DL_FUNC) &_openxlsx2_df_to_xml, 2},
+    {"_openxlsx2_cdigit", (DL_FUNC) &_openxlsx2_cdigit, 2},
     {"_openxlsx2_col_to_df", (DL_FUNC) &_openxlsx2_col_to_df, 1},
     {"_openxlsx2_loadvals", (DL_FUNC) &_openxlsx2_loadvals, 2},
     {"_openxlsx2_readXML", (DL_FUNC) &_openxlsx2_readXML, 8},
@@ -842,7 +856,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_openxlsx2_getXMLXPtrAttrPath", (DL_FUNC) &_openxlsx2_getXMLXPtrAttrPath, 2},
     {"_openxlsx2_printXPtr", (DL_FUNC) &_openxlsx2_printXPtr, 4},
     {"_openxlsx2_write_xml_file", (DL_FUNC) &_openxlsx2_write_xml_file, 2},
-    {"_openxlsx2_xml_attr_mod", (DL_FUNC) &_openxlsx2_xml_attr_mod, 5},
+    {"_openxlsx2_xml_attr_mod", (DL_FUNC) &_openxlsx2_xml_attr_mod, 6},
     {"_openxlsx2_xml_node_create", (DL_FUNC) &_openxlsx2_xml_node_create, 5},
     {"_openxlsx2_xml_append_child_path", (DL_FUNC) &_openxlsx2_xml_append_child_path, 4},
     {"_openxlsx2_xml_remove_child_path", (DL_FUNC) &_openxlsx2_xml_remove_child_path, 5},
