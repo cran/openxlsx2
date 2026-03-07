@@ -576,6 +576,12 @@ test_that("test utils::zip", {
 
   expect_message(write_xlsx(x = mtcars, tmp), "utils::zip")
 
+  r_zipcmd <- Sys.getenv("R_ZIPCMD")
+  Sys.setenv("R_ZIPCMD" = "")
+  on.exit(Sys.setenv("R_ZIPCMD" = r_zipcmd), add = TRUE)
+
+  expect_message(write_xlsx(x = mtcars, tmp), "utils::zip")
+
 })
 
 test_that("test (bsd)tar", {
@@ -636,6 +642,39 @@ test_that("saving using zip::zip", {
 
   expect_message(write_xlsx(x = mtcars, tmp), "zip::zip")
 
+})
+
+test_that("Windows can handle unset or blank R_ZIPCMD", {
+  skip_on_cran()
+  skip_if_not_installed("zip")
+
+  r_zipcmd <- Sys.getenv("R_ZIPCMD")
+  on.exit(Sys.setenv("R_ZIPCMD" = r_zipcmd), add = TRUE)
+
+  tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
+
+  op <- options(
+    "openxlsx2.debug" = TRUE,
+    "openxlsx2.no_maybe_zip" = TRUE,
+    "openxlsx2.no_bsdtar" = TRUE
+  )
+  on.exit(options(op), add = TRUE)
+
+  with_mocked_bindings(
+    {
+      Sys.unsetenv("R_ZIPCMD")
+      expect_equal(Sys.which("zip"), "")
+      expect_equal(Sys.getenv("R_ZIPCMD"), "")
+      expect_message(write_xlsx(x = mtcars, tmp), "zip::zip")
+
+      Sys.setenv("R_ZIPCMD" = "")
+      expect_equal(Sys.getenv("R_ZIPCMD"), "")
+      expect_message(write_xlsx(x = mtcars, tmp), "zip::zip")
+    },
+    Sys.which = function(x) "",
+    .package = "base"
+  )
 })
 
 test_that("file with [trash] folder works", {

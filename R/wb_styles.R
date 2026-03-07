@@ -873,7 +873,8 @@ get_cell_styles <- function(wb, sheet, cell) {
 #' (Defaults to black)
 #' @param font_size Font size. A numeric greater than 0.
 #'   By default, the workbook base font size is used. (Defaults to 11)
-#' @param num_fmt Cell formatting. Some custom openxml format
+#' @param num_fmt Cell formatting. Previously this was a format code. To be backwards compatible, this still allows for a code
+#' @param format_code A custom format code
 #' @param border `NULL` or `TRUE`
 #' @param border_color "black"
 #' @param border_style "thin"
@@ -914,6 +915,7 @@ create_dxfs_style <- function(
     font_size      = NULL,
     font_color     = NULL,
     num_fmt        = NULL,
+    format_code    = NULL,
     border         = NULL,
     border_color   = wb_color(getOption("openxlsx2.borderColor", "black")),
     border_style   = getOption("openxlsx2.borderStyle", "thin"),
@@ -944,8 +946,14 @@ create_dxfs_style <- function(
   if (is.null(text_italic)) text_italic <- ""
   if (is.null(text_underline)) text_underline <- ""
 
+  # behavior similar openxlsx <= 1.24
+  if (is.null(format_code) && !is.null(num_fmt)) {
+    format_code <- num_fmt
+    num_fmt <- 3
+  }
+
   # found numFmtId=3 in MS365 xml not sure if this should be increased
-  if (!is.null(num_fmt)) num_fmt <- create_numfmt(3, num_fmt)
+  if (!is.null(num_fmt)) num_fmt <- create_numfmt(num_fmt, format_code)
 
   font <- create_font(
     color = font_color, name = font_name,
@@ -2017,6 +2025,8 @@ apply_numfmt <- function(value, format_code) {
   if (inherits(value, "hms") || inherits(value, "difftime")) {
     value <- convert_datetime(value)
   }
+  orig_class <- class(value)
+  orig_tzone <- if (!is.null(attr(value, "tzone"))) attr(value, "tzone")
 
   # Standardize input lengths
   max_len <- max(length(value), length(format_code))
@@ -2059,6 +2069,9 @@ apply_numfmt <- function(value, format_code) {
     # --- Value Processing ---
     results[idx] <- vapply(v_subset, function(v) {
       if (is.na(v)) return(NA_character_)
+      # in R 3.6 functions (e.g. rep_len & vapply) drop class and tzone
+      class(v) <- orig_class
+      if (!is.null(orig_tzone)) attr(v, "tzone") <- orig_tzone
 
       # Type Detection
       is_numeric <- is.numeric(v)

@@ -79,6 +79,22 @@ worksheet_lock_properties <- function() {
   )
 }
 
+## handle the files
+TempDirManager <- R6::R6Class("TempDirManager",
+  public = list(
+    path = NULL,
+    initialize = function(path) {
+      self$path <- path
+    }
+  ),
+  private = list(
+    finalize = function() {
+      if (!is.null(self$path) && dir.exists(self$path)) {
+        unlink(self$path, recursive = TRUE)
+      }
+    }
+  )
+)
 
 # R6 class ----------------------------------------------------------------
 # Lines 7 and 8 are needed until r-lib/roxygen2#1504 is fixed
@@ -145,6 +161,26 @@ wbWorkbook <- R6::R6Class(
   "wbWorkbook",
 
   # TODO which can be private?
+
+  ## active ----
+
+  active = list(
+
+    #' @field tmpDir tmpDir
+    tmpDir = function(value) {
+      if (missing(value)) {
+        return(private$.tmpDir)
+      }
+
+      private$.tmpDir <- value
+
+      if (!is.null(value)) {
+        private$.dir_manager <- TempDirManager$new(value)
+      } else {
+        private$.dir_manager <- NULL
+      }
+    }
+  ),
 
   ## public ----
 
@@ -312,8 +348,7 @@ wbWorkbook <- R6::R6Class(
     #' @field path path
     path = character(),     # allows path to be set during initiation or later
 
-    #' @field tmpDir tmpDir
-    tmpDir = NULL,
+    # tmpDir = NULL, # is now an active binding
 
     #' @field namedSheetViews namedSheetViews
     namedSheetViews = character(),
@@ -763,7 +798,7 @@ wbWorkbook <- R6::R6Class(
       private$validate_new_sheet(sheet)
       sheet_name <- replace_legal_chars(sheet)
 
-      if (!is.logical(grid_lines) | length(grid_lines) > 1) {
+      if (!is.logical(grid_lines) || length(grid_lines) > 1) {
         fail <- TRUE
         msg <- c(msg, "grid_lines must be a logical of length 1.")
       }
@@ -788,32 +823,32 @@ wbWorkbook <- R6::R6Class(
       }
       #nocov end
 
-      if (!is.null(odd_header) & length(odd_header) != 3) {
+      if (!is.null(odd_header) && length(odd_header) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("header"))
       }
 
-      if (!is.null(odd_footer) & length(odd_footer) != 3) {
+      if (!is.null(odd_footer) && length(odd_footer) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("footer"))
       }
 
-      if (!is.null(even_header) & length(even_header) != 3) {
+      if (!is.null(even_header) && length(even_header) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("evenHeader"))
       }
 
-      if (!is.null(even_footer) & length(even_footer) != 3) {
+      if (!is.null(even_footer) && length(even_footer) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("evenFooter"))
       }
 
-      if (!is.null(first_header) & length(first_header) != 3) {
+      if (!is.null(first_header) && length(first_header) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("firstHeader"))
       }
 
-      if (!is.null(first_footer) & length(first_footer) != 3) {
+      if (!is.null(first_footer) && length(first_footer) != 3) {
         fail <- TRUE
         msg <- c(msg, lcr("firstFooter"))
       }
@@ -2957,7 +2992,7 @@ wbWorkbook <- R6::R6Class(
       assert_class(overwrite, "logical")
       assert_class(flush, "logical")
 
-      if (file.exists(file) & !overwrite) {
+      if (file.exists(file) && !overwrite) {
         stop("File already exists!")
       }
 
@@ -3045,7 +3080,7 @@ wbWorkbook <- R6::R6Class(
       }
 
       ## xl/comments.xml
-      if (nComments > 0 | nVML > 0) {
+      if (nComments > 0 || nVML > 0) {
 
 
         # TODO use seq_len() or seq_along()?
@@ -4107,7 +4142,7 @@ wbWorkbook <- R6::R6Class(
       tab_attr[["ref"]] <- dims
 
       tab_autofilter <- NULL
-      if ("autofilter" %in% tab_nams) {
+      if ("autoFilter" %in% tab_nams) {
         tab_autofilter <- xml_node(xml, "table", "autoFilter")
         tab_autofilter <- xml_attr_mod(tab_autofilter, xml_attributes = c(ref = dims))
       }
@@ -5567,7 +5602,7 @@ wbWorkbook <- R6::R6Class(
       # fine to do the validation before the actual check to prevent other errors
       sheet <- private$get_sheet_index(sheet)
 
-      if (is.null(first_active_row) & is.null(first_active_col) & !first_row & !first_col) {
+      if (is.null(first_active_row) && is.null(first_active_col) && !first_row && !first_col) {
         return(invisible(self))
       }
 
@@ -5576,15 +5611,15 @@ wbWorkbook <- R6::R6Class(
       if (!is.logical(first_col)) stop("first_col must be TRUE/FALSE")
 
       # make overwrides for arguments
-      if (first_row & !first_col) {
+      if (first_row && !first_col) {
         first_active_col <- NULL
         first_active_row <- NULL
         first_col <- FALSE
-      } else if (first_col & !first_row) {
+      } else if (first_col && !first_row) {
         first_active_row <- NULL
         first_active_col <- NULL
         first_row <- FALSE
-      } else if (first_row & first_col) {
+      } else if (first_row && first_col) {
         first_active_row <- 2L
         first_active_col <- 2L
         first_row <- FALSE
@@ -5606,23 +5641,23 @@ wbWorkbook <- R6::R6Class(
         } else if (first_col) {
           '<pane xSplit="1" topLeftCell="B1" activePane="topRight" state="frozen"/>'
         } else {
-          if (first_active_row == 1 & first_active_col == 1) {
+          if (first_active_row == 1 && first_active_col == 1) {
             ## nothing to do
             # return(NULL)
             return(invisible(self))
           }
 
-          if (first_active_row > 1 & first_active_col == 1) {
+          if (first_active_row > 1 && first_active_col == 1) {
             attrs <- sprintf('ySplit="%s"', first_active_row - 1L)
             activePane <- "bottomLeft"
           }
 
-          if (first_active_row == 1 & first_active_col > 1) {
+          if (first_active_row == 1 && first_active_col > 1) {
             attrs <- sprintf('xSplit="%s"', first_active_col - 1L)
             activePane <- "topRight"
           }
 
-          if (first_active_row > 1 & first_active_col > 1) {
+          if (first_active_row > 1 && first_active_col > 1) {
             attrs <- sprintf('ySplit="%s" xSplit="%s"',
               first_active_row - 1L,
               first_active_col - 1L
@@ -6614,10 +6649,9 @@ wbWorkbook <- R6::R6Class(
       # auto-detect rvg raster prefix from XML comment
       raster_prefix <- NULL
       if (is.character(xml) && length(xml) == 1 && !to_long(xml) && file.exists(xml)) {
-        xml_raw <- paste0(readLines(xml, warn = FALSE), collapse = "")
-        m <- regmatches(xml_raw, regexpr("<!-- rvg_raster_prefix:(.+?) -->", xml_raw, perl = TRUE))
-        if (length(m) == 1) {
-          raster_prefix <- sub("<!-- rvg_raster_prefix:(.+?) -->", "\\1", m, perl = TRUE)
+        xml_cmmnts <- read_xml(xml, comments = 2)
+        if (any(sel <- grepl("^rvg_raster_prefix", xml_cmmnts))) {
+          raster_prefix <- gsub("^rvg_raster_prefix:", "", xml_cmmnts[sel])
         }
       }
 
@@ -9213,6 +9247,7 @@ wbWorkbook <- R6::R6Class(
     #' @param font_size the font size
     #' @param font_color the font color (a `wb_color()` object)
     #' @param num_fmt the number format
+    #' @param format_code the format code
     #' @param border logical if borders are applied
     #' @param border_color the border color
     #' @param border_style the border style
@@ -9230,6 +9265,7 @@ wbWorkbook <- R6::R6Class(
       font_size      = NULL,
       font_color     = NULL,
       num_fmt        = NULL,
+      format_code    = NULL,
       border         = NULL,
       border_color   = wb_color(getOption("openxlsx2.borderColor", "black")),
       border_style   = getOption("openxlsx2.borderStyle", "thin"),
@@ -9243,11 +9279,16 @@ wbWorkbook <- R6::R6Class(
 
       standardize(...)
 
+      if (is.null(num_fmt) && !is.null(format_code)) {
+        num_fmt <- NROW(self$styles_mgr$dxf)
+      }
+
       xml_style <- create_dxfs_style(
         font_name      = font_name,
         font_size      = font_size,
         font_color     = font_color,
         num_fmt        = num_fmt,
+        format_code    = format_code,
         border         = border,
         border_color   = border_color,
         border_style   = border_style,
@@ -9258,6 +9299,11 @@ wbWorkbook <- R6::R6Class(
         text_underline = text_underline,
         ...            = ...
       )
+
+      # TODO the dxf styles are as unique wb_add_numfmt(), because
+      # the format_code is increased and a numfmt might be embedded
+      # in other style elements.
+      if (missing(name)) name <- xml_style
 
       if (!is.null(self$styles_mgr$dxf) && any(name %in% self$styles_mgr$dxf$name))
         warning("dxfs style names should be unique", call. = FALSE)
@@ -9566,6 +9612,10 @@ wbWorkbook <- R6::R6Class(
   # functions that are used to make assignments
   private = list(
     ### fields ----
+    .tmpDir = NULL,
+
+    .dir_manager = NULL,
+
     current_sheet = 0L,
 
     # original sheet name values
@@ -9573,6 +9623,9 @@ wbWorkbook <- R6::R6Class(
 
     ### methods ----
     deep_clone = function(name, value) {
+      if (name == ".dir_manager") {
+        return(value)
+      }
       # Deep cloning method for workbooks.  This method also accesses
       # `$clone(deep = TRUE)` methods for `R6` fields.
       if (R6::is.R6(value)) {
@@ -9589,8 +9642,6 @@ wbWorkbook <- R6::R6Class(
 
     # Cleans up temporary files extracted during wb_load()
     finalize = function() {
-      if (!is.null(self$tmpDir) && dir.exists(self$tmpDir))
-        unlink(self$tmpDir, recursive = TRUE)
     },
 
     pappend = function(field, value = NULL) {

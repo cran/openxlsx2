@@ -1,3 +1,22 @@
+# openxlsx2 1.25
+
+## Fixes
+
+* Fixed missing header for older clang. This fixes the CRAN Mac builds [#1585](https://github.com/JanMarvin/openxlsx2/pull/1585)
+* Fixed `finalize()` calls after `clone()` and `clone(deep = TRUE)`. [#1587](https://github.com/JanMarvin/openxlsx2/pull/1587) (Same bug report as the previous fix for `finalize()`.)
+* If no zip tool is available (e.g., in R without Rtools on Windows and `R_ZIPCMD` is unset), the package no longer attempts to use `utils::zip()`. [#1591](https://github.com/JanMarvin/openxlsx2/pull/1591)
+
+## Internal Changes
+
+* `read_xml()` got a `comments` argument that can either read XML comments or return only XML comments
+
+## Breaking changes
+
+* `create_dxfs_style()` and `wb_add_dxfs_style()` gained a new argument `format_code` to allow varying number format ids. If not set, the function behaves similarly to before. But the argument order has changed.
+
+
+***************************************************************************
+
 # openxlsx2 1.24
 
 ## New features
@@ -8,15 +27,15 @@
 ## Fixes
 
 * In certain environments a zip tool is available via `Sys.which("zip")`, but `Sys.getenv("R_ZIPCMD")` is not configured. When writing, we would detect the first and continue trying `utils::zip()`, but never passed `Sys.which("zip")`. This has been corrected. [#1533](https://github.com/JanMarvin/openxlsx2/pull/1533)
-* Fix reading uninitialized cells [#1546](https://github.com/JanMarvin/openxlsx2/pull/1546)
-* Various changes to comment and thread handling code
-* Fixed immediate `finalize()` calls after `wb_load()` [#1576](https://github.com/JanMarvin/openxlsx2/pull/1576)
+* Fix reading uninitialized cells. [#1546](https://github.com/JanMarvin/openxlsx2/pull/1546)
+* Various changes to comment and thread handling code.
+* Fixed immediate `finalize()` calls after `wb_load()`. [#1576](https://github.com/JanMarvin/openxlsx2/pull/1576)
 
 ## Internal Changes
 
-* Cleanup and remove `waldo` from `testthat` helper functions
-* Update many manual pages
-* Cleanups for consistency in internal XML handler code
+* Cleanup and remove `waldo` from `testthat` helper functions.
+* Update many manual pages.
+* Cleanups for consistency in internal XML handler code.
 
 
 ***************************************************************************
@@ -40,7 +59,7 @@
 * The argument `na` replaces `na.strings` and `na.numbers` in read and write functions. Per default this is either a waiver in write functions or a character vector in read functions. If strings and numbers should be passed to a read function `na = list(strings = ..., numbers = ...)` should be used. In addition a matching option was added `option("openxlsx2.na")`. The previous default values and option remain for the foreseeable future. [#1499](https://github.com/JanMarvin/openxlsx2/pull/1499)
 * It is now possible to apply numeric formats via `wb_to_df(apply_numfmts = TRUE)` to preview numeric formats. The function is still experimental and incomplete. There is limited support for builtin styles. But this should improve setting the automatic column width for worksheets with numeric styles. [#1501](https://github.com/JanMarvin/openxlsx2/pull/1501)
 * Removal of `border`, `fill`, `font` and `numfmt` is possible setting these to `NULL`. [#1511](https://github.com/JanMarvin/openxlsx2/pull/1511)
-* Extend conditional formatting for databars.  ([#1523](https://github.com/JanMarvin/openxlsx2/pull/1523), @balthasars)
+* Extend conditional formatting for databars. ([#1523](https://github.com/JanMarvin/openxlsx2/pull/1523), @balthasars)
 
 ## Fixes
 
