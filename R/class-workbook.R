@@ -28,6 +28,7 @@ last_table_id <- function(wb) {
 }
 
 fun_tab_cols <- function(tab_cols) {
+  tab_cols <- escape_newline_and_tab(tab_cols)
   tabCols <- NULL
   for (i in seq_along(tab_cols)) {
     tmp <- xml_node_create(
@@ -1065,6 +1066,11 @@ wbWorkbook <- R6::R6Class(
 
         # For charts we have to modify the name of the chart in the xml code
         # give each chart its own filename (images can re-use the same file, but charts can't)
+
+        # FIXME this is no longer correct. default mschart and encharter create self contained
+        # chart XML files and only modern charts created by encharter require additonal style
+        # and color XML files. We have to inspect rels and relsEx to see if style and color are
+        # required.
         for (dl in seq_along(drawings_rels)) {
           chartfiles <- reg_match(drawings_rels[dl], "(?<=charts/)chart[0-9]+\\.xml")
 
@@ -1570,6 +1576,7 @@ wbWorkbook <- R6::R6Class(
     #'   `na_strings()` uses the special `#N/A` value within the workbook.
     #' @param inline_strings write characters as inline strings
     #' @param total_row write total rows to table
+    #' @param params optional parameters passed to the data table creation
     #' @param ... additional arguments
     #' @return The `wbWorkbook` object
     add_data_table = function(
@@ -1593,6 +1600,7 @@ wbWorkbook <- R6::R6Class(
         na                = na_strings(),
         inline_strings    = TRUE,
         total_row         = FALSE,
+        params            = NULL,
         ...
     ) {
 
@@ -1631,7 +1639,8 @@ wbWorkbook <- R6::R6Class(
         remove_cell_style = remove_cell_style,
         na                = na,
         inline_strings    = inline_strings,
-        total_row         = total_row
+        total_row         = total_row,
+        params            = params
       )
       invisible(self)
     },
@@ -2992,8 +3001,16 @@ wbWorkbook <- R6::R6Class(
       assert_class(overwrite, "logical")
       assert_class(flush, "logical")
 
+      if (length(file) > 1) {
+        stop("Multiple files provided.", .call = FALSE)
+      }
+
+      if (!file.exists(dirname(file))) {
+        stop("Path to file does not exist.", .call = FALSE)
+      }
+
       if (file.exists(file) && !overwrite) {
-        stop("File already exists!")
+        stop("File already exists!", .call = FALSE)
       }
 
       valid_extensions <- c("xlsx", "xlsm") # "xlsb"
@@ -3960,6 +3977,7 @@ wbWorkbook <- R6::R6Class(
     #' @param showLastColumn showLastColumn
     #' @param showRowStripes showRowStripes
     #' @param showColumnStripes showColumnStripes
+    #' @param numfmts numfmts
     #' @return The `wbWorksheet` object, invisibly
     buildTable = function(
       sheet             = current_sheet(),
@@ -3974,7 +3992,8 @@ wbWorkbook <- R6::R6Class(
       showFirstColumn   = 0,
       showLastColumn    = 0,
       showRowStripes    = 1,
-      showColumnStripes = 0
+      showColumnStripes = 0,
+      numfmts           = NULL
     ) {
 
       id <- as.character(last_table_id(self) + 1) # otherwise will start at 0 for table 1 length indicates the last known
@@ -3995,13 +4014,6 @@ wbWorkbook <- R6::R6Class(
         tSheets <- self$tables$tab_sheet
         tNames  <- self$tables$tab_name
         tActive <- self$tables$tab_act
-      }
-
-
-      ### autofilter
-      autofilter <- if (withFilter) {
-        autofilter_ref <- ref
-        xml_node_create(xml_name = "autoFilter", xml_attributes = c(ref = autofilter_ref))
       }
 
       trf <- NULL
@@ -4030,13 +4042,25 @@ wbWorkbook <- R6::R6Class(
         id <- which(colNames %in% x)
         trf_id <- if (has_total_row) trf[[id]] else NULL
         lbl_id <- if (has_total_lbl && !is.na(lbl[[id]])) lbl[[id]] else NULL
+        numfmt <- if (!is.null(numfmts) && x %in% names(numfmts)) {
+          nf <- numfmts[[x]]
+          if (is.numeric(nf)) {
+            nf
+          } else {
+            self$add_dxfs_style(format_code = nf)
+            nrow(self$styles_mgr$dxf) - 1L
+          }
+        }
+
         xml_node_create(
           "tableColumn",
           xml_attributes = c(
             id                = id,
             name              = x,
             totalsRowFunction = trf_id,
-            totalsRowLabel    = lbl_id
+            totalsRowLabel    = lbl_id,
+            dataDxfId         = as_xml_attr(numfmt)
+            # dataCellStyle = "Percent" # a named style
           )
         )
       })
@@ -4072,6 +4096,35 @@ wbWorkbook <- R6::R6Class(
         totalsRowShown = as_xml_attr(has_total_row)
         #headerRowDxfId="1"
       )
+
+      ### autofilter
+      # run this if withFilter is something (TRUE or a character)
+      autofilter <- NULL
+      if (!isFALSE(withFilter)) {
+        if (!isFALSE(totalsRowCount)) {
+          # exclude total row from filter
+          rowcol         <- dims_to_rowcol(ref)
+          autofilter_ref <- rowcol_to_dims(as.integer(rowcol[[2]])[-length(rowcol[[2]])], rowcol[[1]])
+        } else {
+          autofilter_ref <- ref
+        }
+
+        ### autofilter
+        autofilter <- xml_node_create(xml_name = "autoFilter", xml_attributes = c(ref = autofilter_ref))
+      }
+
+      if (is.character(withFilter) && !is.null(names(withFilter))) {
+        # withFilter is now in the format: c(cyl = "x > 4 & x < 8", am = "x != 1")
+
+        ## prepare condition list & autofilter xml
+        fltr <- create_conditions(withFilter)
+        autofilter <- prepare_autofilter(colNames, autofilter_ref, conditions = fltr)
+
+        ## reverse the condition to determine which rows to hide
+        filter <- reverse_conditions(fltr)
+        sel <- rows_to_hide(self, sheet, ref, filter)
+        self$set_row_heights(rows = sel, hidden = TRUE)
+      }
 
       tab_xml_new <- xml_node_create(
           xml_name = "table",
@@ -6656,8 +6709,8 @@ wbWorkbook <- R6::R6Class(
       }
 
       # prepare mschart drawing
-      if (inherits(xml, "chart_id")) {
-        xml <- drawings(self$drawings_rels[[sheet_drawing]], xml)
+      if (inherits(xml, "chart_id") || inherits(xml, "chartEx_id")) {
+        xml <- drawings(self$drawings_rels[[sheet_drawing]], xml, inherits(xml, "chartEx_id"))
       }
 
       xml <- read_xml(xml, pointer = FALSE)
@@ -6792,10 +6845,9 @@ wbWorkbook <- R6::R6Class(
         path = path_pictur
       )
 
-      xml <- gsub("r:embed=\"", "r:embed=\"orig_", xml)
-
       # --- register raster files produced by rvg::dml_xlsx() ---
       if (!is.null(raster_prefix)) {
+        xml <- gsub("r:embed=\"", "r:embed=\"orig_", xml)
         raster_dir <- dirname(raster_prefix)
         raster_uid <- basename(raster_prefix)
         raster_files <- list.files(
@@ -6880,12 +6932,16 @@ wbWorkbook <- R6::R6Class(
 
     #' @description Add xml chart
     #' @param xml xml
+    #' @param style style
+    #' @param color color
     #' @param col_offset,row_offset positioning parameters
     #' @return The `wbWorkbook` object
     add_chart_xml = function(
       sheet      = current_sheet(),
       dims       = NULL,
       xml,
+      style      = "",
+      color      = "",
       col_offset = 0,
       row_offset = 0,
       ...
@@ -6914,27 +6970,69 @@ wbWorkbook <- R6::R6Class(
         sheet_drawing <- length(self$drawings) + 1L
       }
 
-      next_chart <- NROW(self$charts) + 1
+      n_charts <- NROW(self$charts)
 
-      chart <- data.frame(
-        chart   = xml,
-        colors  = colors1_xml,
-        style   = styleplot_xml,
-        rels    = chart1_rels_xml(next_chart),
-        chartEx = "",
-        relsEx  = "",
-        stringsAsFactors = FALSE
-      )
+      is_chart <- xml_node_name(xml) == "c:chartSpace"
+      is_chartEx <- xml_node_name(xml) == "cx:chartSpace"
+
+      chart_slot   <- if (is_chart) {
+        min(which(!nzchar(self$charts$chart)), n_charts + 1L)
+      } else {
+        0
+      }
+      class(chart_slot) <- c("integer", "chart_id")
+
+      chartEx_slot <- if (is_chartEx) {
+        min(which(!nzchar(self$charts$chartEx)), n_charts + 1L)
+      } else {
+        0
+      }
+      class(chartEx_slot) <- c("integer", "chartEx_id")
+
+      chart <- if (chart_slot > n_charts || chartEx_slot > n_charts) {
+        data.frame(
+          chart   = "",
+          colors  = "",
+          style   = "",
+          rels    = "",
+          chartEx = "",
+          relsEx  = "",
+          stringsAsFactors = FALSE
+        )
+      }
 
       self$charts <- rbind(self$charts, chart)
 
-      class(next_chart) <- c("integer", "chart_id")
+      if (is_chart) self$charts$chart[[chart_slot]] <- xml
+      if (is_chartEx) self$charts$chartEx[[chartEx_slot]] <- xml
+
+      if (nzchar(color) && nzchar(style)) {
+
+        colors_slot  <- min(which(!nzchar(self$charts$colors)))
+        style_slot   <- min(which(!nzchar(self$charts$style)))
+        rels_slot    <- ifelse(is_chart, min(which(!nzchar(self$charts$rels))), 0)
+        relsEx_slot  <- ifelse(is_chartEx, min(which(!nzchar(self$charts$relsEx))), 0)
+
+        stopifnot(rels_slot == chart_slot && relsEx_slot == chartEx_slot)
+
+        if (is_chart) {
+          self$charts$colors[[colors_slot]] <- color
+          self$charts$style[[style_slot]] <- style
+          self$charts$rels[[rels_slot]] <- chart1_rels_xml(colors_slot, style_slot)
+        } else if (is_chartEx) {
+          self$charts$colors[[colors_slot]] <- color
+          self$charts$style[[style_slot]] <- style
+          self$charts$relsEx[[relsEx_slot]] <- chart1_rels_xml(colors_slot, style_slot)
+        }
+      }
+
+      chart_xml <- if (is_chart) chart_slot else chartEx_slot
 
       # create drawing. add it to self$drawings, the worksheet and rels
       self$add_drawing(
         sheet      = sheet,
         dims       = dims,
-        xml        = next_chart,
+        xml        = chart_xml,
         col_offset = col_offset,
         row_offset = row_offset
       )
@@ -6943,10 +7041,71 @@ wbWorkbook <- R6::R6Class(
 
       self$drawings_rels[[sheet_drawing]] <- drawings_rels(
         self$drawings_rels[[sheet_drawing]],
-        next_chart
+        chart_xml
       )
 
       invisible(self)
+    },
+
+    #' @description Add xml chart
+    #' @param sheet sheet
+    #' @param dims dims
+    #' @param graph graph
+    #' @return The `wbWorkbook` object
+    add_encharter = function(
+      sheet = current_sheet(),
+      dims = NULL,
+      graph
+    ) {
+
+      assert_class(graph, "EncharterBase")
+
+      if (inherits(graph, "Chart")) {
+        chart_xml <- graph$render(u_ids = random_string(n = 5, length = 8, pattern = "[0-9]"))
+        self$add_chart_xml(sheet = sheet, dims = dims, xml = chart_xml)
+      } else { # if (inherits(graph, "ChartEx"))
+
+        # Find the highest ID to prevent collisions
+        existing_names <- self$get_named_regions()$name
+        chart_ids <- grep("^_xlchart\\.v1\\.", existing_names, value = TRUE)
+        id_base <- 1L
+        if (length(chart_ids) > 0) {
+          id_nums <- as.integer(gsub("_xlchart\\.v1\\.", "", chart_ids))
+          id_base <- max(id_nums, na.rm = TRUE) + 1L
+        }
+
+        chart_xml <- graph$render(id_start = id_base, guid = st_guid())
+
+        # assign this first: otherwise add_named_region() will impact current_sheet()
+        self$add_chart_xml(
+          sheet = sheet,
+          dims = dims,
+          xml = chart_xml,
+          color = graph$color_xml,
+          style = graph$style_xml
+        )
+
+        h_at <- attr(chart_xml, "head")
+        b_at <- attr(chart_xml, "body")
+        all_refs <- c(h_at, b_at)
+
+        # add named regions
+        for (i in seq_along(all_refs)) {
+          ref <- all_refs[i]
+
+          # Check: Must contain '!' and have at least one character after it
+          # This prevents literal strings (e.g. "Total!") from being treated as ranges
+          is_valid_ref <- !is.na(ref) && ref != "" && grepl("!.+", ref)
+          if (!is_valid_ref) next
+
+          sheet_part <- gsub("^'?(.*?)'?!.*$", "\\1", ref)
+          range_part <- gsub("^.*!", "", ref)
+          self$add_named_region(sheet = sheet_part, dims = range_part, name = names(all_refs)[i], hidden = "1")
+        }
+
+        invisible(self)
+
+      }
     },
 
     #' @description Add mschart chart to the workbook
@@ -8177,16 +8336,19 @@ wbWorkbook <- R6::R6Class(
       ## delete table object and all data in it
       sheet <- private$get_sheet_index(sheet)
 
+      all_tabs_on_sheet <- self$tables$tab_name[self$tables$tab_sheet == sheet]
+
       if (missing(table)) {
-        table <- self$tables$tab_name
-      } else  if (!table %in% self$tables$tab_name) {
+        table <- all_tabs_on_sheet
+      } else if (!all(table %in% all_tabs_on_sheet)) {
         if (length(table) < 1) {
           stop("table argument must be at least 1")
         }
-        stop(sprintf("table '%s' does not exist.\n
-                     Call `wb_get_tables()` to get existing table names", table),
-             call. = FALSE)
+        msg <- "table(s) '%s' not found on sheet.\nCall `wb_get_tables()` to get existing table names"
+        stop(sprintf(msg, setdiff(table, all_tabs_on_sheet)), call. = FALSE)
       }
+
+      table <- intersect(table, all_tabs_on_sheet)
 
       for (tbl in table) {
         ## delete table object (by flagging as deleted)
@@ -9807,7 +9969,7 @@ wbWorkbook <- R6::R6Class(
       file
     ) {
 
-      if (length(self$path) == 0) {
+      if (length(self$tmpDir) == 0) {
         xmlDir <- temp_dir("_openxlsx_wb_workbook")
         self$tmpDir <- xmlDir
       }

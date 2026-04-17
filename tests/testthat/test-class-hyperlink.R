@@ -141,3 +141,17 @@ test_that("hyperlinks work", {
   expect_equal(character(), wb$worksheets[[1]]$hyperlinks)
 
 })
+
+test_that("dont bail on phone number in hyperlink target", {
+  temp_file <- openxlsx2::temp_xlsx()
+  on.exit(unlink(temp_file, recursive = TRUE), add = TRUE)
+
+  wb <- wb_workbook()
+  wb <- wb_add_worksheet(wb)
+  wb <- wb_add_data(wb, x = c("Phone"))
+  wb <- wb_add_hyperlink(wb, target = "TEL:+41444120800")
+
+  wb_save(wb, temp_file)
+  file.exists(temp_file)
+  expect_silent(wb_load(temp_file))
+})

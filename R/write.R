@@ -380,7 +380,7 @@ write_data2 <- function(
   }
 
   if (!is.null(attr(data, "c_cm"))) {
-    warning("modifications with cm formulas are experimental. use at own risk")
+    # warning("modifications with cm formulas are experimental. use at own risk")
     c_cm <- attr(data, "c_cm")
   } else {
     c_cm <- ""
@@ -831,6 +831,7 @@ write_data2 <- function(
 #' @param inline_strings optional write strings as inline strings
 #' @param total_row optional write total rows
 #' @param shared shared formula
+#' @param params optional list. contains data table filters in `choose`
 #' @noRd
 #' @keywords internal
 write_data_table <- function(
@@ -859,7 +860,8 @@ write_data_table <- function(
     inline_strings  = TRUE,
     total_row       = FALSE,
     enforce         = FALSE,
-    shared          = FALSE
+    shared          = FALSE,
+    params          = NULL
 ) {
 
   ## Input validating
@@ -872,6 +874,7 @@ write_data_table <- function(
   assert_class(lastColumn, "logical")
   assert_class(bandedRows, "logical")
   assert_class(bandedCols, "logical")
+  assert_class(params, "list",  or_null = TRUE)
 
   # force with globalenv() options
   x <- force(x)
@@ -1086,6 +1089,7 @@ write_data_table <- function(
 
     ## replace invalid XML characters
     col_names <- replace_legal_chars(colnames(x))
+    col_names <- escape_newline_and_tab(col_names)
     if (rowNames) col_names <- c("_rowNames_", col_names)
 
     ## Table name validation
@@ -1155,6 +1159,15 @@ write_data_table <- function(
     ref2 <- paste0(int2col(startCol + nCol - !rowNames), startRow + nRow)
     ref  <- paste(ref1, ref2, sep = ":")
 
+    numfmts <- NULL
+    if (is.list(params)) {
+      if (!is.null(params$choose))
+        withFilter <- params$choose
+
+      if (!is.null(params$numfmts))
+        numfmts <- params$numfmts
+    }
+
     ## create table.xml and assign an id to worksheet tables
     wb$buildTable(
       sheet             = sheet,
@@ -1169,7 +1182,8 @@ write_data_table <- function(
       showFirstColumn   = firstColumn,
       showLastColumn    = lastColumn,
       showRowStripes    = bandedRows,
-      showColumnStripes = bandedCols
+      showColumnStripes = bandedCols,
+      numfmts           = numfmts
     )
   }
 
@@ -1364,7 +1378,8 @@ do_write_formula <- function(
   }
 
   if (array || cm) {
-    if (length(dfx$X) == 1) {
+    # only if single input
+    if (identical(dim(dfx), c(1L, 1L))) {
       attr(dfx, "f_ref") <- dims
     }
   }
@@ -1412,6 +1427,7 @@ do_write_datatable <- function(
     inline_strings    = TRUE,
     total_row         = FALSE,
     shared            = FALSE,
+    params            = params,
     ...
 ) {
 
@@ -1442,6 +1458,7 @@ do_write_datatable <- function(
     na              = na,
     inline_strings  = inline_strings,
     total_row       = total_row,
-    shared          = shared
+    shared          = shared,
+    params          = params
   )
 }

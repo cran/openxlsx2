@@ -340,6 +340,7 @@ wb_add_data <- function(
 #' @param banded_rows logical. If `TRUE`, rows are color banded.
 #' @param banded_cols logical. If `TRUE`, the columns are color banded.
 #' @param total_row logical. With the default `FALSE` no total row is added.
+#' @param params list. Optional arguments passed to the data table creation.
 #' @param ... additional arguments
 #'
 #' @details # Modify total row argument
@@ -388,6 +389,7 @@ wb_add_data_table <- function(
     na                = na_strings(),
     inline_strings    = TRUE,
     total_row         = FALSE,
+    params            = NULL,
     ...
 ) {
   assert_workbook(wb)
@@ -412,6 +414,7 @@ wb_add_data_table <- function(
     na                = na,
     inline_strings    = inline_strings,
     total_row         = total_row,
+    params            = params,
     ...               = ...
   )
 }
@@ -1667,6 +1670,28 @@ wb_add_drawing <- function(
     col_offset = col_offset,
     row_offset = row_offset,
     ...        = ...
+  )
+}
+
+#' Add a Chart object to a workbook sheet
+#'
+#' @description
+#' Renders a `encharter` R6 object and injects the resulting XML into an
+#' `openxlsx2` workbook at the specified location.
+#'
+#' @param wb An `openxlsx2` workbook object.
+#' @param sheet Sheet name or index where the chart will be placed.
+#' @param dims Character string defining the cell range (e.g., "E2:M20").
+#' @param graph An initialized `encharter` R6 object.
+#'
+#' @return The workbook object, invisibly.
+#' @export
+wb_add_encharter <- function(wb, sheet = current_sheet(), dims = NULL, graph) {
+  assert_workbook(wb)
+  wb$clone(deep = TRUE)$add_encharter(
+    sheet = sheet,
+    dims  = dims,
+    graph = graph
   )
 }
 
@@ -3489,6 +3514,8 @@ wb_add_image <- function(
 #' @param sheet the sheet on which the graph will appear
 #' @param dims the dimensions where the sheet will appear
 #' @param xml chart xml
+#' @param style chart style
+#' @param color chart color
 #' @param col_offset,row_offset positioning
 #' @param ... additional arguments
 #' @seealso [wb_add_drawing()] [wb_add_image()] [wb_add_mschart()] [wb_add_plot()]
@@ -3498,6 +3525,8 @@ wb_add_chart_xml <- function(
   sheet      = current_sheet(),
   dims       = NULL,
   xml,
+  style      = "",
+  color      = "",
   col_offset = 0,
   row_offset = 0,
   ...
@@ -3506,6 +3535,8 @@ wb_add_chart_xml <- function(
   wb$clone(deep = TRUE)$add_chart_xml(
     sheet      = sheet,
     xml        = xml,
+    style      = style,
+    color      = color,
     dims       = dims,
     col_offset = col_offset,
     row_offset = row_offset,
