@@ -7,7 +7,7 @@ knitr::opts_chunk$set(
 )
 
 ## ----package------------------------------------------------------------------
-library(openxlsx2) # openxlsx2 >= 0.4 for mschart and rvg support
+library(openxlsx2) # openxlsx2 >= 1.26 for enharter support
 
 ## create a workbook
 wb <- wb_workbook()
@@ -20,6 +20,54 @@ dev.off()
 
 # Add basic plots to the workbook
 wb$add_worksheet("add_image")$add_image(file = myplot)
+
+## ----encharter----------------------------------------------------------------
+if (requireNamespace("encharter")) {
+library(encharter)
+
+df_bar <- data.frame(
+  Product = c("Software", "Services", "Hardware", "Support"),
+  Q1      = c(310, 195, 140, 85),
+  Q2      = c(340, 210, 130, 90),
+  Q3      = c(375, 225, 125, 95),
+  Q4      = c(420, 250, 120, 105)
+)
+
+wb <- wb_add_worksheet(wb, "add_encharter", grid_lines = FALSE)
+wb <- wb_add_data_table(
+  wb, sheet = "add_encharter", x = df_bar,
+  dims = "A1", table_style = "TableStyleMedium2"
+)
+wb <- wb_set_col_widths(wb, sheet = "add_encharter", cols = 1:5, widths = c(12, 8, 8, 8, 8))
+wb_df <- wb_data(wb)
+
+chart <- ec("barChart")
+chart$set_chart_title("Quarterly Revenue by Product (EUR k)", bold = TRUE)
+chart$set_y_axis(min = 0, format = "#,##0", grid_lines = TRUE, grid_color = "EEEEEE")
+
+colors    <- c("2E4057", "048A81", "E84855", "F4A261")
+quarters  <- c("Q1", "Q2", "Q3", "Q4")
+cols      <- c("B",  "C",  "D",  "E")
+variables <- names(wb_df)
+for (i in seq_along(quarters)) {
+  chart$add_series(
+    name   = variables[i + 1L],
+    label  = variables[1L],
+    data   = wb_df,
+    color  = colors[i]
+  )
+}
+
+chart$set_legend_style(pos = "bottom")
+
+wb <- wb_add_encharter(wb, sheet = "add_encharter", graph = chart, dims = "G1:P18")
+}
+
+## ----chartsheet---------------------------------------------------------------
+# add chartsheet
+wb <- wb |>
+  wb_add_chartsheet() |>
+  wb_add_encharter(graph = chart)
 
 ## ----mschart------------------------------------------------------------------
 if (requireNamespace("mschart")) {
@@ -35,54 +83,5 @@ mylc <- ms_linechart(
 )
 
 wb$add_worksheet("add_mschart")$add_mschart(dims = "A10:G25", graph = mylc)
-
-
-## create chart referencing worksheet cells as input
-# write data starting at B2
-wb$add_worksheet("add_mschart - wb_data")$
-  add_data(x = mtcars, dims = "B2")$
-  add_data(x = data.frame(name = rownames(mtcars)), dims = "A2")
-
-# create wb_data object this will tell this mschart
-# from this PR to create a file corresponding to openxlsx2
-dat <- wb_data(wb, dims = "A2:G10")
-
-# create a few mscharts
-scatter_plot <- ms_scatterchart(
-  data = dat,
-  x = "mpg",
-  y = c("disp", "hp")
-)
-
-bar_plot <- ms_barchart(
-  data = dat,
-  x = "name",
-  y = c("disp", "hp")
-)
-
-area_plot <- ms_areachart(
-  data = dat,
-  x = "name",
-  y = c("disp", "hp")
-)
-
-line_plot <- ms_linechart(
-  data = dat,
-  x = "name",
-  y = c("disp", "hp"),
-  labels = c("disp", "hp")
-)
-
-# add the charts to the data
-wb$
-  add_mschart(dims = "F4:L20", graph = scatter_plot)$
-  add_mschart(dims = "F21:L37", graph = bar_plot)$
-  add_mschart(dims = "M4:S20", graph = area_plot)$
-  add_mschart(dims = "M21:S37", graph = line_plot)
-
-# add chartsheet
-wb$
-  add_chartsheet()$
-  add_mschart(graph = scatter_plot)
 }
 
