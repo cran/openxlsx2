@@ -247,6 +247,9 @@ wbWorkbook <- R6::R6Class(
     #' @field python python
     python = NULL,
 
+    #' @field diagrams diagrams
+    diagrams = NULL,
+
     #' @field webextensions webextensions
     webextensions = NULL,
 
@@ -3159,6 +3162,13 @@ wbWorkbook <- R6::R6Class(
         }
       }
 
+      if (length(self$diagrams)) {
+        diagramsDir     <- dir_create(tmpDir, "xl", "diagrams")
+        for (fl in self$diagrams) {
+            file.copy(fl, diagramsDir, overwrite = TRUE)
+        }
+      }
+
       if (length(self$webextensions)) {
         # we have to split webextensions into webextensions and webextensions/_rels
         webextensionsDir     <- dir_create(tmpDir, "xl", "webextensions")
@@ -3303,6 +3313,10 @@ wbWorkbook <- R6::R6Class(
         tail = "</Relationships>",
         fl = file.path(relsDir, ".rels")
       )
+
+      app_parts <- wb_create_app_xml(self)
+      self$app$HeadingPairs <- app_parts$HeadingPairs
+      self$app$TitlesOfParts <- app_parts$TitlesOfParts
 
       ## write app.xml
       write_file(
@@ -4508,6 +4522,10 @@ wbWorkbook <- R6::R6Class(
     #' @return The `wbWorkbook` object
     set_base_colors = function(theme = "Office", ...) {
 
+      # warn on unknown/misspelled arguments; xml is the only extra key consumed
+      arguments <- c(ls(), "xml")
+      standardize_case_names(..., arguments = arguments)
+
       xml <- list(...)$xml
 
       if (is.null(xml)) {
@@ -5603,6 +5621,10 @@ wbWorkbook <- R6::R6Class(
     #' @return The `wbWorkbook` object, invisibly
     merge_cells = function(sheet = current_sheet(), dims = NULL, solve = FALSE, direction = NULL, ...) {
 
+      # warn on unknown/misspelled arguments; cols/rows are the deprecated keys
+      arguments <- c(ls(), "cols", "rows")
+      standardize_case_names(..., arguments = arguments)
+
       cols <- list(...)[["cols"]]
       rows <- list(...)[["rows"]]
 
@@ -5620,6 +5642,10 @@ wbWorkbook <- R6::R6Class(
     #' Removes cell merging for a sheet
     #' @return The `wbWorkbook` object, invisibly
     unmerge_cells = function(sheet = current_sheet(), dims = NULL, ...) {
+
+      # warn on unknown/misspelled arguments; cols/rows are the deprecated keys
+      arguments <- c(ls(), "cols", "rows")
+      standardize_case_names(..., arguments = arguments)
 
       cols <- list(...)[["cols"]]
       rows <- list(...)[["rows"]]
@@ -6078,6 +6104,10 @@ wbWorkbook <- R6::R6Class(
         ),
         ...
     ) {
+
+      # warn on unknown/misspelled arguments; cols/rows are the deprecated keys
+      arguments <- c(ls(), "cols", "rows")
+      standardize_case_names(..., arguments = arguments)
 
       cols <- list(...)[["cols"]]
       rows <- list(...)[["rows"]]
@@ -8577,12 +8607,9 @@ wbWorkbook <- R6::R6Class(
 
     #' @description get named regions in a workbook
     #' @param tables Return tables as well?
-    #' @param x Not used.
+    #' @param builtins Return builtins as well?
     #' @return A `data.frame` of named regions
-    get_named_regions = function(tables = FALSE, x = NULL) {
-      if (!is.null(x)) {
-        stop("x should not be provided to get_named_regions.", call. = FALSE)
-      }
+    get_named_regions = function(tables = FALSE, builtins = TRUE) {
       z <- NULL
 
       if (length(self$workbook$definedNames)) {
@@ -8600,8 +8627,14 @@ wbWorkbook <- R6::R6Class(
 
       }
 
+      if (!builtins && NROW(z)) {
+        sel <- grepl("_xlnm.", z$name, fixed = TRUE)
+        z <- z[!sel, ]
+      }
+
       z
     },
+
     #' @description remove a named region
     #' @param name name
     #' @return The `wbWorkbook` object
@@ -9077,7 +9110,9 @@ wbWorkbook <- R6::R6Class(
               underline = "u",
               vert_align = "vertAlign"
             )
-            sel <- font_properties[update]
+            # font-element selector: keep this separate from `sel`, which holds
+            # the numeric cell index reused as `dim_sel <- sel[...]` each iteration
+            font_sel <- font_properties[update]
 
             font_id  <- as.integer(vapply(xml_attr(xf_prev, "xf"), "[[", "fontId", FUN.VALUE = NA_character_)) + 1L
             font_xml <- self$styles_mgr$styles$fonts[[font_id]]
@@ -9087,15 +9122,15 @@ wbWorkbook <- R6::R6Class(
             new_font <- read_font(read_xml(new_font))
 
             # update elements
-            old_font[sel] <- new_font[sel]
+            old_font[font_sel] <- new_font[font_sel]
 
             # write as xml font
 
-            sel <- c(
+            font_sel <- c(
               "b", "i", "strike", "condense", "extend", "outline", "shadow",
               "u", "vertAlign", "sz", "color", "name", "family", "charset", "scheme"
             )
-            new_font <- write_font(old_font[sel])
+            new_font <- write_font(old_font[font_sel])
           }
 
           self$styles_mgr$add(new_font, new_font)
@@ -10743,7 +10778,7 @@ wbWorkbook <- R6::R6Class(
       # We need an emptry cc frame, otherwise nothing is written
       if (is.null(ws$sheet_data$cc)) {
         ws$sheet_data$cc <- create_char_dataframe(
-          colnames = c("r", "row_r", "c_r", "c_s", "c_t", "v", "f", "f_attr", "is"),
+          colnames = c("key", "r", "row_r", "c_r", "c_s", "c_t", "v", "f", "f_attr", "is"),
           n = 0
         )
       }

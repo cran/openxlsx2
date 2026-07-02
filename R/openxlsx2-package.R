@@ -1,10 +1,10 @@
 #' xlsx reading, writing and editing.
 #'
-#' This R package is a modern reinterpretation of the widely used popular
+#' This R package is a modern reinterpretation of the widely used
 #' `openxlsx` package. Similar to its predecessor, it simplifies the creation of xlsx
 #' files by providing a clean interface for writing, designing and editing worksheets.
 #' Based on a powerful XML library and focusing on modern programming flows in pipes
-#' or chains, `openxlsx2` allows to break many new ground.
+#' or chains, `openxlsx2` breaks new ground.
 #'
 #' @useDynLib openxlsx2, .registration=TRUE
 #'
@@ -33,10 +33,10 @@
 #' * Enhancing spreadsheets with comments ([wb_add_comment()]),
 #'  images ([wb_add_image()]), plots ([wb_add_plot()]), charts ([wb_add_mschart()]),
 #'  and pivot tables ([wb_add_pivot_table()]).
-#' Customizing cell styles using fonts ([wb_add_font()]),
-#' number formats ([wb_add_numfmt()]), backgrounds ([wb_add_fill()]),
-#' and alignments ([wb_add_cell_style()]). Inserting custom text strings with
-#' [fmt_txt()] and creating comprehensive table styles with [create_tablestyle()].
+#' * Customizing cell styles using fonts ([wb_add_font()]),
+#'  number formats ([wb_add_numfmt()]), backgrounds ([wb_add_fill()]),
+#'  and alignments ([wb_add_cell_style()]). Inserting custom text strings with
+#'  [fmt_txt()] and creating comprehensive table styles with [create_tablestyle()].
 #'
 #' ## Interaction
 #' Interaction with `openxlsx2` objects can occur through two primary methods:
@@ -141,7 +141,7 @@
 #'
 #' This package is licensed under the MIT license and
 #' is based on [`openxlsx`](https://github.com/ycphs/openxlsx) (by Alexander Walker and Philipp Schauberger; COPYRIGHT 2014-2022)
-#' and [`pugixml`](https://github.com/zeux/pugixml) (by Arseny Kapoulkine; COPYRIGHT 2006-2025). Both released under the MIT license.
+#' and [`pugixml`](https://github.com/zeux/pugixml) (by Arseny Kapoulkine; COPYRIGHT 2006-2026). Both released under the MIT license.
 #' @keywords internal
 #' @examples
 #' # read xlsx or xlsm files

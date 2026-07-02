@@ -586,3 +586,22 @@ test_that("reading file with xmlMaps works", {
   expect_true(!is.null(wb$xmlMaps))
   expect_silent(wb$save("/tmp/test.xlsx"))
 })
+
+test_that("skipping builtins works", {
+  skip_online_checks()
+  xlsxFile <- testfile_path("Detailed_occupation_by_sex_and_education_ACS_2022_tab1.xlsx")
+  expect_equal(nrow(wb_load(xlsxFile)$get_named_regions(builtins = FALSE)), 0)
+})
+
+test_that("loading and saving diagrams works", {
+  skip_online_checks()
+  fl <- testfile_path("diagram.xlsx")
+  tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
+
+  wb <- wb_load(fl)
+  expect_equal(length(wb$Content_Types), 25L)
+  expect_silent(wb$save(tmp))
+  wb <- wb_load(tmp)
+  expect_equal(length(wb$Content_Types), 25L)
+})

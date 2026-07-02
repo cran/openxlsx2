@@ -446,6 +446,19 @@ test_that("validate_colors() works", {
   expect_equal(got, exp)
 })
 
+test_that("wb_color() applies the alpha format only once (#1341)", {
+
+  # `name` is an alternative to `hex`; the format must be applied only once.
+  # Regression guard: both validate_color() calls used to fire, swapping the
+  # RGBA alpha a second time (blue: FF0000FF -> FFFF0000 = red).
+  expect_equal(wb_color(name = "blue", format = "RGBA")[["rgb"]], "FF0000FF")
+  expect_equal(wb_color(name = "red",  format = "RGBA")[["rgb"]], "FFFF0000")
+
+  # ARGB default and the hex= path stay correct (single swap)
+  expect_equal(wb_color(name = "blue")[["rgb"]], "FF0000FF")
+  expect_equal(wb_color(hex = "FF0000FF", format = "RGBA")[["rgb"]], "FFFF0000")
+})
+
 test_that("basename2() works", {
 
   long_path <- paste0(
@@ -658,5 +671,27 @@ test_that("hashing passwords works", {
 
   expect_true(verifyPasswordSHA("openxlsx2", stored_hash = hp$hash, stored_salt = hp$salt, stored_spin = hp$spin, stored_algo = hp$algo))
   expect_false(verifyPasswordSHA("openxlsx", stored_hash = hp$hash, stored_salt = hp$salt, stored_spin = hp$spin, stored_algo = hp$algo))
+
+})
+
+test_that("escaping hyperlinks works", {
+  df <- data.frame(
+    id  = c("A1", "A2"),
+    url = c(
+      "https://example.com/search?q=test&x=1",
+      "https://example.com/page?a=10&b=20"
+    )
+  )
+
+  wb <- wb_workbook()$
+    add_worksheet("Sheet1")$
+    add_worksheet("Sheet2")$
+    add_data(sheet = "Sheet1", x = df["id"])$
+    add_hyperlink(sheet = "Sheet1", dims = wb_dims(rows = 2:3, cols = 1), target = df$url)$
+    add_data_table(sheet = "Sheet2", x = df["id"])
+
+  exp <- wb$worksheets_rels[[1]]
+  got <- df_to_xml("Relationship", rbindlist(xml_attr(exp, "Relationship"))[c("Id", "Type", "Target", "TargetMode")])
+  expect_identical(got, exp)
 
 })

@@ -93,6 +93,8 @@ Note that the documentation is more complete in each of the wrapper functions.
 
     \item{\code{python}}{python}
 
+    \item{\code{diagrams}}{diagrams}
+
     \item{\code{webextensions}}{webextensions}
 
     \item{\code{headFoot}}{The header and footer}
@@ -2945,14 +2947,14 @@ are removed.}
   get named regions in a workbook
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{wbWorkbook$get_named_regions(tables = FALSE, x = NULL)}
+    \preformatted{wbWorkbook$get_named_regions(tables = FALSE, builtins = TRUE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{tables}}{Return tables as well?}
-      \item{\code{x}}{Not used.}
+      \item{\code{builtins}}{Return builtins as well?}
     }
     \if{html}{\out{</div>}}
   }

@@ -247,9 +247,10 @@ wb_load <- function(
   # Misc / Singletons
   customXmlDir       <- grep_xml("customXml/")
   docMetadataXML     <- grep_xml("docMetadata/")
-  calcChainXML       <- grep_xml("xl/calcChain\\.xml")
-  embeddings         <- grep_xml("xl/embeddings")
   activeX            <- grep_xml("xl/activeX")
+  calcChainXML       <- grep_xml("xl/calcChain\\.xml")
+  diagrams           <- grep_xml("xl/diagrams")
+  embeddings         <- grep_xml("xl/embeddings")
   python             <- grep_xml("xl/python\\.xml$")
   webextensions      <- grep_xml("xl/webextensions")
   ctrlPropsXML       <- grep_xml("ctrlProps/ctrlProp[0-9]+\\.xml")
@@ -257,7 +258,7 @@ wb_load <- function(
   namedSheetViewsXML <- grep_xml("namedSheetViews/namedSheetView[0-9]+\\.xml$")
 
   cleanup_dir <- function(data_only) {
-    grep_xml("media|vmlDrawing|customXml|embeddings|activeX|vbaProject|webextensions", ignore.case = TRUE, invert = TRUE)
+    grep_xml("activeX|customXml|diagrams|embeddings|media|vbaProject|vmlDrawing|webextensions", ignore.case = TRUE, invert = TRUE)
   }
 
   ## remove all EXCEPT media and charts
@@ -274,7 +275,7 @@ wb_load <- function(
   file_folders <- unique(basename(dirname(xmlFiles)))
   known <- c(
     basename(xmlDir), "_rels", "activeX", "charts", "chartsheets",
-    "ctrlProps", "customXml", "docMetadata", "docProps", "drawings",
+    "ctrlProps", "customXml", "docMetadata", "docProps", "diagrams", "drawings",
     "embeddings", "externalLinks", "featurePropertyBag", "media",
     "namedSheetViews", "persons", "pivotCache", "pivotTables",
     "printerSettings", "queryTables", "richData", "slicerCaches",
@@ -929,6 +930,12 @@ wb_load <- function(
         ws[[node]] <- xml_node(chartsheet_xml, "chartsheet", node)
       }
 
+      # printerSettings binary blobs are intentionally not kept (see the
+      # sheet rels handling below), so a pageSetup r:id would dangle and
+      # trigger a repair prompt in spreadsheet software. Drop the reference.
+      if (length(ws$pageSetup))
+        ws$pageSetup <- xml_attr_mod(ws$pageSetup, xml_attributes = c(`r:id` = ""))
+
     } else {
       worksheet_xml <- read_xml(sheets$target[i])
 
@@ -948,6 +955,12 @@ wb_load <- function(
         for (node in standard_nodes) {
           ws[[node]] <- xml_node(worksheet_xml, "worksheet", node)
         }
+
+        # printerSettings binary blobs are intentionally not kept (see the
+        # sheet rels handling below), so a pageSetup r:id would dangle and
+        # trigger a repair prompt in spreadsheet software. Drop the reference.
+        if (length(ws$pageSetup))
+          ws$pageSetup <- xml_attr_mod(ws$pageSetup, xml_attributes = c(`r:id` = ""))
 
         ws$colBreaks <- xml_node(worksheet_xml, "worksheet", "colBreaks", "brk")
         ws$rowBreaks <- xml_node(worksheet_xml, "worksheet", "rowBreaks", "brk")
@@ -1386,8 +1399,10 @@ wb_load <- function(
         wb$vml[vml_file] <- read_xml(vml, pointer = FALSE)
       }
 
-      for (vml_rel in vmlDrawingRelsXML) {
+      if (length(vmlDrawingRelsXML))
         wb$vml_rels <- rep(list(""), vml_len) # vector("list", vml_len)
+
+      for (vml_rel in vmlDrawingRelsXML) {
 
         vml_file <- cdigit(basename(vml_rel), as_integer = TRUE)
 
@@ -1521,6 +1536,26 @@ wb_load <- function(
 
       cts <- c(cts, '<Default Extension="bin" ContentType="application/vnd.ms-office.activeX"/>')
       cts <- c(cts, sprintf('<Override PartName="/xl/activeX/%s" ContentType="application/vnd.ms-office.activeX+xml"/>', ax_fls))
+    }
+
+    ## xl\diagrams
+    if (length(diagrams)) {
+      wb$diagrams <- diagrams
+      di_sel <- file_ext2(diagrams) == "xml"
+      di_fls <- basename2(diagrams[di_sel])
+
+      clrs <- grep("^colors", di_fls, value = TRUE)
+      data <- grep("^data", di_fls, value = TRUE)
+      drwn <- grep("^drawing", di_fls, value = TRUE)
+      layt <- grep("^layout", di_fls, value = TRUE)
+      qust <- grep("^quickStyle", di_fls, value = TRUE)
+
+      if (length(clrs)) cts <- c(cts, sprintf('<Override PartName="/xl/diagrams/%s" ContentType="application/vnd.openxmlformats-officedocument.drawingml.diagramColors+xml"/>', clrs))
+      if (length(data)) cts <- c(cts, sprintf('<Override PartName="/xl/diagrams/%s" ContentType="application/vnd.openxmlformats-officedocument.drawingml.diagramData+xml"/>', data))
+      if (length(drwn)) cts <- c(cts, sprintf('<Override PartName="/xl/diagrams/%s" ContentType="application/vnd.ms-office.drawingml.diagramDrawing+xml"/>', drwn))
+      if (length(layt)) cts <- c(cts, sprintf('<Override PartName="/xl/diagrams/%s" ContentType="application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml"/>', layt))
+      if (length(qust)) cts <- c(cts, sprintf('<Override PartName="/xl/diagrams/%s" ContentType="application/vnd.openxmlformats-officedocument.drawingml.diagramStyle+xml"/>', qust))
+
     }
 
     ## xl\webextensions

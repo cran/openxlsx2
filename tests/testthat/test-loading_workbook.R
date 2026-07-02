@@ -742,3 +742,65 @@ test_that("has_drawings is defunct", {
     "argument \"has_drawing\" was removed"
   )
 })
+
+test_that("loading keeps every vmlDrawing.vml.rels (#1557 regression)", {
+
+  # A comment with a background image produces a vmlDrawing*.vml.rels per
+  # sheet. wb$vml_rels used to be re-initialised inside the load loop, so all
+  # but the last sheet's .vml.rels were dropped on a load + save round-trip,
+  # leaving dangling o:relid references (Excel repair prompt).
+  img <- system.file("extdata", "einstein.jpg", package = "openxlsx2")
+
+  wb <- wb_workbook()
+  for (i in 1:3) {
+    wb$add_worksheet(paste0("S", i))
+    wb$add_comment(
+      sheet   = i,
+      dims    = "B2",
+      comment = wb_comment(text = paste("comment", i), author = "x"),
+      file    = img
+    )
+  }
+
+  count_vmlrels <- function(f) {
+    sum(grepl("xl/drawings/_rels/vmlDrawing.*\\.vml\\.rels$",
+              unzip(f, list = TRUE)$Name))
+  }
+
+  tmp1 <- temp_xlsx()
+  on.exit(unlink(tmp1), add = TRUE)
+  wb$save(tmp1)
+  expect_equal(count_vmlrels(tmp1), 3)
+
+  wb2 <- wb_load(tmp1)
+  # all three entries survive the load (previously only the last was kept)
+  expect_equal(sum(vapply(wb2$vml_rels, function(x) !all(x == ""), NA)), 3)
+
+  tmp2 <- temp_xlsx()
+  on.exit(unlink(tmp2), add = TRUE)
+  wb2$save(tmp2)
+  expect_equal(count_vmlrels(tmp2), 3)
+
+})
+
+test_that("dangling pageSetup printerSettings r:id is dropped on load (#1640)", {
+
+  # worksheets in this file carry a pageSetup r:id pointing to printerSettings
+  # binary blobs. openxlsx2 intentionally does not keep those blobs, so the
+  # reference dangled and triggered a repair prompt on round-trip.
+  fl <- testfile_path("unemployment-nrw202208.xlsx")
+  tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
+
+  has_rid <- function(wb) {
+    ps <- vapply(wb$worksheets, function(ws) paste0(ws$pageSetup, collapse = ""), NA_character_)
+    any(grepl("r:id", ps, fixed = TRUE))
+  }
+
+  wb <- wb_load(fl)
+  expect_false(has_rid(wb))
+
+  expect_silent(wb$save(tmp))
+  expect_false(has_rid(wb_load(tmp)))
+
+})

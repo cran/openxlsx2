@@ -483,10 +483,12 @@ and <code>fmt_txt()</code> to tweak colors and text.</p>
 <p>Finally it is possible to add <code>encharter</code> objects into
 chartsheets. These are special sheets that contain only a chart object,
 referencing data from another sheet.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># add chartsheet</span></span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>wb <span class="ot">&lt;-</span> wb <span class="sc">|&gt;</span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="fu">wb_add_chartsheet</span>() <span class="sc">|&gt;</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="fu">wb_add_encharter</span>(<span class="at">graph =</span> chart)</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;encharter&quot;</span>)) {</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co"># add chartsheet</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>wb <span class="ot">&lt;-</span> wb <span class="sc">|&gt;</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="fu">wb_add_chartsheet</span>() <span class="sc">|&gt;</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="fu">wb_add_encharter</span>(<span class="at">graph =</span> chart)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>}</span></code></pre></div>
 </div>
 </div>
 <div id="add-mschart-plots" class="section level2">

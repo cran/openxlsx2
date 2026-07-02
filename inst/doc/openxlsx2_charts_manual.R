@@ -64,10 +64,12 @@ wb <- wb_add_encharter(wb, sheet = "add_encharter", graph = chart, dims = "G1:P1
 }
 
 ## ----chartsheet---------------------------------------------------------------
+if (requireNamespace("encharter")) {
 # add chartsheet
 wb <- wb |>
   wb_add_chartsheet() |>
   wb_add_encharter(graph = chart)
+}
 
 ## ----mschart------------------------------------------------------------------
 if (requireNamespace("mschart")) {

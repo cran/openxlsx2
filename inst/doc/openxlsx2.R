@@ -25,6 +25,10 @@ modern_r <- getRversion() >= "4.1.0"
 ## ----eval = modern_r----------------------------------------------------------
 wb <- wb_workbook() |> wb_add_worksheet() |> wb_add_data(x = mtcars)
 
+## ----include=FALSE------------------------------------------------------------
+# if modern_r is false there is no wb
+wb <- wb_workbook()$add_worksheet()$add_data(x = mtcars)
+
 ## -----------------------------------------------------------------------------
 wb
 
