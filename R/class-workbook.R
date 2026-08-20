@@ -7421,7 +7421,7 @@ wbWorkbook <- R6::R6Class(
           ))
       }
 
-      cat(unlist(showText))
+      cat(unlist(showText), "\n")
       invisible(self)
     },
 
@@ -8684,6 +8684,31 @@ wbWorkbook <- R6::R6Class(
         stop("Elements of order are greater than the number of worksheets")
       }
 
+      ## Code adapted from set_sheet_names()
+      ## rename defined names
+      if (length(self$workbook$definedNames)) {
+        ind <- self$get_named_regions()
+        ind <- ind[order(as.integer(rownames(ind))), ]
+
+        has_local <- ind$localSheetId != ""
+        local_ids <- as.integer(ind$localSheetId[has_local])
+        target_sheets <- as.integer(sheets) - 1L
+
+        if (any(local_ids %in% target_sheets)) {
+          ind$new_sheet <- NA_integer_
+          ind$new_sheet[has_local] <- pmax(match(local_ids, target_sheets) - 1L, 0L)
+
+          mask <- !is.na(ind$new_sheet)
+          new_ids <- sprintf('localSheetId="%d"', ind$new_sheet[mask])
+
+          self$workbook$definedNames[mask] <- stringi::stri_replace_first_regex(
+            self$workbook$definedNames[mask],
+            'localSheetId="[0-9]+"',
+            new_ids
+          )
+        }
+      }
+
       self$sheetOrder <- sheets
       invisible(self)
     },
@@ -9565,7 +9590,7 @@ wbWorkbook <- R6::R6Class(
           wb_style <- create_char_dataframe(names(org_style), n = 0)
 
         # remove all values
-        org_style <- org_style[c("r", "row_r", "c_r", "c_s")]
+        org_style <- org_style[c("key", "r", "row_r", "c_r", "c_s")]
 
         # do not merge c_s and do not create duplicates
         merged_style <- merge(org_style,

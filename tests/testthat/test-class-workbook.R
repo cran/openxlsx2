@@ -130,6 +130,25 @@ test_that("$set_order() works", {
   expect_identical(wb$get_sheet_names(), exp)
 })
 
+test_that("sorting sheet, sorts named regions", {
+
+  wb <- wb_workbook()$
+    add_worksheet("S1")$add_data(x = mtcars)$
+    add_worksheet("S2")$add_data(x = cars)$
+    add_worksheet("S3")$add_data(x = iris)
+
+  wb$add_named_region(sheet = "S1", dims = wb_dims(x = mtcars), local_sheet = TRUE, name = "mtcars")
+  wb$add_named_region(sheet = "S2", dims = wb_dims(x = cars), local_sheet = TRUE, name = "cars")
+  wb$add_named_region(sheet = "S3", dims = wb_dims(x = iris), local_sheet = TRUE, name = "iris")
+
+  wb$workbook$definedNames
+
+  wb$set_order(3:1)
+  wb$set_selected(sheet = "S3")
+
+  expect_equal(wb$get_named_regions()$localSheetId, c('1', '0', '2'))
+})
+
 
 # sheet names -------------------------------------------------------------
 
@@ -1110,7 +1129,7 @@ test_that("wbWorkbook print works", {
            " ",
            "Worksheets:",
            " Sheets: Sheet 1, Sheet 1 (1), Sheet & NoSheet ",
-           " Write order: 1, 2, 3")
+           " Write order: 1, 2, 3 ")
   got <- capture.output(wb)
   expect_equal(got, exp)
 
