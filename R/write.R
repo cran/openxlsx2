@@ -104,7 +104,8 @@ inner_update <- function(
   # values with the formula. If the entire cc is replaced with x, we can skip.
   if (!all(cc$f_attr == "")) {
     ff <- rbindlist(xml_attr(paste0("<f ", cc$f_attr, "/>"), "f"))
-    if (length(sf <- ff$si[sel & ff$t[sel] == "shared" & ff$ref[sel] != ""]) && !all(cc$key %in% x$key)) {
+    mask <- !is.na(sel) & ff$t[sel] == "shared" & ff$ref[sel] != ""
+    if (length(sf <- ff$si[sel[mask]]) && !all(cc$key %in% x$key)) {
 
       # collect all the shared formulas that we have to convert
       sel_fsi <- ff$si %in% unique(sf)
@@ -753,12 +754,12 @@ write_data2 <- function(
     cc <- wb$worksheets[[sheetno]]$sheet_data$cc
 
     sel <- grepl("<si>", cc$v)
-    cc_sst <- stringi::stri_unique(cc[sel, "v"])
+    v <- cc$v[sel]
+    Encoding(v) <- "UTF-8"
 
-    wb$sharedStrings <- stringi::stri_unique(c(wb$sharedStrings, cc_sst))
+    wb$sharedStrings <- stringi::stri_unique(c(wb$sharedStrings, stringi::stri_unique(v)))
 
-    sel <- grepl("<si>", cc$v)
-    cc$v[sel] <- as.character(match(cc$v[sel], wb$sharedStrings) - 1L)
+    cc$v[sel] <- as.character(match(v, wb$sharedStrings) - 1L)
 
     text        <- si_to_txt(wb$sharedStrings)
     uniqueCount <- length(wb$sharedStrings)

@@ -2990,8 +2990,10 @@ wbWorkbook <- R6::R6Class(
     #' @param overwrite If `FALSE`, will not overwrite when `path` exists
     #' @param path Deprecated argument previously used for file. Please use file in new code.
     #' @param flush Experimental, streams the worksheet file to disk
+    #' @param use_modification_date If `TRUE`, sets timestamps of files within the
+    #'   resulting xlsx to the `datetime_modified` property of `wb`.
     #' @return The `wbWorkbook` object invisibly
-    save = function(file = self$path, overwrite = TRUE, path = NULL, flush = FALSE) {
+    save = function(file = self$path, overwrite = TRUE, path = NULL, flush = FALSE, use_modification_date = FALSE) {
 
       if (!is.null(path)) {
         .Deprecated(old = "wb_save(path)", new = "wb_save(file)", package = "openxlsx2")
@@ -3001,6 +3003,7 @@ wbWorkbook <- R6::R6Class(
       assert_class(file, "character")
       assert_class(overwrite, "logical")
       assert_class(flush, "logical")
+      assert_class(use_modification_date, "logical")
 
       if (length(file) > 1) {
         stop("Multiple files provided.", .call = FALSE)
@@ -3942,6 +3945,26 @@ wbWorkbook <- R6::R6Class(
       compr_level <- getOption("openxlsx2.compression_level") %||%
         getOption("openxlsx2.compresssionevel") %||%
         6L
+
+      if (use_modification_date) {
+        # Set timestamps on created files and folders to the user-specified
+        # last modified time; datetime_modified. This facilitates the creation
+        # of a cryptographically deterministic file.
+        Sys.setFileTime(
+          list.files(
+            path = tmpDir,
+            all.files = TRUE,
+            full.names = TRUE,
+            recursive = TRUE,
+            include.dirs = TRUE
+          ),
+          as.POSIXct(
+            self$get_properties()["datetime_modified"],
+            format = "%Y-%m-%dT%H:%M:%SZ",
+            tz = "UTC"
+          )
+        )
+      }
 
       zipped <- zip_output(
         zip_path = tmpFile,
@@ -5084,7 +5107,25 @@ wbWorkbook <- R6::R6Class(
 
       base_font <- wb_get_base_font(self)
 
-      if (any(widths == "auto")) {
+      # "auto" with an optional offset: "auto+2" adds 2 width units to every
+      # automatically sized column, "auto-1" subtracts 1
+      is_auto <- grepl("^auto([+-][0-9]+([.][0-9]+)?)?$", col_width)
+      bad_auto <- startsWith(as.character(col_width), "auto") & !is_auto
+      if (any(bad_auto)) {
+        stop("Invalid `widths` entry \"", col_width[bad_auto][1],
+             "\". Use \"auto\", \"auto+n\" or \"auto-n\", e.g. \"auto+2\".")
+      }
+
+      if (any(is_auto)) {
+
+        offs <- sub("^auto", "", col_width[is_auto])
+        offs[offs == ""] <- "0"
+        offs <- as.numeric(offs)
+        if (length(unique(offs)) > 1L) {
+          warning("Multiple different \"auto\" offsets supplied; using \"auto",
+                  ifelse(offs[1L] < 0, "", "+"), offs[1L], "\" for all columns.")
+        }
+        auto_offset <- offs[1L]
 
         if (is.null(self$worksheets[[sheet]]$sheet_data$cc)) {
           # sheet has no data
@@ -5125,6 +5166,8 @@ wbWorkbook <- R6::R6Class(
         },
         NA_real_
         )
+
+        col_width <- pmax(col_width + auto_offset, 0)
       }
 
       # all are equal sized. we ignore cells which have NA
@@ -6117,11 +6160,6 @@ wbWorkbook <- R6::R6Class(
         dims <- rowcol_to_dims(rows, cols)
       }
 
-      # as_integer returns a range, but we want to know all columns
-      ddims <- dims_to_rowcol(dims, as_integer = FALSE)
-      rows <- sort(as.integer(ddims[["row"]]))
-      cols <- sort(col2int(ddims[["col"]]))
-
       if (!is.null(style)) assert_class(style, "character")
       assert_class(type, "character")
       assert_class(params, "list")
@@ -6132,6 +6170,13 @@ wbWorkbook <- R6::R6Class(
       dxfId <- NULL
       values <- NULL
       params <- validate_cf_params(params)
+
+      # `dims` may consist of several blocks ("A2:A5,C2:C2"). This runs before
+      # a style is registered, so an unusable `dims` leaves the workbook untouched.
+      cf_ranges <- cf_dims_to_sqref(dims)
+
+      if (is.null(cf_ranges))
+        stop("`dims` does not select any cell", call. = FALSE)
 
       # A style was explicitly requested
       # For colorScale the style is a vector of colors, either an R string like "blue" or a wb_color() object
@@ -6149,256 +6194,237 @@ wbWorkbook <- R6::R6Class(
         dxfId <- self$styles_mgr$get_dxf_id(smp)
       }
 
-      cols <- tapply(cols, cumsum(c(1, diff(cols) != 1)), function(g) {
-        range(g)
-      })
+      # a single conditionalFormatting element carries every range of the
+      # selection, "A1:B2 C2:D3", so one rule covers the whole selection
+      sqref <- cf_ranges$sqref
 
-      rows <- tapply(rows, cumsum(c(1, diff(rows) != 1)), function(g) {
-        range(g)
-      })
+      switch(
+        type,
 
-      orig_rule <- rule
+        expression = {
+          # TODO should we bother to do any conversions or require the text
+          # entered to be exactly as an spreadsheet expression would be written?
+          msg <- "When type == 'expression', "
 
-      for (row in rows) {
-        for (col in cols) {
+          if (!is.character(rule) || length(rule) != 1L) {
+            stop(msg, "rule must be a single length character vector")
+          }
 
-          switch(
-            type,
+          rule <- gsub("!=", "<>", rule)
+          rule <- gsub("==", "=", rule)
+          rule <- replace_legal_chars(rule) # replaces <>
 
-            expression = {
-              # TODO should we bother to do any conversions or require the text
-              # entered to be exactly as an spreadsheet expression would be written?
-              msg <- "When type == 'expression', "
+          if (!grepl("[A-Z]", substr(rule, 1, 2))) {
+            ## formula looks like "operatorX" , attach top left cell to rule
+            rule <- paste0(cf_ranges$anchor, rule)
+          } ## else, there is a letter in the formula and apply as is
 
-              if (!is.character(orig_rule) || length(orig_rule) != 1L) {
-                stop(msg, "rule must be a single length character vector")
-              }
+        },
 
-              rule <- orig_rule
+        colorScale = {
+          # - style is a vector of colors with length 2 or 3
+          # - rule specifies the quantiles (numeric vector of length 2 or 3), if NULL min and max are used
+          msg <- "When type == 'colorScale', "
 
-              rule <- gsub("!=", "<>", rule)
-              rule <- gsub("==", "=", rule)
-              rule <- replace_legal_chars(rule) # replaces <>
+          if (!is.character(style)) {
+            stop(msg, "style must be a vector of colors of length 2 or 3.")
+          }
 
-              if (!grepl("[A-Z]", substr(rule, 1, 2))) {
-                ## formula looks like "operatorX" , attach top left cell to rule
-                rule <- paste0(
-                  get_cell_refs(data.frame(row[1], col[1], stringsAsFactors = FALSE)),
-                  rule
-                )
-              } ## else, there is a letter in the formula and apply as is
+          if (!length(style) %in% 2:3) {
+            stop(msg, "style must be a vector of length 2 or 3.")
+          }
 
-            },
-
-            colorScale = {
-              # - style is a vector of colors with length 2 or 3
-              # - rule specifies the quantiles (numeric vector of length 2 or 3), if NULL min and max are used
-              msg <- "When type == 'colorScale', "
-
-              if (!is.character(style)) {
-                stop(msg, "style must be a vector of colors of length 2 or 3.")
-              }
-
-              if (!length(style) %in% 2:3) {
-                stop(msg, "style must be a vector of length 2 or 3.")
-              }
-
-              if (!is.null(rule)) {
-                if (length(rule) != length(style)) {
-                  stop(msg, "rule and style must have equal lengths.")
-                }
-              }
-
-              style <- validate_color(style)
-
-              if (isFALSE(style)) {
-                stop(msg, "style must be valid colors")
-              }
-
-              values <- rule
-              rule <- style
-            },
-
-            dataBar = {
-              # - style is a vector of colors of length 2 or 3
-              # - rule specifies the quantiles (numeric vector of length 2 or 3), if NULL min and max are used
-              msg <- "When type == 'dataBar', "
-              style <- style %||% "#638EC6"
-
-              # TODO use inherits() not class()
-              if (!inherits(style, "character")) {
-                stop(msg, "style must be a vector of colors of length 1 or 2.")
-              }
-
-              if (!length(style) %in% 1:2) {
-                stop(msg, "style must be a vector of length 1 or 2.")
-              }
-
-              if (!is.null(rule)) {
-                if (length(rule) != length(style)) {
-                  stop(msg, "rule and style must have equal lengths.")
-                }
-              }
-
-              ## Additional parameters passed by ...
-              # showValue, gradient, border
-              style <- validate_color(style)
-
-              if (isFALSE(style)) {
-                stop(msg, "style must be valid colors")
-              }
-
-              values <- rule
-              rule <- style
-            },
-
-            iconSet = {
-              # - rule is the iconSet values
-              msg <- "When type == 'iconSet', "
-              values <- rule
-            },
-
-            duplicatedValues = {
-              # type == "duplicatedValues"
-              # - style is a Style object
-              # - rule is ignored
-
-              rule <- style
-            },
-
-            uniqueValues = {
-              # type == "uniqueValues"
-              # - style is a Style object
-              # - rule is ignored
-
-              rule <- style
-            },
-
-            containsBlanks = {
-              # - style is Style object
-              # - rule is cell to check for errors
-              msg <- "When type == 'containsBlanks', "
-
-              rule <- style
-            },
-
-            notContainsBlanks = {
-              # - style is Style object
-              # - rule is cell to check for errors
-              msg <- "When type == 'notContainsBlanks', "
-
-              rule <- style
-            },
-
-            containsErrors = {
-              # - style is Style object
-              # - rule is cell to check for errors
-              msg <- "When type == 'containsErrors', "
-
-              rule <- style
-            },
-
-            notContainsErrors = {
-              # - style is Style object
-              # - rule is cell to check for errors
-              msg <- "When type == 'notContainsErrors', "
-
-              rule <- style
-            },
-
-            containsText = {
-              # - style is Style object
-              # - rule is text to look for
-              msg <- "When type == 'contains', "
-
-              if (!inherits(rule, "character")) {
-                stop(msg, "rule must be a character vector of length 1.")
-              }
-
-              values <- rule
-              rule <- style
-            },
-
-            notContainsText = {
-              # - style is Style object
-              # - rule is text to look for
-              msg <- "When type == 'notContains', "
-
-              if (!inherits(rule, "character")) {
-                stop(msg, "rule must be a character vector of length 1.")
-              }
-
-              values <- rule
-              rule <- style
-            },
-
-            beginsWith = {
-              # - style is Style object
-              # - rule is text to look for
-              msg <- "When type == 'beginsWith', "
-
-              if (!is.character("character")) {
-                stop(msg, "rule must be a character vector of length 1.")
-              }
-
-              values <- rule
-              rule <- style
-            },
-
-            endsWith = {
-              # - style is Style object
-              # - rule is text to look for
-              msg <- "When type == 'endsWith', "
-
-              if (!inherits(rule, "character")) {
-                stop(msg, "rule must be a character vector of length 1.")
-              }
-
-              values <- rule
-              rule <- style
-            },
-
-            between = {
-              rule <- range(rule)
-            },
-
-            topN = {
-              # - rule is ignored
-              # - 'rank' and 'percent' are named params
-
-              ## Additional parameters passed by ...
-              # percent, rank
-
-              values <- params
-              rule <- style
-            },
-
-            bottomN = {
-              # - rule is ignored
-              # - 'rank' and 'percent' are named params
-
-              ## Additional parameters passed by ...
-              # percent, rank
-
-              values <- params
-              rule <- style
+          if (!is.null(rule)) {
+            if (length(rule) != length(style)) {
+              stop(msg, "rule and style must have equal lengths.")
             }
-          )
+          }
 
-          private$do_conditional_formatting(
-            sheet    = sheet,
-            startRow = row[1],
-            endRow   = row[2],
-            startCol = col[1],
-            endCol   = col[2],
-            dxfId    = dxfId,
-            formula  = rule,
-            type     = type,
-            values   = values,
-            params   = params
-          )
+          style <- validate_color(style)
+
+          if (isFALSE(style)) {
+            stop(msg, "style must be valid colors")
+          }
+
+          values <- rule
+          rule <- style
+        },
+
+        dataBar = {
+          # - style is a vector of colors of length 2 or 3
+          # - rule specifies the quantiles (numeric vector of length 2 or 3), if NULL min and max are used
+          msg <- "When type == 'dataBar', "
+          style <- style %||% "#638EC6"
+
+          # TODO use inherits() not class()
+          if (!inherits(style, "character")) {
+            stop(msg, "style must be a vector of colors of length 1 or 2.")
+          }
+
+          if (!length(style) %in% 1:2) {
+            stop(msg, "style must be a vector of length 1 or 2.")
+          }
+
+          if (!is.null(rule)) {
+            if (length(rule) != length(style)) {
+              stop(msg, "rule and style must have equal lengths.")
+            }
+          }
+
+          ## Additional parameters passed by ...
+          # showValue, gradient, border
+          style <- validate_color(style)
+
+          if (isFALSE(style)) {
+            stop(msg, "style must be valid colors")
+          }
+
+          values <- rule
+          rule <- style
+        },
+
+        iconSet = {
+          # - rule is the iconSet values
+          msg <- "When type == 'iconSet', "
+          values <- rule
+        },
+
+        duplicatedValues = {
+          # type == "duplicatedValues"
+          # - style is a Style object
+          # - rule is ignored
+
+          rule <- style
+        },
+
+        uniqueValues = {
+          # type == "uniqueValues"
+          # - style is a Style object
+          # - rule is ignored
+
+          rule <- style
+        },
+
+        containsBlanks = {
+          # - style is Style object
+          # - rule is cell to check for errors
+          msg <- "When type == 'containsBlanks', "
+
+          rule <- style
+        },
+
+        notContainsBlanks = {
+          # - style is Style object
+          # - rule is cell to check for errors
+          msg <- "When type == 'notContainsBlanks', "
+
+          rule <- style
+        },
+
+        containsErrors = {
+          # - style is Style object
+          # - rule is cell to check for errors
+          msg <- "When type == 'containsErrors', "
+
+          rule <- style
+        },
+
+        notContainsErrors = {
+          # - style is Style object
+          # - rule is cell to check for errors
+          msg <- "When type == 'notContainsErrors', "
+
+          rule <- style
+        },
+
+        containsText = {
+          # - style is Style object
+          # - rule is text to look for
+          msg <- "When type == 'contains', "
+
+          if (!inherits(rule, "character")) {
+            stop(msg, "rule must be a character vector of length 1.")
+          }
+
+          values <- rule
+          rule <- style
+        },
+
+        notContainsText = {
+          # - style is Style object
+          # - rule is text to look for
+          msg <- "When type == 'notContains', "
+
+          if (!inherits(rule, "character")) {
+            stop(msg, "rule must be a character vector of length 1.")
+          }
+
+          values <- rule
+          rule <- style
+        },
+
+        beginsWith = {
+          # - style is Style object
+          # - rule is text to look for
+          msg <- "When type == 'beginsWith', "
+
+          if (!is.character(rule)) {
+            stop(msg, "rule must be a character vector of length 1.")
+          }
+
+          values <- rule
+          rule <- style
+        },
+
+        endsWith = {
+          # - style is Style object
+          # - rule is text to look for
+          msg <- "When type == 'endsWith', "
+
+          if (!inherits(rule, "character")) {
+            stop(msg, "rule must be a character vector of length 1.")
+          }
+
+          values <- rule
+          rule <- style
+        },
+
+        between = {
+          rule <- range(rule)
+        },
+
+        topN = {
+          # - rule is ignored
+          # - 'rank' and 'percent' are named params
+
+          ## Additional parameters passed by ...
+          # percent, rank
+
+          values <- params
+          rule <- style
+        },
+
+        bottomN = {
+          # - rule is ignored
+          # - 'rank' and 'percent' are named params
+
+          ## Additional parameters passed by ...
+          # percent, rank
+
+          values <- params
+          rule <- style
         }
-      }
+      )
+
+      private$do_conditional_formatting(
+        sheet   = sheet,
+        sqref   = sqref,
+        dxfId   = dxfId,
+        formula = rule,
+        type    = type,
+        values  = values,
+        params  = params
+      )
 
       invisible(self)
     },
@@ -6427,13 +6453,31 @@ wbWorkbook <- R6::R6Class(
         if (is.data.frame(cf)) {
 
           if (!is.null(dims)) {
-            if (any(sel <- cf$sqref %in% dims)) {
+            # a non consecutive dims is stored as the sqref of a single
+            # element, "A1:B2 C2:D3". Both sides go through the same range
+            # builder as add_conditional_formatting(), so a selection is found
+            # whichever way it is written: "A1:B4,C1:C4" as well as "A1:C4",
+            # and a loaded file's "A5" or "A1:C3 B4:C4 D2:D4" as well. Every
+            # element of dims is one selection of its own, as it was when this
+            # matched the stored sqref directly. Only cell ranges go through
+            # the builder, a whole column "A:A" or row "1:1" of a loaded file
+            # is compared as written: dims_to_rowcol() reads "A:A" as A1 and
+            # cannot read "1:1".
+            canon <- function(x) {
+              p <- unlist(strsplit(x, "[,; ]"))
+              p <- p[nzchar(p)]
+              if (!length(p) || !all(grepl("^[$]?[A-Z]+[$]?[0-9]+(:[$]?[A-Z]+[$]?[0-9]+)?$", p))) return(x)
+              tryCatch(cf_dims_to_sqref(x)$sqref, error = function(e) x)
+            }
+            sqrefs <- vapply(dims, canon, NA_character_, USE.NAMES = FALSE)
+            stored <- vapply(cf$sqref, canon, NA_character_, USE.NAMES = FALSE)
+            if (length(sqrefs) && any(sel <- stored %in% sqrefs)) {
               cf <- cf[!sel, ]
             }
           } else if (first) {
-              cf <- cf[-1, ]
+            cf <- cf[-1, ]
           } else if (last) {
-              cf <- cf[-nrow(cf), ]
+            cf <- cf[-nrow(cf), ]
           }
 
           if (nrow(cf) == 0) cf <- character()
@@ -10506,10 +10550,7 @@ wbWorkbook <- R6::R6Class(
 
     do_conditional_formatting = function(
         sheet,
-        startRow,
-        endRow,
-        startCol,
-        endCol,
+        sqref,
         dxfId,
         formula,
         type,
@@ -10520,10 +10561,10 @@ wbWorkbook <- R6::R6Class(
       # TODO rename: setConditionFormatting?  Or addConditionalFormatting
       # TODO can this be moved to the sheet data?
       sheet <- private$get_sheet_index(sheet)
-      sqref <- stringi::stri_join(
-        get_cell_refs(data.frame(x = c(startRow, endRow), y = c(startCol, endCol), stringsAsFactors = FALSE)),
-        collapse = ":"
-      )
+
+      # `sqref` may carry several ranges, "A1:B2 C2:D3". Rules that write a
+      # cell reference into their formula anchor it to the first range.
+      first <- sub(" .*$", "", sqref)
 
       dxfId <- max(dxfId, 0L)
 
@@ -10555,16 +10596,16 @@ wbWorkbook <- R6::R6Class(
         duplicatedValues = cf_create_duplicated_values(priority, dxfId),
 
         ## containsText ----
-        containsText = cf_create_contains_text(priority, dxfId, sqref, values),
+        containsText = cf_create_contains_text(priority, dxfId, first, values),
 
         ## notContainsText ----
-        notContainsText = cf_create_not_contains_text(priority, dxfId, sqref, values),
+        notContainsText = cf_create_not_contains_text(priority, dxfId, first, values),
 
         ## beginsWith ----
-        beginsWith = cf_begins_with(priority, dxfId, sqref, values),
+        beginsWith = cf_begins_with(priority, dxfId, first, values),
 
         ## endsWith ----
-        endsWith = cf_ends_with(priority, dxfId, sqref, values),
+        endsWith = cf_ends_with(priority, dxfId, first, values),
 
         ## between ----
         between = cf_between(priority, dxfId, formula),
@@ -10582,16 +10623,16 @@ wbWorkbook <- R6::R6Class(
         iconSet = cf_icon_set(priority, self$worksheets[[sheet]]$extLst, sqref, values, params),
 
         ## containsErrors ----
-        containsErrors = cf_iserror(priority, dxfId, sqref),
+        containsErrors = cf_iserror(priority, dxfId, first),
 
         ## notContainsErrors ----
-        notContainsErrors = cf_isnoerror(priority, dxfId, sqref),
+        notContainsErrors = cf_isnoerror(priority, dxfId, first),
 
         ## containsBlanks ----
-        containsBlanks = cf_isblank(priority, dxfId, sqref),
+        containsBlanks = cf_isblank(priority, dxfId, first),
 
         ## notContainsBlanks ----
-        notContainsBlanks = cf_isnoblank(priority, dxfId, sqref),
+        notContainsBlanks = cf_isnoblank(priority, dxfId, first),
 
         # do we have a match.arg() anywhere or will it just be showned in this switch()?
         stop("type `", type, "` is not a valid formatting rule")

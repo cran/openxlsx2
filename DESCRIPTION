@@ -1,12 +1,13 @@
 Type: Package
 Package: openxlsx2
 Title: Read, Write and Edit 'xlsx' Files
-Version: 1.29
+Version: 1.30
 Language: en-US
 Authors@R: c(
   person("Jordan Mark", "Barbone", email = "jmbarbone@gmail.com", role = "aut", comment = c(ORCID = "0000-0001-9788-3628")),
   person("Jan Marvin", "Garbuszus", email = "jan.garbuszus@ruhr-uni-bochum.de", role = c("aut", "cre")),
   person("Olivier", "Roy", role = "ctb"),
+  person("Paul", "Schmidt", role = "ctb", comment = c(ORCID = "0000-0003-1528-2082")),
   person(family = "openxlsx authors", role = "cph", comment = "openxlsx package"),
   person("Arseny", "Kapoulkine", role = c("ctb", "cph"), comment = "Author of included pugixml code")
   )
@@ -24,16 +25,17 @@ Suggests: encharter, ggplot2, knitr, mschart (>= 0.4), openssl,
         rmarkdown, rvg, testthat (>= 3.0.0), zip
 VignetteBuilder: knitr
 Encoding: UTF-8
-Config/roxygen2/version: 8.1.0
+Config/roxygen2/version: 8.1.1
 Config/testthat/edition: 3
 NeedsCompilation: yes
-Packaged: 2026-08-20 06:40:07 UTC; janmarvingarbuszus
+Packaged: 2026-10-11 11:16:19 UTC; janmarvingarbuszus
 Author: Jordan Mark Barbone [aut] (ORCID:
     <https://orcid.org/0000-0001-9788-3628>),
   Jan Marvin Garbuszus [aut, cre],
   Olivier Roy [ctb],
+  Paul Schmidt [ctb] (ORCID: <https://orcid.org/0000-0003-1528-2082>),
   openxlsx authors [cph] (openxlsx package),
   Arseny Kapoulkine [ctb, cph] (Author of included pugixml code)
 Maintainer: Jan Marvin Garbuszus <jan.garbuszus@ruhr-uni-bochum.de>
 Repository: CRAN
-Date/Publication: 2026-08-20 13:20:31 UTC
+Date/Publication: 2026-10-11 12:10:02 UTC

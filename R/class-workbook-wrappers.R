@@ -115,11 +115,18 @@ wb_workbook <- function(
 #' As an additional fallback, the `zip` package can be used. It is no longer
 #' listed in `Imports` and must be installed separately if needed.
 #'
+#' The `use_modification_date` argument causes the resulting xlsx file to be
+#' cryptographically deterministic when given the same `wbWorkbook` object and
+#' when using the same zipping utility, which may prove to be convenient if the
+#' file is tracked within a Git repository.
+#'
 #' @param wb A `wbWorkbook` object to write to file
 #' @param file A path to save the workbook to
 #' @param overwrite If `FALSE`, will not overwrite when `file` already exists.
 #' @param path Deprecated argument. Please use `file` in new code.
 #' @param flush Experimental, streams the worksheet file to disk
+#' @param use_modification_date If `TRUE`, sets timestamps of files within the
+#'   resulting xlsx to the `datetime_modified` property of `wb`.
 #'
 #' @export
 #' @family workbook wrappers
@@ -150,9 +157,9 @@ wb_workbook <- function(
 #' # if the last one is left blank the fallback is zip::zip
 #' openxlsx2::write_xlsx(x = cars, temp_xlsx())
 #' }
-wb_save <- function(wb, file = NULL, overwrite = TRUE, path = NULL, flush = FALSE) {
+wb_save <- function(wb, file = NULL, overwrite = TRUE, path = NULL, flush = FALSE, use_modification_date = FALSE) {
   assert_workbook(wb)
-  wb$clone()$save(file = file, overwrite = overwrite, path = path, flush = flush)
+  wb$clone()$save(file = file, overwrite = overwrite, path = path, flush = flush, use_modification_date = use_modification_date)
 }
 
 # add data ----------------------------------------------------------------
@@ -1474,7 +1481,9 @@ wb_remove_row_heights <- function(wb, sheet = current_sheet(), rows) {
 #' @param sheet A name or index of a worksheet, a vector in the case of `remove_`
 #' @param cols Indices of cols to set/remove column widths.
 #' @param widths Width to set `cols` to specified column width or `"auto"` for
-#'   automatic sizing. `widths` is recycled to the length of `cols`. openxlsx2
+#'   automatic sizing. `"auto"` accepts an offset, e.g. `"auto+2"` or `"auto-1"`,
+#'   which is added to (subtracted from) every automatically sized column.
+#'   `widths` is recycled to the length of `cols`. openxlsx2
 #'   sets the default width is 8.43, as this is the standard in some spreadsheet
 #'   software. See **Details** for general information on column widths.
 #' @param hidden Logical vector recycled to the length of `cols`.
@@ -1921,11 +1930,11 @@ wb_get_base_colors <- function(wb, xml = FALSE, plot = TRUE) {
 }
 #' @export
 #' @rdname wb_base_colors
-#' @usage NULL
+#' @usage wb_set_base_colours(wb, theme = "Office", ...)
 wb_set_base_colours <- wb_set_base_colors
 #' @export
 #' @rdname wb_base_colors
-#' @usage NULL
+#' @usage wb_get_base_colours(wb, xml = FALSE, plot = TRUE)
 wb_get_base_colours <- wb_get_base_colors
 
 
@@ -4826,7 +4835,7 @@ wb_add_form_control <- function(
 #' @details
 #' Conditional formatting `type` accept different parameters. Unless noted,
 #' unlisted parameters are ignored.
-#' If an expression is pointing to a cell `"A1=1"`, this cell reference is fluid and not fixed like `"$A$1=1"`. It will behave similar to a formula, when `dims` is spanning multiple columns or rows (A1, A2, A3 ... in vertical direction, A1, B1, C1 ... in horizontal direction). If `dims` is a non consecutive range ("A1:B2,D1:F2"), the expression is applied to each range. For the second `dims` range it will be evaluated again as `"A1=1"`.
+#' If an expression is pointing to a cell `"A1=1"`, this cell reference is fluid and not fixed like `"$A$1=1"`. It will behave similar to a formula, when `dims` is spanning multiple columns or rows (A1, A2, A3 ... in vertical direction, A1, B1, C1 ... in horizontal direction). If `dims` is a non consecutive range ("A1:B2,D1:F2"), the selection is covered by a single rule, as it would be in a spreadsheet application: its blocks are ordered top to bottom and left to right first, the expression is anchored to the top left cell of the first range and moves along the cells of every range from there, so in `D1` it is evaluated as `"D1=1"`. The order the ranges were written in does not matter, `"A3:B4,C1:D2"` is anchored in `C1`. Blocks that overlap are cut apart, so that no cell is covered twice.
 #' \describe{
 #'   \item{`expression`}{
 #'     `[style]`\cr A `Style` object\cr\cr
