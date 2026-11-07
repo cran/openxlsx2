@@ -1,14 +1,210 @@
 // #include <Rcpp/Lightest>
 
+#include <cstdio>
+#include <cstring>
+#include <fstream>
 #include <iomanip>
+#include <iterator>
+#include <set>
 
 #include "openxlsx2.h"
 #include "xlsb_defines.h"
 #include "xlsb_flags.h"
 #include "xlsb_funs.h"
+#include "xls_defines.h"
+#include "xls_funs.h"
+#include "xls_pivot.h"
+
+// Two kinds of xlsb files are knowingly not supported. Both were seen in a single
+// file each, in the test files of other projects:
+//
+// * Package parts with a namespace prefix, e.g. a workbook.bin.rels whose elements
+//   are written as <ns0:Relationship/> (ExcelDataReader Issue682.xlsb). The prefix
+//   is only removed when the workbook part itself uses one. Removing namespaces is
+//   already a workaround, and it is not extended to other parts.
+// * Part names that differ in case from the usual names, e.g. xl/SharedStrings.bin
+//   while the relationship points to sharedStrings.bin (calamine issue_419.xlsb).
+//   The Open Packaging Conventions compare part names without regard to case, but
+//   parts are looked up by their usual names. Changing every lookup to ignore case
+//   for single files is not worth the risk for all other files.
+
+// The texts that formulas need for the numbers they store: the sheets of each XTI
+// entry, the defined names and the tables. They are read from the binary parts
+// before any of them is converted, so every formula is written complete.
+// [[Rcpp::export]]
+Rcpp::List xlsb_context(native_path workbookPath, std::vector<native_path> extLinkPaths, std::vector<native_path> tablePaths) {
+  bool swapit = is_big_endian();
+
+  // workbook: sheets, supporting books (internal or the relationship of an external
+  // link), the XTI entries and the names
+  std::vector<std::string> sheets, supbooks, names;
+  std::vector<std::vector<int32_t> > xtis;
+  std::ifstream wb(workbookPath, std::ios::in | std::ios::binary);
+  bool end_of_workbook = !wb;
+  R_xlen_t idx = 0;
+  while (!end_of_workbook) {
+    checkInterrupt(idx);
+    int32_t x = 0, size = 0;
+    RECORD(x, size, wb, swapit);
+    std::streampos rec_end = wb.tellg() + std::streamoff(size);
+
+    switch (x) {
+      case BrtBundleSh: {
+        // state and id of the sheet, then the relationship id
+        wb.seekg(8, std::ios_base::cur);
+        XLNullableWideString(wb, swapit);
+        sheets.push_back(escape_xml(XLWideString(wb, swapit)));
+        break;
+      }
+      case BrtSupSelf: supbooks.push_back("0"); break;
+      case BrtSupSame: supbooks.push_back("1"); break;
+      case BrtSupAddin: supbooks.push_back("2"); break;
+      case BrtSupBookSrc: supbooks.push_back(XLNullableWideString(wb, swapit)); break;
+      case BrtExternSheet: {
+        uint32_t cXti = 0;
+        cXti = readbin(cXti, wb, swapit);
+        if (cXti > 65535) Rcpp::stop("cXti to large");
+        for (uint32_t i = 0; i < cXti; ++i) xtis.push_back(Xti(wb, swapit));
+        break;
+      }
+      case BrtName: {
+        uint16_t flags = 0;
+        flags = readbin(flags, wb, swapit);
+        // more flags, the key and the sheet of a local name
+        wb.seekg(7, std::ios_base::cur);
+        std::string name = XLWideString(wb, swapit);
+        BrtNameFlags view_flags(flags);
+        if (view_flags.fBuiltin() && name.find("_xlnm.") == std::string::npos) name = "_xlnm." + name;
+        names.push_back(escape_xml(name));
+        break;
+      }
+      case BrtEndBook: end_of_workbook = true; break;
+      default: break;
+    }
+    wb.seekg(rec_end, std::ios_base::beg);
+  }
+
+  // external links: the names of the sheets in the other workbook
+  std::vector<std::vector<std::string> > ext_sheets;
+  for (const native_path& ext_path : extLinkPaths) {
+    std::ifstream ext(ext_path, std::ios::in | std::ios::binary);
+    std::vector<std::string> tabs;
+    while (ext && ext.peek() != std::char_traits<char>::eof()) {
+      int32_t x = 0, size = 0;
+      RECORD(x, size, ext, swapit);
+      std::streampos rec_end = ext.tellg() + std::streamoff(size);
+      if (x == BrtSupTabs) {
+        uint32_t cTab = 0;
+        cTab = readbin(cTab, ext, swapit);
+        if (cTab > 65535) Rcpp::stop("cTab to large");
+        for (uint32_t j = 0; j < cTab; ++j) tabs.push_back(escape_xml(XLWideString(ext, swapit)));
+        break;
+      }
+      ext.seekg(rec_end, std::ios_base::beg);
+    }
+    ext_sheets.push_back(tabs);
+  }
+
+  // XTI entries: own sheets, a range of sheets or the sheets of an external link.
+  // Sheets are counted from 0, -1 is a deleted sheet. External links are numbered
+  // in the order of the relationship ids of the links that are used.
+  std::set<int64_t> used_links;
+  for (size_t i = 0; i < xtis.size(); ++i) {
+    if (static_cast<size_t>(xtis[i][0]) >= supbooks.size()) continue;
+    const std::string& type = supbooks[static_cast<size_t>(xtis[i][0])];
+    if (type.compare(0, 3, "rId") != 0 || xtis[i][1] + 1 < 1) continue;
+    std::string digits;
+    for (char c : type) if (c >= '0' && c <= '9') digits += c;
+    if (!digits.empty()) used_links.insert(std::stoll(digits));
+  }
+
+  std::vector<utf8_string> xti(xtis.size());
+  for (size_t i = 0; i < xtis.size(); ++i) {
+    int64_t first = static_cast<int64_t>(xtis[i][1]) + 1, last = static_cast<int64_t>(xtis[i][2]) + 1;
+    std::string text;
+    if (first == 0) {
+      text = "#REF";
+    } else if (first >= 1 && static_cast<size_t>(xtis[i][0]) < supbooks.size()) {
+      const std::string& type = supbooks[static_cast<size_t>(xtis[i][0])];
+      bool external = type.compare(0, 3, "rId") == 0;
+      const std::vector<std::string>* tabs = &sheets;
+      std::string prefix;
+      if (external) {
+        std::string digits;
+        for (char c : type) if (c >= '0' && c <= '9') digits += c;
+        int64_t link = digits.empty() ? 0 : static_cast<int64_t>(std::distance(used_links.begin(), used_links.find(std::stoll(digits)))) + 1;
+        tabs = (link >= 1 && static_cast<size_t>(link) <= ext_sheets.size()) ? &ext_sheets[static_cast<size_t>(link) - 1] : nullptr;
+        prefix = "[" + std::to_string(link) + "]";
+      }
+      if (tabs && static_cast<size_t>(first) <= tabs->size()) {
+        // a sheet name is quoted if it has anything but letters and digits, an
+        // external reference always
+        std::string name = (*tabs)[static_cast<size_t>(first) - 1];
+        bool ok = true;
+        if (first < last) {
+          if (static_cast<size_t>(last) <= tabs->size()) name += ":" + (*tabs)[static_cast<size_t>(last) - 1];
+          else ok = false;
+        }
+        bool quote = external;
+        for (char c : name) {
+          if (c != ':' && !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))) quote = true;
+        }
+        if (ok) text = quote ? "'" + prefix + name + "'" : name;
+      }
+    }
+    xti[i] = utf8_string(text);
+  }
+
+  // tables: id, name and the names of the columns
+  Rcpp::IntegerVector table_id;
+  std::vector<utf8_string> table_name;
+  Rcpp::List table_columns;
+  for (const native_path& tab_path : tablePaths) {
+    std::ifstream tab(tab_path, std::ios::in | std::ios::binary);
+    bool in_table = false;
+    uint32_t idList = 0;
+    std::string display_name;
+    std::vector<utf8_string> cols;
+    while (tab && tab.peek() != std::char_traits<char>::eof()) {
+      int32_t x = 0, size = 0;
+      RECORD(x, size, tab, swapit);
+      std::streampos rec_end = tab.tellg() + std::streamoff(size);
+      if (x == BrtBeginList) {
+        // range and type of the table
+        tab.seekg(20, std::ios_base::cur);
+        idList = readbin(idList, tab, swapit);
+        // header and total rows, flags, six dxfs and the connection id
+        tab.seekg(40, std::ios_base::cur);
+        XLNullableWideString(tab, swapit);
+        display_name = XLNullableWideString(tab, swapit);
+        in_table = true;
+      } else if (x == BrtBeginListCol && in_table) {
+        // id, function, three dxfs and the query table field, then the name
+        tab.seekg(24, std::ios_base::cur);
+        XLNullableWideString(tab, swapit);
+        cols.push_back(utf8_string(XLNullableWideString(tab, swapit)));
+      } else if (x == BrtEndList) {
+        break;
+      }
+      tab.seekg(rec_end, std::ios_base::beg);
+    }
+    if (!in_table) continue;
+    table_id.push_back(static_cast<int32_t>(idList));
+    table_name.push_back(utf8_string(display_name));
+    table_columns.push_back(Rcpp::wrap(cols));
+  }
+
+  return Rcpp::List::create(
+    Rcpp::Named("xti") = xti,
+    Rcpp::Named("names") = std::vector<utf8_string>(names.begin(), names.end()),
+    Rcpp::Named("table_id") = table_id,
+    Rcpp::Named("table_name") = table_name,
+    Rcpp::Named("table_columns") = table_columns
+  );
+}
 
 // [[Rcpp::export]]
-int32_t styles_bin(std::string filePath, std::string outPath, bool debug) {
+int32_t styles_bin(native_path filePath, native_path outPath, bool debug) {
   std::ofstream out(outPath);
   std::ifstream bin(filePath, std::ios::in | std::ios::binary | std::ios::ate);
 
@@ -217,9 +413,11 @@ int32_t styles_bin(std::string filePath, std::string outPath, bool debug) {
             xnumFillToRight = 0.0,
             xnumFillToTop = 0.0,
             xnumFillToBottom = 0.0,
-            aPos = 0.0 // not used
+            aPos = 0.0
           ;
-          std::vector<int32_t> aColor;  // not used
+          std::vector<int32_t> aColor;
+          std::vector<std::vector<int32_t>> stopColors;
+          std::vector<double> stopPositions;
 
           fls = readbin(fls, bin, swapit);
           std::vector<int32_t> fgColor = brtColor(bin, swapit);
@@ -243,9 +441,11 @@ int32_t styles_bin(std::string filePath, std::string outPath, bool debug) {
             // gradient fill colors and positions
             aColor = brtColor(bin, swapit);
             aPos   = Xnum(bin, swapit);
+            stopColors.push_back(aColor);
+            stopPositions.push_back(aPos);
             if (debug) {  // #nocov start
-              Rcpp::Rcout << "unused gradient Colors: " <<
-                to_argb(fgColor[6], fgColor[3], fgColor[4], fgColor[5]) <<
+              Rcpp::Rcout << "gradient Colors: " <<
+                to_argb(aColor[6], aColor[3], aColor[4], aColor[5]) <<
                   ": " << aPos << std::endl;
             }  // #nocov end
           }
@@ -306,7 +506,39 @@ int32_t styles_bin(std::string filePath, std::string outPath, bool debug) {
             out << "</patternFill>" << std::endl;
             out << "</fill>" << std::endl;
           } else {
-            Rcpp::Rcout << "gradient fill not implemented" << std::endl;
+            out << "<gradientFill";
+            if (iGradientType == 1) {
+              out << " type=\"path\"";
+              out << " left=\"" << xnumFillToLeft << "\"";
+              out << " right=\"" << xnumFillToRight << "\"";
+              out << " top=\"" << xnumFillToTop << "\"";
+              out << " bottom=\"" << xnumFillToBottom << "\"";
+            } else {
+              out << " degree=\"" << xnumDegree << "\"";
+            }
+            out << ">" << std::endl;
+
+            for (size_t i = 0; i < stopColors.size(); ++i) {
+              const std::vector<int32_t> &sc = stopColors[i];
+              double stoptint = 0.0;
+              if (sc[2] != 0) stoptint = static_cast<double>(sc[2]) / 32767;
+              std::stringstream stopstream;
+              stopstream << std::setprecision(16) << stoptint;
+
+              out << "<stop position=\"" << stopPositions[i] << "\">";
+              if (sc[0] == 0x00)
+                out << "<color auto=\"1\"/>";
+              if (sc[0] == 0x01)
+                out << "<color indexed=\"" << sc[1] << "\"/>";
+              if (sc[0] == 0x02)
+                out << "<color rgb=\"" << to_argb(sc[6], sc[3], sc[4], sc[5]) << "\"/>";
+              if (sc[0] == 0x03)
+                out << "<color theme=\"" << sc[1] << "\" tint=\"" << stopstream.str() << "\"/>";
+              out << "</stop>" << std::endl;
+            }
+
+            out << "</gradientFill>" << std::endl;
+            out << "</fill>" << std::endl;
           }
 
           break;
@@ -391,9 +623,11 @@ int32_t styles_bin(std::string filePath, std::string outPath, bool debug) {
           trot = readbin(trot, bin, swapit);
           indent = readbin(indent, bin, swapit);
 
+          // #nocov start: corrupt file
           if (indent > 250) {
             Rcpp::stop("indent to big");
           }
+          // #nocov end
 
           if (ixfeParent == 0xFFFF) {
             // is_cell_style_xf = true;
@@ -540,20 +774,16 @@ int32_t styles_bin(std::string filePath, std::string outPath, bool debug) {
           uint32_t cdxfs = 0;
           cdxfs = readbin(cdxfs, bin, swapit);
 
-          out << "<dxfs>" << std::endl;
+          out << "<dxfs count=\"" << cdxfs << "\">" << std::endl;
           break;
         }
 
-          // This is a todo. the xfPropDataBlob is almost the entire styles part again
-          // case BrtDXF: {
-          //   uint16_t flags = 0, reserved = 0, cprops = 0;
-          //   flags = readbin(flags, bin, swapit);
-          //   reserved = readbin(reserved, bin, swapit);
-          //   cprops = readbin(cprops, bin, swapit);
-          //
-          //   out << "<dxfs>" << std::endl;
-          //  break;
-          // }
+        case BrtDXF: {
+          std::vector<uint8_t> dxf(static_cast<size_t>(size));
+          bin.read(reinterpret_cast<char*>(dxf.data()), size);
+          out << xlsb_dxf(dxf) << std::endl;
+          break;
+        }
 
         case BrtEndDXFs: {
           out << "</dxfs>" << std::endl;
@@ -587,7 +817,8 @@ int32_t styles_bin(std::string filePath, std::string outPath, bool debug) {
 }
 
 // [[Rcpp::export]]
-int32_t table_bin(std::string filePath, std::string outPath, bool debug) {
+int32_t table_bin(native_path filePath, native_path outPath, Rcpp::List context, bool debug) {
+  XlsbContext ctx = xlsb_context_from_list(context);
   std::ofstream out(outPath);
   std::ifstream bin(filePath, std::ios::in | std::ios::binary | std::ios::ate);
 
@@ -747,8 +978,7 @@ int32_t table_bin(std::string filePath, std::string outPath, bool debug) {
         case BrtBeginCustomRichFilters: {
           int32_t fAnd = 0;
 
-          // in xlsb it is flipped
-          fAnd = readbin(fAnd, bin, swapit) ^ 1;
+          fAnd = readbin(fAnd, bin, swapit);
 
           out << "<customFilters" << std::endl;
           if (fAnd) out << " and=\"" << fAnd << "\"";  // and="1"
@@ -773,13 +1003,12 @@ int32_t table_bin(std::string filePath, std::string outPath, bool debug) {
             // a bool
             int8_t boolean = 0;
             boolean = readbin(boolean, bin, swapit);
-            union_val = static_cast<double>(readbin(boolean, bin, swapit));
+            union_val = static_cast<double>(boolean);
             for (int8_t blk = 0; blk < 7; ++blk) {
               readbin(boolean, bin, swapit);
             }
           } else {
             // ignore
-            readbin(union_val, bin, swapit);
             readbin(union_val, bin, swapit);
           }
 
@@ -805,8 +1034,24 @@ int32_t table_bin(std::string filePath, std::string outPath, bool debug) {
         }
 
         case BrtDynamicFilter: {
-          Rcpp::warning("Dynamic Filter found. This is not handled.");
-          bin.seekg(size, bin.cur);
+          std::streampos dyn_end = bin.tellg() + static_cast<std::streamoff>(size);
+          uint32_t iDynFilterType = 0;
+          uint8_t dyn_flag = 0;
+          double dyn_val = 0;
+          iDynFilterType = readbin(iDynFilterType, bin, swapit);
+          dyn_flag = readbin(dyn_flag, bin, swapit);
+          dyn_val = Xnum(bin, swapit);
+
+          std::string dyn_type = to_dynamic_filter(iDynFilterType);
+          if (iDynFilterType == 1 || iDynFilterType == 2) {
+            out << "<dynamicFilter type=\"" << (iDynFilterType == 1 ? "aboveAverage" : "belowAverage")
+                << "\" val=\"" << dyn_val << "\"/>" << std::endl;
+          } else if (!dyn_type.empty()) {
+            out << "<dynamicFilter type=\"" << dyn_type << "\"/>" << std::endl;
+          } else {
+            Rcpp::warning("Dynamic Filter found. This type is not handled.");
+          }
+          bin.seekg(dyn_end);
           break;
         }
 
@@ -821,6 +1066,31 @@ int32_t table_bin(std::string filePath, std::string outPath, bool debug) {
 
           out << "<iconFilter iconSet=\"" << iconSet << "\" iconId=\"" << iIcon << "\"/>" << std::endl;
 
+          break;
+        }
+
+        case BrtAFilterDateGroupItem: {
+          uint16_t dg_year = 0, dg_month = 0, dg_day = 0, dg_hour = 0, dg_minute = 0, dg_second = 0;
+          std::streampos dg_end = bin.tellg() + static_cast<std::streamoff>(size);
+          dg_year = readbin(dg_year, bin, swapit);
+          dg_month = readbin(dg_month, bin, swapit);
+          dg_day = readbin(dg_day, bin, swapit);
+          dg_hour = readbin(dg_hour, bin, swapit);
+          dg_minute = readbin(dg_minute, bin, swapit);
+          dg_second = readbin(dg_second, bin, swapit);
+          bin.seekg(dg_end - static_cast<std::streamoff>(4));
+          uint32_t dateTimeGrouping = 0;
+          dateTimeGrouping = readbin(dateTimeGrouping, bin, swapit);
+
+          static const char* const groupings[6] = {"year", "month", "day", "hour", "minute", "second"};
+          out << "<dateGroupItem year=\"" << dg_year << "\"";
+          if (dateTimeGrouping >= 1) out << " month=\"" << dg_month << "\"";
+          if (dateTimeGrouping >= 2) out << " day=\"" << dg_day << "\"";
+          if (dateTimeGrouping >= 3) out << " hour=\"" << dg_hour << "\"";
+          if (dateTimeGrouping >= 4) out << " minute=\"" << dg_minute << "\"";
+          if (dateTimeGrouping >= 5) out << " second=\"" << dg_second << "\"";
+          out << " dateTimeGrouping=\"" << groupings[dateTimeGrouping < 6 ? dateTimeGrouping : 0] << "\"/>" << std::endl;
+          bin.seekg(dg_end);
           break;
         }
 
@@ -897,7 +1167,7 @@ int32_t table_bin(std::string filePath, std::string outPath, bool debug) {
           std::string fml;
           flags = readbin(flags, bin, swapit);
           int32_t sharedFormula = false;
-          fml = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+          fml = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record, ctx);
 
           // need to write this formula somehwere
           // if (debug) Rcpp::Rcout << fml << std::endl;
@@ -958,7 +1228,7 @@ int32_t table_bin(std::string filePath, std::string outPath, bool debug) {
 }
 
 // [[Rcpp::export]]
-int32_t comments_bin(std::string filePath, std::string outPath, bool debug) {
+int32_t comments_bin(native_path filePath, native_path outPath, bool debug) {
   std::ofstream out(outPath);
   std::ifstream bin(filePath, std::ios::in | std::ios::binary | std::ios::ate);
 
@@ -1084,7 +1354,7 @@ int32_t comments_bin(std::string filePath, std::string outPath, bool debug) {
 }
 
 // [[Rcpp::export]]
-int32_t externalreferences_bin(std::string filePath, std::string outPath, bool debug) {
+int32_t externalreferences_bin(native_path filePath, native_path outPath, bool debug) {
   std::ofstream out(outPath);
   std::ifstream bin(filePath, std::ios::in | std::ios::binary | std::ios::ate);
 
@@ -1299,7 +1569,7 @@ int32_t externalreferences_bin(std::string filePath, std::string outPath, bool d
 }
 
 // [[Rcpp::export]]
-int32_t sharedstrings_bin(std::string filePath, std::string outPath, bool debug) {
+int32_t sharedstrings_bin(native_path filePath, native_path outPath, bool debug) {
   std::ofstream out(outPath);
   std::ifstream bin(filePath, std::ios::in | std::ios::binary | std::ios::ate);
 
@@ -1372,7 +1642,8 @@ int32_t sharedstrings_bin(std::string filePath, std::string outPath, bool debug)
 }
 
 // [[Rcpp::export]]
-int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
+int32_t workbook_bin(native_path filePath, native_path outPath, Rcpp::List context, bool debug) {
+  XlsbContext ctx = xlsb_context_from_list(context);
   std::ofstream out(outPath);
   std::ifstream bin(filePath, std::ios::in | std::ios::binary | std::ios::ate);
 
@@ -1385,9 +1656,8 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
     bool first_extern_sheet = true;
     bool has_revision_record = false;
 
-    std::vector<std::string> defNams, xtis, reference_type, customWorkbookView;
+    std::vector<std::string> defNams, reference_type, customWorkbookView, pivotCaches;
     defNams.push_back("<definedNames>");
-    xtis.push_back("<xtis>");
 
     R_xlen_t idx = 0;
     while (!end_of_workbook) {
@@ -1680,8 +1950,10 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
           // fFutureFunction - future function
           // reserved        - 0
 
+          // #nocov start: corrupt file
           if (view_flags2.reserved() != 0)
             Rcpp::stop("reserved not 0");
+          // #nocov end
 
           if (debug) {  // #nocov start
             Rprintf(
@@ -1717,7 +1989,7 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
           std::string fml = "", comment = "";
 
           int32_t sharedFormula = false;
-          fml = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+          fml = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record, ctx);
 
           comment = XLNullableWideString(bin, swapit);
 
@@ -1740,10 +2012,12 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
             std::string unusedstring2 = XLNullableWideString(bin, swapit);
           }
 
+          // #nocov start: corrupt file
           if (bin.tellg() != end_pos) {
             Rprintf("%d: %d", (int)bin.tellg(), (int)end_pos);
             Rcpp::stop("repositioning");
           }
+          // #nocov end
 
           if (view_flags.fBuiltin()) {
             // add the builtin xl name namespace
@@ -1767,6 +2041,19 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
 
           defNams.push_back(defNam);
 
+          break;
+        }
+
+        case BrtBeginPivotCacheIDs:
+        case BrtEndPivotCacheIDs:
+        case BrtEndPivotCacheID:
+          break;
+
+        case BrtBeginPivotCacheID: {
+          uint32_t idSx = 0;
+          idSx = readbin(idSx, bin, swapit);
+          std::string relId = XLNullableWideString(bin, swapit);
+          pivotCaches.push_back("<pivotCache cacheId=\"" + std::to_string(idSx) + "\" r:id=\"" + relId + "\"/>");
           break;
         }
 
@@ -1845,18 +2132,10 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
           cXti = readbin(cXti, bin, swapit);
           if (cXti > 65535) Rcpp::stop("cXti to large");
 
-          std::vector<uint32_t> rgXti(cXti);
-          // Rcpp::Rcout << "reference_type: " << reference_type.size() << std::endl;
-          // Rcpp::Rcout << "reference_type: " << cXti << std::endl;
+          // the entries are part of the formula context, here they are only checked
           for (uint32_t i = 0; i < cXti; ++i) {
             std::vector<int32_t> xti = Xti(bin, swapit);
-            if ((size_t)xti[0] > reference_type.size()) Rcpp::stop("references do not match");
-            std::string tmp = "<xti id=\"" + std::to_string(xti[0]) +
-              "\" firstSheet=\"" + std::to_string(xti[1]) +
-              "\" lastSheet=\"" +  std::to_string(xti[2]) +
-              "\" type=\"" +  reference_type[static_cast<size_t>(xti[0])] +
-              "\" />";
-            xtis.push_back(tmp);
+            if ((size_t)xti[0] >= reference_type.size()) Rcpp::stop("references do not match");
           }
 
           break;
@@ -1915,8 +2194,8 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
           break;
         }
 
-          if (debug) Rcpp::Rcout << "<BrtWbFactoid>" << std::endl;
         case BrtWbFactoid: {  // ???
+          if (debug) Rcpp::Rcout << "<BrtWbFactoid>" << std::endl;
           bin.seekg(size, bin.cur);
           break;
         }
@@ -1939,16 +2218,6 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
             }
           }
 
-          // custom xti output
-          if (xtis.size() > 1) {
-            xtis.push_back("</xtis>");
-
-            for (size_t i = 0; i < xtis.size(); ++i) {
-              if (debug) Rcpp::Rcout << xtis[i] << std::endl;
-              out << xtis[i] << std::endl;
-            }
-          }
-
           if (customWorkbookView.size()) {
             out << "<customWorkbookViews>" << std::endl;
             for (size_t i = 0; i < customWorkbookView.size(); ++i) {
@@ -1958,6 +2227,12 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
             out << "</customWorkbookViews>" << std::endl;
           }
 
+
+          if (pivotCaches.size()) {
+            out << "<pivotCaches>" << std::endl;
+            for (size_t i = 0; i < pivotCaches.size(); ++i) out << pivotCaches[i] << std::endl;
+            out << "</pivotCaches>" << std::endl;
+          }
 
           if (debug) Rcpp::Rcout << "</workbook>" << std::endl;
           out << "</workbook>" << std::endl;
@@ -1997,7 +2272,8 @@ int32_t workbook_bin(std::string filePath, std::string outPath, bool debug) {
 }
 
 // [[Rcpp::export]]
-int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath, bool debug) {
+int32_t worksheet_bin(native_path filePath, bool chartsheet, native_path outPath, Rcpp::List context, bool debug) {
+  XlsbContext ctx = xlsb_context_from_list(context);
   std::ofstream out(outPath);
   std::ifstream bin(filePath, std::ios::in | std::ios::binary | std::ios::ate);
 
@@ -2008,10 +2284,23 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
     bin.seekg(0, std::ios_base::beg);
 
     bool first_row = true;
+    uint16_t def_row_twips = 0;
     bool in_sheet_data = false;
     bool end_of_worksheet = false;
+    bool extlst_open = false, ext_open = false;
+    bool cf_iconset = false, x14_skip = false;
+    std::string x14_sqref;
+    std::vector<std::string> x14_colors;
+    uint8_t x14_flags = 0, x14_axis = 0;
+    int32_t cf_row = 0, cf_col = 0;
+    auto open_ext = [&](const char *uri) {
+      if (!extlst_open) out << "<extLst>";
+      extlst_open = ext_open = true;
+      out << "<ext uri=\"" << uri << "\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">" << std::endl;
+    };
     bool has_revision_record = false;
     std::string fml_type;
+    std::string brk_tag;
 
     int32_t row = 0;
     int32_t col = 0;
@@ -2038,6 +2327,12 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
       RECORD(x, size, bin, swapit);
       if (debug) Rcpp::Rcout << x << ": " << size << std::endl;
+
+      // cell and row records are only valid inside of sheetData, e.g. a stray cell in a FRT block is skipped
+      if (!in_sheet_data && x >= BrtRowHdr && x <= BrtFmlaError) {
+        bin.seekg(size, bin.cur);
+        continue;
+      }
 
       switch(x) {
 
@@ -2415,6 +2710,9 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
           // sqrfx[0] is the number of rfx following
           sqrfx = UncheckedSqRfX(bin, swapit);
+          // #nocov start: corrupt file
+          if (sqrfx.size() < 5) Rcpp::stop("xlsb: selection without a range");
+          // #nocov end
 
           std::string ac = int_to_col(colAct + 1) + std::to_string(rwAct + 1);
           std::string lref = int_to_col(sqrfx[3] + 1) + std::to_string(sqrfx[1] + 1);
@@ -2541,7 +2839,26 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
         case BrtWsFmtInfo: {
           if (debug) Rcpp::Rcout << "BrtWsFmtInfo: " << bin.tellg() << std::endl;
-          bin.seekg(size, bin.cur);
+          uint32_t dxGCol = 0;
+          uint16_t cchDefColWidth = 0, miyDefRwHeight = 0, fmt_flags = 0;
+          uint8_t iOutLevelRw = 0, iOutLevelCol = 0;
+          dxGCol = readbin(dxGCol, bin, swapit);
+          cchDefColWidth = readbin(cchDefColWidth, bin, swapit);
+          miyDefRwHeight = readbin(miyDefRwHeight, bin, swapit);
+          fmt_flags = readbin(fmt_flags, bin, swapit);
+          def_row_twips = miyDefRwHeight;
+          iOutLevelRw = readbin(iOutLevelRw, bin, swapit);
+          iOutLevelCol = readbin(iOutLevelCol, bin, swapit);
+
+          out << "<sheetFormatPr";
+          if (cchDefColWidth > 0) out << " baseColWidth=\"" << cchDefColWidth << "\"";
+          if (dxGCol > 0 && dxGCol <= 255u * 256u) out << " defaultColWidth=\"" << static_cast<double>(dxGCol) / 256 << "\"";
+          out << " defaultRowHeight=\"" << static_cast<double>(miyDefRwHeight) / 20 << "\"";
+          if (fmt_flags & 0x0001) out << " customHeight=\"1\"";
+          if (fmt_flags & 0x0002) out << " zeroHeight=\"1\"";
+          if (iOutLevelRw > 0) out << " outlineLevelRow=\"" << static_cast<uint32_t>(iOutLevelRw) << "\"";
+          if (iOutLevelCol > 0) out << " outlineLevelCol=\"" << static_cast<uint32_t>(iOutLevelCol) << "\"";
+          out << "/>" << std::endl;
           break;
         }
 
@@ -2555,23 +2872,23 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
         case BrtRowHdr: {
           if (debug) Rcpp::Rcout << "<row/>: " << bin.tellg() << std::endl;
-
-          if (!in_sheet_data) bin.seekg(size, bin.cur);
+          // some writers add bytes after the fields, the next record starts after them
+          std::streampos row_end = bin.tellg() + std::streamoff(size);
 
           // close open rows
           if (!first_row) {
 
             for (size_t i = 0; i < colvec.size(); ++i) {
-              out << "<c r=\"" << colvec[i].c_r << "\" s=\"" << colvec[i].c_s << "\" t=\""<< colvec[i].c_t << "\">" << std::endl;
-              out << "<v>" << escape_xml(colvec[i].v) << "</v>" << std::endl;
-              out << colvec[i].is  << std::endl;
-              out << "<f " << colvec[i].f_attr << ">" << colvec[i].f << "</f>" << std::endl;
-              out << "</c>" << std::endl;
+              out << "<c r=\"" << colvec[i].c_r << "\" s=\"" << colvec[i].c_s << "\" t=\""<< colvec[i].c_t << "\">\n";
+              out << "<v>" << escape_xml(colvec[i].v) << "</v>\n";
+              out << colvec[i].is  << "\n";
+              out << "<f " << colvec[i].f_attr << ">" << colvec[i].f << "</f>\n";
+              out << "</c>\n";
             }
 
             colvec.clear();
 
-            out << "</row>" <<std::endl;
+            out << "</row>\n";
           } else {
             first_row = false;
           }
@@ -2587,9 +2904,11 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
           rw = readbin(rw, bin, swapit);
 
+          // #nocov start: corrupt file
           if (rw > 0x00100000 || rw < row) {
             Rcpp::stop("row either decreasing or to large");
           }
+          // #nocov end
 
           ixfe = readbin(ixfe, bin, swapit);
           miyRw = readbin(miyRw, bin, swapit);
@@ -2648,9 +2967,10 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           out << rw + 1 << "\"";
 
           if (view_flags.fUnsynced() != 0) {
-            // Rcpp::Rcout << " ht=\"" << miyRw/20 << "\"" << std::endl;
-            out << " ht=\"" << miyRw/20 << "\"";
+            out << " ht=\"" << static_cast<double>(miyRw) / 20 << "\"";
             out << " customHeight=\"" << view_flags.fUnsynced() << "\"";
+          } else if (miyRw > 0 && miyRw != def_row_twips) {
+            out << " ht=\"" << static_cast<double>(miyRw) / 20 << "\"";
           }
 
           if (ccolspan)
@@ -2687,6 +3007,7 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
               (int32_t)fPhShow << " : " << ccolspan << "; " << bin.tellg() << std::endl;
           }  // #nocov end
 
+          if (bin.tellg() < row_end) bin.seekg(row_end, std::ios_base::beg);
           break;
         }
 
@@ -2880,19 +3201,19 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           col = cell[0];
           if (debug) Rf_PrintValue(Rcpp::wrap(cell));
 
-          bool val = 0;
+          uint8_t val = 0;
           val = readbin(val, bin, swapit);
-          if (debug) Rcpp::Rcout << val << std::endl;
+          if (debug) Rcpp::Rcout << static_cast<int32_t>(val) << std::endl;
 
           uint16_t grbitFlags = 0;
           grbitFlags = readbin(grbitFlags, bin, swapit);
 
           GrbitFmlaFlags view_flags(grbitFlags);
 
-          std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record);
+          std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record, ctx);
 
           xml_col column;
-          column.v = std::to_string((int32_t)val);
+          column.v = std::to_string(static_cast<int32_t>(val != 0));
 
           std::string a0 = int_to_col(cell[0] + 1) + std::to_string(row);
           std::string a1 = int_to_col(cell[0] + 1) + std::to_string(row + 1);
@@ -2937,7 +3258,7 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
           GrbitFmlaFlags view_flags(grbitFlags);
 
-          std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record);
+          std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record, ctx);
 
           xml_col column;
           column.v = fErr;
@@ -2985,7 +3306,7 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
           GrbitFmlaFlags view_flags(grbitFlags);
 
-          std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record);
+          std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record, ctx);
 
           std::stringstream stream;
           stream << std::setprecision(16) << xnum;
@@ -3037,7 +3358,7 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
           GrbitFmlaFlags view_flags(grbitFlags);
 
-          std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record);
+          std::string fml = CellParsedFormula(bin, swapit, debug, 0, row, is_shared_formula, has_revision_record, ctx);
 
           std::string a0 = int_to_col(cell[0] + 1) + std::to_string(row);
           std::string a1 = int_to_col(cell[0] + 1) + std::to_string(row + 1);
@@ -3092,10 +3413,13 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
           flags = readbin(flags, bin, 0);
 
-          std::string fml = CellParsedFormula(bin, swapit, debug, col, row, is_shared_formula, has_revision_record);
+          std::string fml = CellParsedFormula(bin, swapit, debug, col, row, is_shared_formula, has_revision_record, ctx);
           if (debug) Rcpp::Rcout << "BrtArrFmla: " << fml << std::endl;
 
           // add to the last colvec element
+          // #nocov start: corrupt file
+          if (colvec.empty()) Rcpp::stop("xlsb: formula without a cell");
+          // #nocov end
           auto last = colvec.size() - 1L;
           colvec[last].f = fml;
           colvec[last].f_attr = "t=\"array\"";
@@ -3136,12 +3460,15 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
           if (debug) Rcpp::Rcout << "ref: " << ref << std::endl;
 
-          std::string fml = CellParsedFormula(bin, swapit, debug, col, row, is_shared_formula, has_revision_record);
+          std::string fml = CellParsedFormula(bin, swapit, debug, col, row, is_shared_formula, has_revision_record, ctx);
           if (debug) Rcpp::Rcout << "BrtShrFmla: " << fml << std::endl;
 
           fml_type = "shared";
 
           // add to the last colvec element
+          // #nocov start: corrupt file
+          if (colvec.empty()) Rcpp::stop("xlsb: formula without a cell");
+          // #nocov end
           auto last = colvec.size() - 1L;
           colvec[last].f = fml;
 
@@ -3166,14 +3493,15 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
             // should be the last row
             for (size_t i = 0; i < colvec.size(); ++i) {
-              out << "<c r=\"" << colvec[i].c_r << "\" s=\"" << colvec[i].c_s << "\" t=\""<< colvec[i].c_t << "\">" << std::endl;
-              out << "<v>" << escape_xml(colvec[i].v) << "</v>" << std::endl;
-              out << "<f " << colvec[i].f_attr << " >" << colvec[i].f << "</f>" << std::endl;
-              out << "</c>" << std::endl;
+              out << "<c r=\"" << colvec[i].c_r << "\" s=\"" << colvec[i].c_s << "\" t=\""<< colvec[i].c_t << "\">\n";
+              out << "<v>" << escape_xml(colvec[i].v) << "</v>\n";
+              if (!colvec[i].is.empty()) out << colvec[i].is << "\n";
+              out << "<f " << colvec[i].f_attr << " >" << colvec[i].f << "</f>\n";
+              out << "</c>\n";
             }
 
             colvec.clear();
-            out << "</row>" << std::endl;
+            out << "</row>\n";
           }
           out << "</sheetData>" << std::endl;
 
@@ -3398,8 +3726,7 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
         case BrtBeginCustomRichFilters: {
           int32_t fAnd = 0;
 
-          // in xlsb it is flipped
-          fAnd = readbin(fAnd, bin, swapit) ^ 1;
+          fAnd = readbin(fAnd, bin, swapit);
 
           out << "<customFilters" << std::endl;
           if (fAnd) out << " and=\"" << fAnd << "\"";  // and="1"
@@ -3424,13 +3751,12 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
             // a bool
             int8_t boolean = 0;
             boolean = readbin(boolean, bin, swapit);
-            union_val = static_cast<double>(readbin(boolean, bin, swapit));
+            union_val = static_cast<double>(boolean);
             for (int8_t blk = 0; blk < 7; ++blk) {
               readbin(boolean, bin, swapit);
             }
           } else {
             // ignore
-            readbin(union_val, bin, swapit);
             readbin(union_val, bin, swapit);
           }
 
@@ -3474,12 +3800,16 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           guids[3] = readbin(guid3, bin, 0);
 
           iTabId = readbin(iTabId, bin, swapit);
+          // #nocov start: corrupt file
           if (iTabId < 1 || iTabId > 65535)
             Rcpp::stop("iTabId out of range");
+          // #nocov end
 
           dwScale = readbin(dwScale, bin, swapit);
+          // #nocov start: corrupt file
           if (dwScale < 0 || dwScale > 400)  // dialog sheet 0 else 10
             Rcpp::stop("dwScale out of range");
+          // #nocov end
 
           flags = readbin(flags, bin, swapit);
           // hsState
@@ -3507,16 +3837,22 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           guids[3] = readbin(guid3, bin, 0);
 
           iTabId = readbin(iTabId, bin, swapit);
+          // #nocov start: corrupt file
           if (iTabId < 1 || iTabId > 65535)
             Rcpp::stop("iTabId out of range");
+          // #nocov end
 
           dwScale = readbin(dwScale, bin, swapit);
+          // #nocov start: corrupt file
           if (dwScale < 0 || dwScale > 400)  // dialog sheet 0 else 10
             Rcpp::stop("dwScale out of range");
+          // #nocov end
 
           icv = readbin(icv, bin, swapit);
+          // #nocov start: corrupt file
           if (icv > 64)
             Rcpp::stop("icv out of range");
+          // #nocov end
 
           flags = readbin(flags, bin, swapit);
 
@@ -3605,8 +3941,24 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
         case BrtDynamicFilter: {
           if (debug) Rcpp::Rcout << "BrtDynamicFilter" << std::endl;
-          Rcpp::warning("Dynamic Filter found. This is not handled.");
-          bin.seekg(size, bin.cur);
+          std::streampos dyn_end = bin.tellg() + static_cast<std::streamoff>(size);
+          uint32_t iDynFilterType = 0;
+          uint8_t dyn_flag = 0;
+          double dyn_val = 0;
+          iDynFilterType = readbin(iDynFilterType, bin, swapit);
+          dyn_flag = readbin(dyn_flag, bin, swapit);
+          dyn_val = Xnum(bin, swapit);
+
+          std::string dyn_type = to_dynamic_filter(iDynFilterType);
+          if (iDynFilterType == 1 || iDynFilterType == 2) {
+            out << "<dynamicFilter type=\"" << (iDynFilterType == 1 ? "aboveAverage" : "belowAverage")
+                << "\" val=\"" << dyn_val << "\"/>" << std::endl;
+          } else if (!dyn_type.empty()) {
+            out << "<dynamicFilter type=\"" << dyn_type << "\"/>" << std::endl;
+          } else {
+            Rcpp::warning("Dynamic Filter found. This type is not handled.");
+          }
+          bin.seekg(dyn_end);
           break;
         }
 
@@ -3621,6 +3973,50 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           if (iIconSet) iconSet = to_iconset(iIconSet);
 
           out << "<iconFilter iconSet=\"" << iconSet << "\" iconId=\""<< iIcon<< "\"/>" << std::endl;
+
+          break;
+        }
+
+        case BrtAFilterDateGroupItem: {
+          uint16_t dg_year = 0, dg_month = 0, dg_day = 0, dg_hour = 0, dg_minute = 0, dg_second = 0;
+          std::streampos dg_end = bin.tellg() + static_cast<std::streamoff>(size);
+          dg_year = readbin(dg_year, bin, swapit);
+          dg_month = readbin(dg_month, bin, swapit);
+          dg_day = readbin(dg_day, bin, swapit);
+          dg_hour = readbin(dg_hour, bin, swapit);
+          dg_minute = readbin(dg_minute, bin, swapit);
+          dg_second = readbin(dg_second, bin, swapit);
+          bin.seekg(dg_end - static_cast<std::streamoff>(4));
+          uint32_t dateTimeGrouping = 0;
+          dateTimeGrouping = readbin(dateTimeGrouping, bin, swapit);
+
+          static const char* const groupings[6] = {"year", "month", "day", "hour", "minute", "second"};
+          out << "<dateGroupItem year=\"" << dg_year << "\"";
+          if (dateTimeGrouping >= 1) out << " month=\"" << dg_month << "\"";
+          if (dateTimeGrouping >= 2) out << " day=\"" << dg_day << "\"";
+          if (dateTimeGrouping >= 3) out << " hour=\"" << dg_hour << "\"";
+          if (dateTimeGrouping >= 4) out << " minute=\"" << dg_minute << "\"";
+          if (dateTimeGrouping >= 5) out << " second=\"" << dg_second << "\"";
+          out << " dateTimeGrouping=\"" << groupings[dateTimeGrouping < 6 ? dateTimeGrouping : 0] << "\"/>" << std::endl;
+          bin.seekg(dg_end);
+          break;
+        }
+
+        case BrtTop10Filter: {
+          if (debug) Rcpp::Rcout << "BrtTop10Filter" << std::endl;
+
+          uint8_t top10_flags = 0;
+          double fVal = 0, fFilterVal = 0;
+          top10_flags = readbin(top10_flags, bin, swapit);
+          fVal = Xnum(bin, swapit);
+          fFilterVal = Xnum(bin, swapit);
+
+          out << "<top10";
+          out << (top10_flags & 0x01 ? " top=\"1\"" : " top=\"0\"");
+          if (top10_flags & 0x02) out << " percent=\"1\"";
+          out << " val=\"" << fVal << "\"";
+          if (fFilterVal != 0) out << " filterVal=\"" << fFilterVal << "\"";
+          out << "/>" << std::endl;
 
           break;
         }
@@ -3681,7 +4077,7 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           std::string strProgID = XLNullableWideString(bin, swapit);
 
           int32_t sharedFormula = false;
-          if (view_flags.fLinked()) std::string link = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+          if (view_flags.fLinked()) std::string link = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record, ctx);
 
           std::string stRelID = XLNullableWideString(bin, swapit);
           out << "<oleObject progId=\"" << strProgID << "\" shapeId=\"" << shapeId << "\" r:id=\"" << stRelID << "\" />" << std::endl;
@@ -3732,8 +4128,8 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           strPrompt      = XLNullableWideString(bin, swapit);
 
           int32_t sharedFormula = false;
-          std::string formula1 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
-          std::string formula2 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+          std::string formula1 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record, ctx);
+          std::string formula2 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record, ctx);
 
           std::string lref = int_to_col(sqrfx[3] + 1) + std::to_string(sqrfx[1] + 1);
           std::string rref = int_to_col(sqrfx[4] + 1) + std::to_string(sqrfx[2] + 1);
@@ -3796,6 +4192,7 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
 
           if (idvMac > 65534) Rcpp::stop("idvMac to big");
 
+          open_ext("{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF}");
           out << "<x14:dataValidations count=\"" <<
             std::to_string(idvMac) <<
             "\" xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\""
@@ -3868,7 +4265,7 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
               uint32_t flags_cfml = 0;
               flags_cfml = readbin(flags_cfml, bin, swapit);
               int32_t sharedFormula = false;
-              std::string frt_fml = FRTParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+              std::string frt_fml = FRTParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record, ctx);
               frt_fmls.push_back(frt_fml);
               // Rcpp::Rcout << frt_fmls[cfml] << std::endl;
             }
@@ -3954,34 +4351,179 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           break;
         }
 
-        case BrtBeginConditionalFormattings:
-        case BrtBeginConditionalFormatting14: {
-          if (debug) Rcpp::Rcout << "BrtBegin/EndDCon" << std::endl;
-
-          Rcpp::warning("Worksheet contains unhandled conditional formatting.");
+        case BrtBeginConditionalFormattings: {
+          if (debug) Rcpp::Rcout << "<x14:conditionalFormattings>" << std::endl;
+          open_ext("{78C0D931-6437-407d-A8EE-F0AAD7539E65}");
+          out << "<x14:conditionalFormattings xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\">" << std::endl;
           bin.seekg(size, bin.cur);
           break;
         }
 
-        case BrtBeginConditionalFormatting: {
+        case BrtBeginConditionalFormatting14: {
+          std::streampos rec_end = bin.tellg() + static_cast<std::streamoff>(size);
+          bin.seekg(12, bin.cur);
+          std::vector<int32_t> sqrfx = UncheckedSqRfX(bin, swapit);
+          x14_sqref.clear();
+          for (int32_t k = 0; k < sqrfx[0]; ++k) {
+            size_t at = 1 + 4 * static_cast<size_t>(k);
+            std::string lref = int_to_col(sqrfx[at + 2] + 1) + std::to_string(sqrfx[at] + 1);
+            std::string rref = int_to_col(sqrfx[at + 3] + 1) + std::to_string(sqrfx[at + 1] + 1);
+            if (k > 0) x14_sqref += " ";
+            x14_sqref += lref == rref ? lref : lref + ":" + rref;
+          }
+          if (sqrfx[0] > 0) {
+            cf_row = sqrfx[1];
+            cf_col = sqrfx[3];
+          }
+          out << "<x14:conditionalFormatting>" << std::endl;
+          bin.seekg(rec_end);
+          break;
+        }
 
+        case BrtEndConditionalFormatting14: {
+          out << "<xm:sqref>" << x14_sqref << "</xm:sqref></x14:conditionalFormatting>" << std::endl;
+          bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtBeginCFRule14: {
+          std::vector<uint8_t> rule(static_cast<size_t>(size));
+          bin.read(reinterpret_cast<char*>(rule.data()), size);
+          x14_skip = true;
+          if (rule.size() >= 24 && rule[4] == 4) {
+            char guid[40];
+            const uint8_t* g = rule.data() + rule.size() - 20;
+            std::snprintf(guid, sizeof(guid), "{%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
+                          g[3], g[2], g[1], g[0], g[5], g[4], g[7], g[6], g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15]);
+            out << "<x14:cfRule type=\"dataBar\" id=\"" << guid << "\">" << std::endl;
+            x14_skip = false;
+          } else {
+            Rcpp::warning("Worksheet contains unhandled conditional formatting.");
+          }
+          break;
+        }
+
+        case BrtEndCFRule14: {
+          if (!x14_skip) out << "</x14:cfRule>" << std::endl;
+          x14_skip = false;
+          bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtBeginDatabar14: {
+          std::vector<uint8_t> db(static_cast<size_t>(size));
+          bin.read(reinterpret_cast<char*>(db.data()), size);
+          x14_colors.clear();
+          if (x14_skip || db.size() < 11) break;
+          x14_flags = static_cast<uint8_t>(db[9]);
+          x14_axis = db[8];
+          out << "<x14:dataBar minLength=\"" << static_cast<unsigned>(db[4]) << "\" maxLength=\"" << static_cast<unsigned>(db[5]) << "\"";
+          if (!db[6]) out << " showValue=\"0\"";
+          if (x14_flags & 0x01) out << " border=\"1\"";
+          if (!(x14_flags & 0x02)) out << " gradient=\"0\"";
+          if (db[7] == 1) out << " direction=\"leftToRight\"";
+          if (db[7] == 2) out << " direction=\"rightToLeft\"";
+          if (db[8] == 1) out << " axisPosition=\"middle\"";
+          if (db[8] == 2) out << " axisPosition=\"none\"";
+          if (!(x14_flags & 0x04)) out << " negativeBarColorSameAsPositive=\"1\"";
+          out << " negativeBarBorderColorSameAsPositive=\"" << ((x14_flags & 0x08) ? "0" : "1") << "\">" << std::endl;
+          break;
+        }
+
+        case BrtEndDatabar14: {
+          if (!x14_skip) {
+            size_t x14_pos = 0;
+            auto next_color = [&](const char* tag) {
+              if (x14_pos < x14_colors.size()) out << "<x14:" << tag << x14_colors[x14_pos++] << "/>";
+            };
+            if (x14_flags & 0x01) next_color("borderColor");
+            if (x14_flags & 0x04) next_color("negativeFillColor");
+            if ((x14_flags & 0x01) && (x14_flags & 0x08)) next_color("negativeBorderColor");
+            if (x14_axis != 2) next_color("axisColor");
+            out << "</x14:dataBar>" << std::endl;
+          }
+          bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtColor14: {
+          std::vector<uint8_t> color(static_cast<size_t>(size));
+          bin.read(reinterpret_cast<char*>(color.data()), size);
+          if (x14_skip || color.size() < 12) break;
+          color.erase(color.begin(), color.begin() + 4);
+          std::string attr = xlsb_color_attr(color, 0);
+          x14_colors.push_back(attr.empty() ? " auto=\"1\"" : attr);
+          break;
+        }
+
+        case BrtCFVO14: {
+          std::streampos rec_end = bin.tellg() + static_cast<std::streamoff>(size);
+          bin.seekg(4, bin.cur);
+          uint32_t iType = 0, fSaveGTE = 0, fGTE = 0, cbFmla = 0;
+          double numParam = 0;
+          iType = readbin(iType, bin, swapit);
+          numParam = readbin(numParam, bin, swapit);
+          fSaveGTE = readbin(fSaveGTE, bin, swapit);
+          fGTE = readbin(fGTE, bin, swapit);
+          cbFmla = readbin(cbFmla, bin, swapit);
+
+          std::string fml;
+          if (cbFmla != 0) {
+            int32_t sharedFormula = false;
+            fml = CellParsedFormula(bin, swapit, debug, cf_col, cf_row, sharedFormula, has_revision_record, ctx);
+          }
+
+          if (!x14_skip) {
+            static const char* const names[10] = {"num", "num", "min", "max", "percent", "percentile", "num", "formula", "autoMin", "autoMax"};
+            const char* type = names[iType < 10 ? iType : 0];
+            if (iType == 8 || iType == 9) {
+              out << "<x14:cfvo type=\"" << type << "\"/>" << std::endl;
+            } else if (iType == 2 || iType == 3) {
+              out << "<x14:cfvo type=\"" << type << "\"/>" << std::endl;
+            } else {
+              std::stringstream num;
+              num << std::setprecision(15) << numParam;
+              out << "<x14:cfvo type=\"" << type << "\"><xm:f>" << (fml.empty() ? num.str() : escape_xml(fml)) << "</xm:f></x14:cfvo>" << std::endl;
+            }
+          }
+
+          bin.seekg(rec_end);
+          break;
+        }
+
+        case BrtCFRuleExt: {
+          std::vector<uint8_t> ext(static_cast<size_t>(size));
+          bin.read(reinterpret_cast<char*>(ext.data()), size);
+          if (ext.size() >= 20) {
+            char guid[40];
+            const uint8_t* g = ext.data() + 4;
+            std::snprintf(guid, sizeof(guid), "{%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
+                          g[3], g[2], g[1], g[0], g[5], g[4], g[7], g[6], g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15]);
+            out << "<extLst><ext uri=\"{B025F937-C7B1-47D3-B67F-A62EFF666E3E}\" "
+                   "xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\"><x14:id>" << guid << "</x14:id></ext></extLst>" << std::endl;
+          }
+          break;
+        }
+
+        case BrtBeginConditionalFormatting: {
           if (debug) Rcpp::Rcout << "<conditionalFormatting>" << std::endl;
 
           uint32_t ccf = 0, fPivot = 0;
-          std::vector<int32_t> sqrfx;
-
-          ccf = readbin(ccf, bin, swapit);  // not needed?
+          ccf = readbin(ccf, bin, swapit);
           fPivot = readbin(fPivot, bin, swapit);
 
-          sqrfx = UncheckedSqRfX(bin, swapit);
-          std::string lref = int_to_col(sqrfx[3] + 1) + std::to_string(sqrfx[1] + 1);
-          std::string rref = int_to_col(sqrfx[4] + 1) + std::to_string(sqrfx[2] + 1);
-
+          std::vector<int32_t> sqrfx = UncheckedSqRfX(bin, swapit);
           std::string sqref;
-          if (lref.compare(rref) == 0) {
-            sqref = lref;
-          } else {
-            sqref =  lref + ":" + rref;
+          for (int32_t k = 0; k < sqrfx[0]; ++k) {
+            size_t at = 1 + 4 * static_cast<size_t>(k);
+            std::string lref = int_to_col(sqrfx[at + 2] + 1) + std::to_string(sqrfx[at] + 1);
+            std::string rref = int_to_col(sqrfx[at + 3] + 1) + std::to_string(sqrfx[at + 1] + 1);
+            if (k > 0) sqref += " ";
+            sqref += lref == rref ? lref : lref + ":" + rref;
+          }
+          if (sqrfx[0] > 0) {
+            cf_row = sqrfx[1];
+            cf_col = sqrfx[3];
           }
 
           out << "<conditionalFormatting";
@@ -3995,9 +4537,12 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
         case BrtBeginCFRule: {
           if (debug) Rcpp::Rcout << "<cfRule>" << std::endl;
 
+          std::streampos rec_end = bin.tellg() + static_cast<std::streamoff>(size);
+
           uint16_t flags = 0;
           uint32_t iType = 0, iTemplate = 0, dxfId = 0, iPri = 0, iParam = 0, reserved1 = 0, reserved2 = 0;
           uint32_t cbFmla1 = 0, cbFmla2 = 0, cbFmla3 = 0;
+          
 
           iType = readbin(iType, bin, swapit);
           iTemplate = readbin(iTemplate, bin, swapit);
@@ -4016,51 +4561,176 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           int32_t sharedFormula = false;
           std::string rgce1, rgce2, rgce3;
           if (cbFmla1 != 0x00000000) {
-            rgce1 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+            rgce1 = CellParsedFormula(bin, swapit, debug, cf_col, cf_row, sharedFormula, has_revision_record, ctx);
           }
           if (cbFmla2 != 0x00000000) {
-            rgce2 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+            rgce2 = CellParsedFormula(bin, swapit, debug, cf_col, cf_row, sharedFormula, has_revision_record, ctx);
           }
           if (cbFmla3 != 0x00000000) {
-            rgce3 = CellParsedFormula(bin, swapit, debug, 0, 0, sharedFormula, has_revision_record);
+            rgce3 = CellParsedFormula(bin, swapit, debug, cf_col, cf_row, sharedFormula, has_revision_record, ctx);
           }
 
-          BrtBeginCFRuleFlags view_flags(flags);
+          static const char* const operators[9] = {"", "between", "notBetween", "equal", "notEqual", "greaterThan",
+                                                   "lessThan", "greaterThanOrEqual", "lessThanOrEqual"};
+          static const char* const periods[10] = {"today", "tomorrow", "yesterday", "last7Days", "lastMonth",
+                                                  "nextMonth", "thisWeek", "nextWeek", "lastWeek", "thisMonth"};
+          static const char* const text_types[4] = {"containsText", "notContainsText", "beginsWith", "endsWith"};
+          static const char* const text_operators[4] = {"containsText", "notContains", "beginsWith", "endsWith"};
 
+          bool has_dxf = false;
           std::stringstream cfRule;
           cfRule << "<cfRule";
-          // the type is defined by iType and iTemplate eg:
-          // CF_TYPE_EXPRIS & CF_TEMPLATE_CONTAINSNOBLANKS
-          // (but then again, not sure why iType is needed)
-          cfRule << " type=\"" << iType << "/" << iTemplate << "\"";
-          cfRule << " dxfId=\"" << dxfId << "\"";
+
+          if (iType == 1) {
+            cfRule << " type=\"cellIs\"";
+            if (iParam >= 1 && iParam <= 8) cfRule << " operator=\"" << operators[iParam] << "\"";
+            has_dxf = true;
+          } else if (iType == 2) {
+            has_dxf = true;
+            if (iTemplate == 7) cfRule << " type=\"uniqueValues\"";
+            else if (iTemplate == 8) {
+              uint32_t k = iParam < 4 ? iParam : 0;
+              cfRule << " type=\"" << text_types[k] << "\" operator=\"" << text_operators[k] << "\" text=\"" << escape_xml(strParam) << "\"";
+            }
+            else if (iTemplate == 9) cfRule << " type=\"containsBlanks\"";
+            else if (iTemplate == 10) cfRule << " type=\"notContainsBlanks\"";
+            else if (iTemplate == 11) cfRule << " type=\"containsErrors\"";
+            else if (iTemplate == 12) cfRule << " type=\"notContainsErrors\"";
+            else if (iTemplate >= 15 && iTemplate <= 24) cfRule << " type=\"timePeriod\" timePeriod=\"" << periods[iTemplate - 15] << "\"";
+            else if (iTemplate >= 25 && iTemplate <= 26) {
+              cfRule << " type=\"aboveAverage\"";
+              if (iTemplate == 26) cfRule << " aboveAverage=\"0\"";
+              if (iParam > 0) cfRule << " stdDev=\"" << iParam << "\"";
+            }
+            else if (iTemplate == 27) cfRule << " type=\"duplicateValues\"";
+            else if (iTemplate >= 29 && iTemplate <= 30) {
+              cfRule << " type=\"aboveAverage\"";
+              if (iTemplate == 30) cfRule << " aboveAverage=\"0\"";
+              cfRule << " equalAverage=\"1\"";
+              if (iParam > 0) cfRule << " stdDev=\"" << iParam << "\"";
+            }
+            else cfRule << " type=\"expression\"";
+          } else if (iType == 3) {
+            cfRule << " type=\"colorScale\"";
+          } else if (iType == 4) {
+            cfRule << " type=\"dataBar\"";
+          } else if (iType == 5) {
+            cfRule << " type=\"top10\" rank=\"" << iParam << "\"";
+            cfRule << (flags & 0x10 ? " percent=\"1\"" : " percent=\"0\"");
+            if (flags & 0x08) cfRule << " bottom=\"1\"";
+            has_dxf = true;
+          } else if (iType == 6) {
+            cfRule << " type=\"iconSet\"";
+          }
+
+          if (has_dxf && dxfId != 0xFFFFFFFFu) cfRule << " dxfId=\"" << dxfId << "\"";
           cfRule << " priority=\"" << iPri << "\"";
-          cfRule << " operator=\"" << iParam << "\"";
-          cfRule << " stopIfTrue=\"" << view_flags.fStopTrue() << "\"";
-          cfRule << " percent=\"" << view_flags.fPercent() << "\"";
-          cfRule << " aboveAverage=\"" << view_flags.fAbove() << "\"";
-          cfRule << " bottom=\"" << view_flags.fBottom() << "\"";
-          // rank="" ???
-          // stdDev="" ??
-          // timePeriod="" ??
-          cfRule << " text=\"" << strParam << "\"";
-          cfRule << " >" << std::endl;
+          if (flags & 0x02) cfRule << " stopIfTrue=\"1\"";
+          cfRule << ">";
+          if (!rgce1.empty()) cfRule << "<formula>" << rgce1 << "</formula>";
+          if (!rgce2.empty()) cfRule << "<formula>" << rgce2 << "</formula>";
+          if (!rgce3.empty()) cfRule << "<formula>" << rgce3 << "</formula>";
 
-          if (debug) {  // #nocov start
-            Rcpp::Rcout << cfRule.str() << std::endl;
-            Rcpp::Rcout << rgce1 << std::endl;
-            Rcpp::Rcout << rgce2 << std::endl;
-            Rcpp::Rcout << rgce3 << std::endl;
-          }  // #nocov end
+          if (debug) Rcpp::Rcout << cfRule.str() << std::endl;
+          out << cfRule.str() << std::endl;
 
+          bin.seekg(rec_end);
           break;
         }
 
-        case BrtEndConditionalFormatting14:
-        case BrtBeginCFRule14:
-        case BrtEndCFRule14: {
-          if (debug) Rcpp::Rcout << "BrtBegin/EndDCon 14" << std::endl;
+        case BrtBeginColorScale: {
+          out << "<colorScale>" << std::endl;
           bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtEndColorScale: {
+          out << "</colorScale>" << std::endl;
+          bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtBeginDatabar: {
+          uint8_t bLenMin = 0, bLenMax = 0, fShowValue = 0;
+          bLenMin = readbin(bLenMin, bin, swapit);
+          bLenMax = readbin(bLenMax, bin, swapit);
+          fShowValue = readbin(fShowValue, bin, swapit);
+          out << "<dataBar minLength=\"" << static_cast<unsigned>(bLenMin) << "\" maxLength=\"" << static_cast<unsigned>(bLenMax) << "\"";
+          if (!fShowValue) out << " showValue=\"0\"";
+          out << ">" << std::endl;
+          bin.seekg(size - 3, bin.cur);
+          break;
+        }
+
+        case BrtEndDatabar: {
+          out << "</dataBar>" << std::endl;
+          bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtBeginIconSet: {
+          static const char* const icons[17] = {"3Arrows", "3ArrowsGray", "3Flags", "3TrafficLights1", "3TrafficLights2",
+                                                "3Signs", "3Symbols", "3Symbols2", "4Arrows", "4ArrowsGray",
+                                                "4RedToBlack", "4Rating", "4TrafficLights", "5Arrows", "5ArrowsGray",
+                                                "5Rating", "5Quarters"};
+          uint32_t iSet = 0;
+          uint16_t icon_flags = 0;
+          iSet = readbin(iSet, bin, swapit);
+          icon_flags = readbin(icon_flags, bin, swapit);
+          out << "<iconSet iconSet=\"" << icons[iSet < 17 ? iSet : 0] << "\"";
+          if (icon_flags & 0x02) out << " showValue=\"0\"";
+          if (icon_flags & 0x04) out << " reverse=\"1\"";
+          out << ">" << std::endl;
+          cf_iconset = true;
+          bin.seekg(size - 6, bin.cur);
+          break;
+        }
+
+        case BrtEndIconSet: {
+          out << "</iconSet>" << std::endl;
+          cf_iconset = false;
+          bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtCFVO: {
+          std::streampos rec_end = bin.tellg() + static_cast<std::streamoff>(size);
+
+          uint32_t iType = 0, fSaveGTE = 0, fGTE = 0, cbFmla = 0;
+          double numParam = 0;
+          iType = readbin(iType, bin, swapit);
+          numParam = readbin(numParam, bin, swapit);
+          fSaveGTE = readbin(fSaveGTE, bin, swapit);
+          fGTE = readbin(fGTE, bin, swapit);
+          cbFmla = readbin(cbFmla, bin, swapit);
+
+          std::string fml;
+          if (cbFmla != 0) {
+            int32_t sharedFormula = false;
+            fml = CellParsedFormula(bin, swapit, debug, cf_col, cf_row, sharedFormula, has_revision_record, ctx);
+          }
+
+          static const char* const names[8] = {"num", "num", "min", "max", "percent", "percentile", "num", "formula"};
+          out << "<cfvo type=\"" << names[iType < 8 ? iType : 0] << "\"";
+          if (!fml.empty()) {
+            out << " val=\"" << fml << "\"";
+          } else if (iType != 2 && iType != 3) {
+            std::stringstream num;
+            num << std::setprecision(15) << numParam;
+            out << " val=\"" << num.str() << "\"";
+          }
+          if (cf_iconset && !fGTE) out << " gte=\"0\"";
+          out << "/>" << std::endl;
+
+          bin.seekg(rec_end);
+          break;
+        }
+
+        case BrtColor: {
+          std::vector<uint8_t> color(static_cast<size_t>(size));
+          bin.read(reinterpret_cast<char*>(color.data()), size);
+          std::string attr = xlsb_color_attr(color, 0);
+          out << "<color" << (attr.empty() ? " auto=\"1\"" : attr) << "/>" << std::endl;
           break;
         }
 
@@ -4074,19 +4744,9 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           break;
         }
 
-        case BrtBeginIconSet:
-        case BrtEndIconSet:
-        case BrtCFVO: {
-          if (debug) Rcpp::Rcout << "IconSet in worksheet (?)" << std::endl;
-          Rcpp::warning("Worksheet contains unhandled conditional formatting.");
-          bin.seekg(size, bin.cur);
-          break;
-        }
-
         case BrtEndCFRule: {
           if (debug) Rcpp::Rcout << "</cfRule>" << std::endl;
-          // Rcpp::Rcout << "</cfRule>" << std::endl;
-
+          out << "</cfRule>" << std::endl;
           break;
         }
 
@@ -4098,13 +4758,13 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
         }
 
         case BrtEndConditionalFormattings: {
-          // UNHANDLED
-          if (debug) Rcpp::Rcout << "</conditionalFormattings>" << std::endl;
+          if (debug) Rcpp::Rcout << "</x14:conditionalFormattings>" << std::endl;
+          out << "</x14:conditionalFormattings>" << std::endl;
           bin.seekg(size, bin.cur);
           break;
         }
 
-        // unhandled page breaks. differentiates in column and row breaks
+        // page breaks. differentiates in column and row breaks
         case BrtBeginColBrk:
         case BrtBeginRwBrk: {
 
@@ -4114,6 +4774,9 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           ibrkMac = readbin(ibrkMac, bin, swapit);
           if (ibrkMac > 1024) Rcpp::stop("ibrkMac to big");
           ibrkManMac = readbin(ibrkManMac, bin, swapit);
+
+          brk_tag = (x == BrtBeginColBrk) ? "colBreaks" : "rowBreaks";
+          out << "<" << brk_tag << " count=\"" << ibrkMac << "\" manualBreakCount=\"" << ibrkManMac << "\">" << std::endl;
 
           break;
         }
@@ -4129,6 +4792,13 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           fMan        = readbin(fMan, bin, swapit);
           fPivot      = readbin(fPivot, bin, swapit);
 
+          out << "<brk id=\"" << unRwCol << "\"";
+          if (unColRwStrt) out << " min=\"" << unColRwStrt << "\"";
+          out << " max=\"" << unColRwEnd << "\"";
+          out << " man=\"" << (fMan & 0x01) << "\"";
+          if (fPivot & 0x01) out << " pt=\"1\"";
+          out << "/>" << std::endl;
+
           break;
         }
 
@@ -4136,26 +4806,58 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
         case BrtEndRwBrk: {
           if (debug) Rcpp::Rcout << "<BrtEnd..Brk>" << std::endl;
 
+          out << "</" << brk_tag << ">" << std::endl;
+
           break;
         }
-          // end unhandled page breaks
+          // end page breaks
 
         case BrtFRTBegin: {
           if (debug) Rcpp::Rcout << "BrtFRTBegin" << std::endl;
 
-          // we only handle this for data validation lists.
-          out << "<extLst>" <<
-            "<ext uri=\"{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF}\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\">" <<
-              std::endl;
+          ProductVersion(bin, swapit, debug, true);
 
-          ProductVersion(bin, swapit, debug, true);  // reserved must be 0
+          break;
+        }
 
+        case BrtBeginSlicersEx: {
+          open_ext("{A8765BA9-456A-4dab-B4F3-ACF838C121DE}");
+          out << "<x14:slicerList>";
+          bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtBeginSlicerEx: {
+          std::streampos start = bin.tellg();
+          bin.seekg(4, bin.cur);
+          uint16_t cch = 0;
+          cch = readbin(cch, bin, swapit);
+          std::string rid;
+          for (uint16_t i = 0; i < cch; ++i) {
+            uint16_t ch = 0;
+            ch = readbin(ch, bin, swapit);
+            rid += static_cast<char>(ch);
+          }
+          out << "<x14:slicer r:id=\"" << rid << "\"/>";
+          bin.seekg(start + static_cast<std::streamoff>(size), bin.beg);
+          break;
+        }
+
+        case BrtEndSlicerEx: {
+          bin.seekg(size, bin.cur);
+          break;
+        }
+
+        case BrtEndSlicersEx: {
+          out << "</x14:slicerList>";
+          bin.seekg(size, bin.cur);
           break;
         }
 
         case BrtFRTEnd: {
           if (debug) Rcpp::Rcout << "BrtFRTEnd" << std::endl;
-          out << "</ext></extLst>" << std::endl;
+          if (ext_open) out << "</ext>" << std::endl;
+          ext_open = false;
           bin.seekg(size, bin.cur);
           break;
         }
@@ -4172,6 +4874,8 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
           }
 
           if (debug)  Rcpp::Rcout << "</worksheet>" << bin.tellg() << std::endl;
+
+          if (extlst_open) out << "</extLst>" << std::endl;
 
           if (chartsheet)
             out << "</chartsheet>" << std::endl;
@@ -4231,11 +4935,9 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
         }
 
         default: {
-          // if (debug) {
-            Rcpp::Rcout << "Unhandled: " << std::to_string(x) <<
-              ": " << std::to_string(size) <<
-                " @ " << bin.tellg() << std::endl;
-          // }
+          Rcpp::Rcout << "Unhandled: " << std::to_string(x) <<
+            ": " << std::to_string(size) <<
+              " @ " << bin.tellg() << std::endl;
           bin.seekg(size, bin.cur);
           break;
         }
@@ -4253,4 +4955,657 @@ int32_t worksheet_bin(std::string filePath, bool chartsheet, std::string outPath
   } else {
     return -1;
   };
+}
+
+// Pivot tables and pivot caches of xlsb files. The parts are converted the way
+// the xls parts are: the cache gets the layout and the items of its fields, the
+// records of the cache are not imported and the cache is refreshed when the
+// file is opened.
+
+namespace {
+
+struct BinRecord {
+  int32_t id = 0;
+  std::vector<uint8_t> data;
+};
+
+std::vector<BinRecord> pivot_records(const std::string& path) {
+  std::vector<BinRecord> out;
+  std::ifstream in(path, std::ios::in | std::ios::binary);
+  if (!in) return out;
+  std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+
+  size_t pos = 0, n = bytes.size();
+  while (pos < n) {
+    BinRecord rec;
+    uint32_t id = bytes[pos++];
+    if ((id & 0x80) != 0) {
+      if (pos >= n) break;
+      id = (id & 0x7Fu) | ((bytes[pos++] & 0x7Fu) << 7);
+    }
+    uint32_t size = 0;
+    bool done = false;
+    for (unsigned k = 0; k < 4 && pos < n; ++k) {
+      uint8_t b = bytes[pos++];
+      size |= static_cast<uint32_t>(b & 0x7Fu) << (7 * k);
+      if ((b & 0x80) == 0) {
+        done = true;
+        break;
+      }
+    }
+    if (!done || size > n - pos) break;
+    rec.id = static_cast<int32_t>(id);
+    rec.data.assign(bytes.begin() + static_cast<std::ptrdiff_t>(pos), bytes.begin() + static_cast<std::ptrdiff_t>(pos + size));
+    pos += size;
+    out.push_back(rec);
+  }
+  return out;
+}
+
+// XLWideString and XLNullableWideString: the number of characters and the characters
+std::string pivot_string(const std::vector<uint8_t>& r, size_t& pos) {
+  if (pos + 4 > r.size()) {
+    pos = r.size();
+    return std::string();
+  }
+  uint32_t len = xls_pv_u32(r, pos);
+  pos += 4;
+  if (len == 0xFFFFFFFFu) return std::string();
+  if (len > (r.size() - pos) / 2) {
+    pos = r.size();
+    return std::string();
+  }
+  std::u16string s;
+  for (uint32_t i = 0; i < len; ++i) {
+    s.push_back(static_cast<char16_t>(xls_pv_u16(r, pos)));
+    pos += 2;
+  }
+  return to_utf8(s);
+}
+
+}  // namespace
+
+// [[Rcpp::export]]
+int32_t pivotcache_bin(native_path filePath, native_path outPath, native_path recordsPath, native_path recordsOut, bool debug) {
+  std::vector<BinRecord> recs = pivot_records(filePath);
+  if (recs.empty()) return -1;
+
+  XlsPivotSource src;
+  uint32_t src_type = 0, n_records = 0, slicer_id = 0;
+  std::vector<XlsPivotCacheField> fields;
+  bool in_items = false;
+
+  for (size_t i = 0; i < recs.size(); ++i) {
+    const std::vector<uint8_t>& d = recs[i].data;
+    if (debug) Rcpp::Rcout << "pivot cache record " << recs[i].id << ": " << d.size() << std::endl;
+
+    switch (recs[i].id) {
+      case BrtBeginPivotCacheDef:
+        n_records = xls_pv_u32(d, 17);
+        break;
+
+      case BrtBeginPCDSource:
+        src_type = xls_pv_u32(d, 0);
+        break;
+
+      case BrtBeginPCD14:
+        slicer_id = xls_pv_u32(d, 5);
+        break;
+
+      case BrtBeginPCDSRange: {
+        if (d.size() < 3) break;
+        bool is_name = (d[0] & 0x01) != 0, has_rel = (d[2] & 0x01) != 0, has_sheet = (d[2] & 0x02) != 0;
+        size_t pos = 3;
+        if (has_sheet) src.sheet = pivot_string(d, pos);
+        if (has_rel) {
+          src_type = 1;
+          pivot_string(d, pos);
+        }
+        if (is_name) {
+          src.name = pivot_string(d, pos);
+        } else {
+          src.ref = int_to_col(xls_pv_u32(d, pos + 8) + 1u) + std::to_string(xls_pv_u32(d, pos) + 1u) + ":" +
+                    int_to_col(xls_pv_u32(d, pos + 12) + 1u) + std::to_string(xls_pv_u32(d, pos + 4) + 1u);
+        }
+        break;
+      }
+
+      case BrtBeginPCDField: {
+        XlsPivotCacheField f;
+        size_t pos = 20;
+        f.name = pivot_string(d, pos);
+        fields.push_back(f);
+        break;
+      }
+
+      case BrtEndPCDField:
+        in_items = false;
+        break;
+
+      case BrtBeginPCDFAtbl: {
+        in_items = true;
+        if (fields.empty()) break;
+        XlsPivotCacheField& f = fields.back();
+        uint32_t fl = xls_pv_u16(d, 0);
+        f.flags = fl;
+        f.shared = d.size() >= 6 && xls_pv_u32(d, 2) > 0;
+        // flags: 0x1 semi mixed types, 0x2 non date, 0x4 date, 0x8 string, 0x10 blank, 0x40 number,
+        // 0x80 integer, 0x100 minimum and maximum. Fields with items get them from the items.
+        if (d.size() >= 6 && xls_pv_u32(d, 2) == 0) {
+          std::string a;
+          if ((fl & 0x01u) == 0) a += " containsSemiMixedTypes=\"0\"";
+          if ((fl & 0x02u) == 0) a += " containsNonDate=\"0\"";
+          if ((fl & 0x04u) != 0) a += " containsDate=\"1\"";
+          if ((fl & 0x08u) == 0) a += " containsString=\"0\"";
+          if ((fl & 0x10u) != 0) a += " containsBlank=\"1\"";
+          if ((fl & 0x40u) != 0) a += " containsNumber=\"1\"";
+          if ((fl & 0x80u) != 0) a += " containsInteger=\"1\"";
+          if ((fl & 0x100u) != 0 && d.size() >= 22) {
+            uint64_t b1 = static_cast<uint64_t>(xls_pv_u32(d, 6)) | (static_cast<uint64_t>(xls_pv_u32(d, 10)) << 32);
+            uint64_t b2 = static_cast<uint64_t>(xls_pv_u32(d, 14)) | (static_cast<uint64_t>(xls_pv_u32(d, 18)) << 32);
+            double serial[2] = {0, 0};
+            std::memcpy(&serial[0], &b1, sizeof(double));
+            std::memcpy(&serial[1], &b2, sizeof(double));
+            if ((fl & 0x04u) == 0) {
+              a += " minValue=\"" + xls_num(serial[0]) + "\" maxValue=\"" + xls_num(serial[1]) + "\"";
+            } else {
+              // dates are serial numbers, converted to year, month and day
+              std::string iso[2];
+              for (int k = 0; k < 2; ++k) {
+                double whole = std::floor(serial[k]);
+                long z = static_cast<long>(whole) - 25569 + 719468;
+                long era = (z >= 0 ? z : z - 146096) / 146097;
+                long doe = z - era * 146097;
+                long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+                long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+                long mp = (5 * doy + 2) / 153;
+                long day = doy - (153 * mp + 2) / 5 + 1;
+                long month = mp < 10 ? mp + 3 : mp - 9;
+                long year = yoe + era * 400 + (month <= 2 ? 1 : 0);
+                long secs = std::lround((serial[k] - whole) * 86400.0);
+                char buf[128];
+                std::snprintf(buf, sizeof(buf), "%04ld-%02ld-%02ldT%02ld:%02ld:%02ld", year, month, day, secs / 3600, (secs / 60) % 60, secs % 60);
+                iso[k] = buf;
+              }
+              a += " minDate=\"" + iso[0] + "\" maxDate=\"" + iso[1] + "\"";
+            }
+          }
+          f.attrs = a;
+        }
+        break;
+      }
+
+      case BrtEndPCDFAtbl:
+        in_items = false;
+        break;
+
+      case BrtPCDIMissing:
+      case BrtPCDINumber:
+      case BrtPCDIBoolean:
+      case BrtPCDIError:
+      case BrtPCDIString:
+      case BrtPCDIDatetime:
+      case BrtPCDIAMissing:
+      case BrtPCDIANumber:
+      case BrtPCDIABoolean:
+      case BrtPCDIAError:
+      case BrtPCDIAString:
+      case BrtPCDIADatetime:
+      case BrtBeginPCDIRun: {
+        if (!in_items || fields.empty()) break;
+        XlsPivotCacheField& f = fields.back();
+        f.attrs.clear();
+
+        // items are missing 0, number 1, boolean 2, error 3, string 4, datetime 5. The
+        // items with attributes carry six more bytes, they are not imported. A run holds
+        // many items of the same type.
+        int kind = 0;
+        size_t n_items = 1, pos = 0;
+        if (recs[i].id == BrtBeginPCDIRun) {
+          uint32_t run_type = xls_pv_u16(d, 0);
+          n_items = xls_pv_u32(d, 2);
+          pos = 6;
+          if (run_type == 1) kind = 1;
+          else if (run_type == 2) kind = 4;
+          else if (run_type == 0x20) kind = 5;
+          else return -1;
+        } else {
+          kind = recs[i].id >= BrtPCDIAMissing ? recs[i].id - BrtPCDIAMissing : recs[i].id - BrtPCDIMissing;
+        }
+
+        for (size_t k = 0; k < n_items && pos <= d.size(); ++k) {
+          if (kind == 4) {
+            f.items += "<s v=\"" + escape_xml(pivot_string(d, pos)) + "\"/>";
+            ++f.n_str;
+          } else if (kind == 1) {
+            uint64_t bits = static_cast<uint64_t>(xls_pv_u32(d, pos)) | (static_cast<uint64_t>(xls_pv_u32(d, pos + 4)) << 32);
+            pos += 8;
+            double x = 0;
+            std::memcpy(&x, &bits, sizeof(x));
+            if (f.n_num == 0 || x < f.min) f.min = x;
+            if (f.n_num == 0 || x > f.max) f.max = x;
+            if (x == std::floor(x)) ++f.n_int;
+            f.items += "<n v=\"" + xls_num(x) + "\"/>";
+            ++f.n_num;
+          } else if (kind == 2) {
+            f.items += std::string("<b v=\"") + ((pos < d.size() && d[pos] != 0) ? "1" : "0") + "\"/>";
+            ++pos;
+            ++f.n_other;
+          } else if (kind == 3) {
+            f.items += "<e v=\"" + xls_error(pos < d.size() ? d[pos] : static_cast<uint8_t>(0)) + "\"/>";
+            ++pos;
+            ++f.n_other;
+          } else if (kind == 5) {
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%04u-%02u-%02uT%02u:%02u:%02u", xls_pv_u16(d, pos), xls_pv_u16(d, pos + 2),
+                          pos + 4 < d.size() ? d[pos + 4] : 0u, pos + 5 < d.size() ? d[pos + 5] : 0u,
+                          pos + 6 < d.size() ? d[pos + 6] : 0u, pos + 7 < d.size() ? d[pos + 7] : 0u);
+            pos += 8;
+            std::string dt = buf;
+            if (f.n_date == 0 || dt < f.min_date) f.min_date = dt;
+            if (f.n_date == 0 || dt > f.max_date) f.max_date = dt;
+            f.items += "<d v=\"" + dt + "\"/>";
+            ++f.n_date;
+          } else {
+            f.items += "<m/>";
+            ++f.n_blank;
+          }
+          ++f.count;
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
+
+  if (src_type != 0 || (src.name.empty() && src.ref.empty()) || fields.empty()) return -1;
+
+  // The records: fields with items store the index of the item, the others the value. A file in
+  // which a record does not end where its fields end is not imported, the cache is refreshed.
+  bool refresh = true;
+  if (!recordsPath.empty()) {
+    std::ifstream rin(recordsPath, std::ios::in | std::ios::binary);
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(rin)), std::istreambuf_iterator<char>());
+    std::ofstream rout(recordsOut);
+    std::vector<uint8_t> rec;
+    std::string line;
+    uint32_t n_rec = 0;
+    bool ok = !bytes.empty();
+
+    rout << "<pivotCacheRecords xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" "
+            "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">";
+
+    size_t pos = 0, n = bytes.size();
+    while (ok && pos < n) {
+      uint32_t id = bytes[pos++];
+      if ((id & 0x80) != 0) {
+        if (pos >= n) break;
+        id = (id & 0x7Fu) | ((bytes[pos++] & 0x7Fu) << 7);
+      }
+      uint32_t size = 0;
+      bool done = false;
+      for (unsigned k = 0; k < 4 && pos < n; ++k) {
+        uint8_t b = bytes[pos++];
+        size |= static_cast<uint32_t>(b & 0x7Fu) << (7 * k);
+        if ((b & 0x80) == 0) {
+          done = true;
+          break;
+        }
+      }
+      if (!done || size > n - pos) {
+        ok = false;
+        break;
+      }
+      if (id == BrtPCRRecordDt) {
+        ok = false;
+        break;
+      }
+      if (id != BrtPCRRecord) {
+        pos += size;
+        continue;
+      }
+
+      rec.assign(bytes.begin() + static_cast<std::ptrdiff_t>(pos), bytes.begin() + static_cast<std::ptrdiff_t>(pos + size));
+      pos += size;
+
+      size_t at = 0;
+      line = "<r>";
+      for (size_t k = 0; ok && k < fields.size(); ++k) {
+        const XlsPivotCacheField& f = fields[k];
+        if (f.shared) {
+          if (at + 4 > rec.size()) { ok = false; break; }
+          line += "<x v=\"" + std::to_string(xls_pv_u32(rec, at)) + "\"/>";
+          at += 4;
+        } else if ((f.flags & 0x08u) != 0) {
+          std::string str = pivot_string(rec, at);
+          line += "<s v=\"" + escape_xml(str) + "\"/>";
+        } else if ((f.flags & 0x40u) != 0 && (f.flags & 0x04u) == 0) {
+          if (at + 8 > rec.size()) { ok = false; break; }
+          uint64_t bits = static_cast<uint64_t>(xls_pv_u32(rec, at)) | (static_cast<uint64_t>(xls_pv_u32(rec, at + 4)) << 32);
+          double num = 0;
+          std::memcpy(&num, &bits, sizeof(double));
+          line += "<n v=\"" + xls_num(num) + "\"/>";
+          at += 8;
+        } else if ((f.flags & 0x04u) != 0 && (f.flags & 0x40u) == 0) {
+          if (at + 8 > rec.size()) { ok = false; break; }
+          char buf[128];
+          std::snprintf(buf, sizeof(buf), "%04u-%02u-%02uT%02u:%02u:%02u", xls_pv_u16(rec, at), xls_pv_u16(rec, at + 2),
+                        static_cast<unsigned>(rec[at + 4]), static_cast<unsigned>(rec[at + 5]), static_cast<unsigned>(rec[at + 6]),
+                        static_cast<unsigned>(rec[at + 7]));
+          line += std::string("<d v=\"") + buf + "\"/>";
+          at += 8;
+        } else {
+          ok = false;
+        }
+      }
+      if (at != rec.size()) ok = false;
+      line += "</r>";
+      rout << line;
+      ++n_rec;
+    }
+
+    rout << "</pivotCacheRecords>\n";
+    rout.close();
+    if (ok && n_rec > 0) {
+      refresh = false;
+      n_records = n_rec;
+    }
+    if (refresh) std::remove(recordsOut.c_str());
+  }
+
+  std::ofstream out(outPath);
+  out << xls_pivot_cache_write(fields, n_records, src, slicer_id, refresh);
+  return static_cast<int32_t>(fields.size());
+}
+
+// Returns the id of the cache of the table, -1 if the table is not imported
+// [[Rcpp::export]]
+int32_t pivottable_bin(native_path filePath, native_path outPath, bool debug) {
+  std::vector<BinRecord> recs = pivot_records(filePath);
+  if (recs.empty()) return -1;
+
+  XlsPivotView v;
+  int64_t cache_id = -1;
+  int line_axis = -1;
+  bool in_format = false;
+  v.axes.resize(2);
+
+  for (size_t i = 0; i < recs.size(); ++i) {
+    const std::vector<uint8_t>& d = recs[i].data;
+    if (debug) Rcpp::Rcout << "pivot table record " << recs[i].id << ": " << d.size() << std::endl;
+
+    switch (recs[i].id) {
+      case BrtBeginSXView: {
+        cache_id = xls_pv_u32(d, 28);
+        if (d.size() > 5) {
+          v.row_grand = (d[5] & 0x20) != 0;
+          v.col_grand = (d[5] & 0x40) != 0;
+        }
+        if (d.size() > 15) {
+          v.outline = (d[8] & 0x02) != 0;
+          v.version = d[14];
+        }
+        size_t pos = 32;
+        v.name = pivot_string(d, pos);
+        v.data_name = pivot_string(d, pos);
+        break;
+      }
+
+      case BrtBeginSXLocation:
+        v.row1 = static_cast<uint16_t>(xls_pv_u32(d, 0));
+        v.row2 = static_cast<uint16_t>(xls_pv_u32(d, 4));
+        v.col1 = static_cast<uint16_t>(xls_pv_u32(d, 8));
+        v.col2 = static_cast<uint16_t>(xls_pv_u32(d, 12));
+        v.head_row = static_cast<uint16_t>(xls_pv_u32(d, 16));
+        v.data_row = static_cast<uint16_t>(xls_pv_u32(d, 20));
+        v.data_col = static_cast<uint16_t>(xls_pv_u32(d, 24));
+        break;
+
+      case BrtBeginSXVD: {
+        XlsPivotField f;
+        f.axis = static_cast<uint16_t>(xls_pv_u32(d, 0) & 0x0F);
+        f.default_subtotal = d.size() > 1 && (d[1] & 0x01) != 0;
+        f.subtotals = static_cast<uint16_t>((xls_pv_u32(d, 0) >> 8) & 0x0FFFu);
+        f.numfmt = xls_pv_u32(d, 4);
+        f.multi = d.size() > 10 && (d[10] & 0x08) != 0;
+        f.sort = d.size() > 9 ? static_cast<uint8_t>((d[9] & 0x30) == 0x30 ? 1 : ((d[9] & 0x30) == 0x10 ? 2 : 0)) : static_cast<uint8_t>(0);
+        size_t pos = 16;
+        f.name = pivot_string(d, pos);
+        v.fields.push_back(f);
+        break;
+      }
+
+      case BrtBeginSXVI: {
+        if (v.fields.empty() || d.size() < 7) break;
+        XlsPivotItem it;
+        it.type = d[0];
+        it.flags = static_cast<uint16_t>(xls_pv_u16(d, 1));
+        uint32_t c = xls_pv_u32(d, 3);
+        it.cache = c > 0xFFFEu ? static_cast<uint16_t>(0xFFFF) : static_cast<uint16_t>(c);
+        if (d.size() > 7) {
+          size_t pos = 7;
+          it.name = pivot_string(d, pos);
+        }
+        v.fields.back().items.push_back(it);
+        break;
+      }
+
+      case BrtBeginISXVDRws:
+      case BrtBeginISXVDCols: {
+        std::vector<uint16_t>& axis = v.axes[recs[i].id == BrtBeginISXVDRws ? 0 : 1];
+        uint32_t n = xls_pv_u32(d, 0);
+        for (uint32_t k = 0; k < n && 4 + 4 * static_cast<size_t>(k) + 4 <= d.size(); ++k) {
+          uint32_t x = xls_pv_u32(d, 4 + 4 * static_cast<size_t>(k));
+          axis.push_back(x == 0xFFFFFFFEu ? static_cast<uint16_t>(0xFFFE) : static_cast<uint16_t>(x));
+        }
+        break;
+      }
+
+      case BrtBeginSXLIRws:
+      case BrtBeginSXLICols:
+        line_axis = recs[i].id == BrtBeginSXLIRws ? 0 : 1;
+        break;
+
+      case BrtEndSXLIRws:
+      case BrtEndSXLICols:
+        line_axis = -1;
+        break;
+
+      case BrtBeginSXLI:
+        if (line_axis >= 0 && d.size() >= 12) {
+          XlsPivotLine l;
+          l.reuse = static_cast<uint16_t>(xls_pv_u16(d, 0));
+          l.type = d[2];
+          l.data = xls_pv_u32(d, 8);
+          v.lines[line_axis].push_back(l);
+        }
+        break;
+
+      case BrtBeginISXVIs:
+        if (line_axis >= 0 && !v.lines[line_axis].empty()) {
+          // the entries of the previous line that are repeated come first
+          XlsPivotLine& l = v.lines[line_axis].back();
+          for (size_t k = 4 * static_cast<size_t>(l.reuse); k + 4 <= d.size(); k += 4) l.x.push_back(xls_pv_u32(d, k));
+        }
+        break;
+
+      case BrtBeginSXFormat:
+        if (d.size() >= 6) {
+          XlsPivotFormat f;
+          f.dxf = xls_pv_u32(d, 2);
+          v.formats.push_back(f);
+          in_format = true;
+        }
+        break;
+
+      case BrtEndSXFormat:
+        in_format = false;
+        break;
+
+      case BrtBeginPRule:
+        if (in_format && !v.formats.empty() && d.size() >= 8) {
+          XlsPivotFormat& f = v.formats.back();
+          f.field = static_cast<int32_t>(xls_pv_u32(d, 0));
+          f.type = d[4];
+          f.flags = d[5];
+          f.axis = static_cast<uint8_t>(xls_pv_u16(d, 6) & 0x0F);
+          f.position = static_cast<uint8_t>((xls_pv_u16(d, 6) >> 4) & 0xFF);
+          in_format = false;
+        }
+        break;
+
+      case BrtTableStyleClient:
+        if (d.size() >= 6) {
+          v.style_flags = static_cast<uint16_t>(xls_pv_u16(d, 0));
+          size_t pos = 2;
+          std::string style = pivot_string(d, pos);
+          if (!style.empty()) v.style = style;
+        }
+        break;
+
+      case BrtBeginSXPI: {
+        XlsPivotPage p;
+        p.field = static_cast<uint16_t>(xls_pv_u32(d, 0));
+        uint32_t item = xls_pv_u32(d, 4);
+        p.item = item <= 0x00100000u ? static_cast<uint16_t>(item) : static_cast<uint16_t>(0x7FFD);
+        v.pages.push_back(p);
+        break;
+      }
+
+      case BrtBeginSXDI: {
+        XlsPivotDataField df;
+        df.field = static_cast<uint16_t>(xls_pv_u32(d, 0));
+        df.function = static_cast<uint16_t>(xls_pv_u32(d, 4));
+        df.display = static_cast<uint16_t>(xls_pv_u32(d, 8));
+        df.base_field = static_cast<uint16_t>(xls_pv_u32(d, 12));
+        df.base_item = static_cast<uint16_t>(xls_pv_u32(d, 16));
+        df.numfmt = static_cast<uint16_t>(xls_pv_u32(d, 20));
+        if (d.size() > 25) {
+          size_t pos = 25;
+          df.name = pivot_string(d, pos);
+        }
+        v.data.push_back(df);
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
+
+  if (cache_id < 0 || v.fields.empty()) return -1;
+
+  std::ofstream out(outPath);
+  out << xls_pivot_view_xml(v, static_cast<int32_t>(cache_id));
+  return static_cast<int32_t>(cache_id);
+}
+
+// [[Rcpp::export]]
+int32_t slicer_bin(native_path filePath, native_path outPath, bool debug) {
+  std::vector<BinRecord> recs = pivot_records(filePath);
+  if (recs.empty()) return -1;
+
+  std::string slicers;
+  int32_t n = 0;
+  for (size_t i = 0; i < recs.size(); ++i) {
+    const std::vector<uint8_t>& d = recs[i].data;
+    if (debug) Rcpp::Rcout << "slicer record " << recs[i].id << ": " << d.size() << std::endl;
+    if (recs[i].id != BrtBeginSlicer || d.size() < 17) continue;
+
+    uint8_t flags = d[0];
+    uint32_t start = xls_pv_u32(d, 1), columns = xls_pv_u32(d, 5), level = xls_pv_u32(d, 9), height = xls_pv_u32(d, 13);
+    size_t pos = 17;
+    std::string name = pivot_string(d, pos);
+    std::string cache = pivot_string(d, pos);
+    std::string caption, style;
+    if ((flags & 0x02) != 0) caption = pivot_string(d, pos);
+    if ((flags & 0x04) != 0) style = pivot_string(d, pos);
+
+    slicers += "<slicer name=\"" + escape_xml(name) + "\" cache=\"" + escape_xml(cache) + "\"";
+    if ((flags & 0x02) != 0) slicers += " caption=\"" + escape_xml(caption) + "\"";
+    if ((flags & 0x01) == 0) slicers += " showCaption=\"0\"";
+    if (start != 0) slicers += " startItem=\"" + std::to_string(start) + "\"";
+    if (columns != 1) slicers += " columnCount=\"" + std::to_string(columns) + "\"";
+    if (level != 0) slicers += " level=\"" + std::to_string(level) + "\"";
+    if ((flags & 0x04) != 0) slicers += " style=\"" + escape_xml(style) + "\"";
+    if ((flags & 0x08) != 0) slicers += " lockedPosition=\"1\"";
+    slicers += " rowHeight=\"" + std::to_string(height) + "\"/>";
+    ++n;
+  }
+  if (n == 0) return -1;
+
+  std::ofstream out(outPath);
+  out << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+      << "<slicers xmlns=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" "
+         "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"x\" "
+         "xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">"
+      << slicers << "</slicers>\n";
+  return n;
+}
+
+// [[Rcpp::export]]
+int32_t slicercache_bin(native_path filePath, native_path outPath, bool debug) {
+  std::vector<BinRecord> recs = pivot_records(filePath);
+  if (recs.empty()) return -1;
+
+  std::string name, source, tables, items;
+  uint32_t pivot_cache_id = 0;
+  size_t n_items = 0;
+  bool have_def = false;
+
+  for (size_t i = 0; i < recs.size(); ++i) {
+    const std::vector<uint8_t>& d = recs[i].data;
+    if (debug) Rcpp::Rcout << "slicer cache record " << recs[i].id << ": " << d.size() << std::endl;
+
+    switch (recs[i].id) {
+      case BrtBeginSlicerCacheDef: {
+        size_t pos = 0;
+        name = pivot_string(d, pos);
+        source = pivot_string(d, pos);
+        have_def = true;
+        break;
+      }
+
+      case BrtSlicerCachePivotTables: {
+        size_t pos = 4;
+        for (uint32_t k = 0, n = xls_pv_u32(d, 0); k < n && pos + 8 <= d.size(); ++k) {
+          uint32_t tab = xls_pv_u32(d, pos);
+          pos += 4;
+          std::string pt = pivot_string(d, pos);
+          tables += "<pivotTable tabId=\"" + std::to_string(tab) + "\" name=\"" + escape_xml(pt) + "\"/>";
+        }
+        break;
+      }
+
+      case BrtBeginSlicerCacheNative:
+        pivot_cache_id = xls_pv_u32(d, 4);
+        break;
+
+      case BrtSlicerCacheNativeItem: {
+        for (uint32_t k = 0, n = xls_pv_u32(d, 0); k < n && 4 + 5 * static_cast<size_t>(k) + 5 <= d.size(); ++k) {
+          size_t at = 4 + 5 * static_cast<size_t>(k);
+          items += "<i x=\"" + std::to_string(xls_pv_u32(d, at)) + "\"" + ((d[at + 4] & 0x01) != 0 ? " s=\"1\"" : "") + "/>";
+          ++n_items;
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
+  if (!have_def || pivot_cache_id == 0) return -1;
+
+  std::ofstream out(outPath);
+  out << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+      << "<slicerCacheDefinition xmlns=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" "
+         "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"x\" "
+         "xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" name=\""
+      << escape_xml(name) << "\" sourceName=\"" << escape_xml(source) << "\">";
+  if (!tables.empty()) out << "<pivotTables>" << tables << "</pivotTables>";
+  out << "<data><tabular pivotCacheId=\"" << pivot_cache_id << "\"><items count=\"" << n_items << "\">" << items
+      << "</items></tabular></data></slicerCacheDefinition>\n";
+  return 1;
 }

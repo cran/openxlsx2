@@ -22,17 +22,36 @@ illegal_chars <- function() { c("\\", "/", "?", "*", ":", "[", "]") } # nolint
 legal_chars   <- function() { c("&",     '"',      "'",      "<",    ">",    "\a", "\b", "\v", "\f") } # nolint
 legal_sub     <- function() { c("&amp;", "&quot;", "&apos;", "&lt;", "&gt;", "",   "",   "",   ""  ) } # nolint
 
+#' remove characters that are not allowed in XML 1.0
+#'
+#' Removes raw control characters (U+0000 to U+001F except tab, line feed and
+#' carriage return), the noncharacters U+FFFE and U+FFFF, and character
+#' references to them like `&#01;` or `&#x1;`. None of them are allowed in
+#' XML 1.0 and Excel refuses to open files containing them.
+#' @param x some xml string
+#' @noRd
+strip_xml_control_chars <- function(x) {
+  # most strings contain none of these, a byte wise search is much faster than the replacement
+  # U+FFFE and U+FFFF are the UTF-8 byte sequences EF BF BE and EF BF BF
+  hit <- grepl("[\\x{01}-\\x{08}\\x{0B}\\x{0C}\\x{0E}-\\x{1F}]|\\xEF\\xBF[\\xBE\\xBF]|&#", x, perl = TRUE, useBytes = TRUE)
+  if (any(hit)) {
+    x[hit] <- stringi::stri_replace_all_regex(
+      x[hit],
+      paste0(
+        "[\\x{01}-\\x{08}\\x{0B}\\x{0C}\\x{0E}-\\x{1F}\\x{FFFE}\\x{FFFF}]",
+        "|&#(?:[xX]0*(?:[0-8bBcCeEfF]|1[0-9a-fA-F]|[fF]{3}[eEfF])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]|6553[45]));"
+      ),
+      ""
+    )
+  }
+  x
+}
+
 #' converts & to &amp;
 #' @param x some xml string
 #' @noRd
 replace_legal_chars <- function(x) {
   x <- as.character(x)
-  bad <- Encoding(x) != "UTF-8"
-
-  if (any(bad)) {
-    x[bad] <- stringi::stri_conv(x[bad], from = "", to = "UTF-8")
-  }
-
   stringi::stri_replace_all_fixed(x, legal_chars(), legal_sub(), vectorize_all = FALSE)
 }
 
@@ -74,8 +93,8 @@ clean_worksheet_name <- function(x, replacement = " ") {
 replaceXMLEntities <- function(x) {
   stringi::stri_replace_all_fixed(
     x,
-    c("&amp;", "&quot;", "&apos;", "&lt;", "&gt;"),
-    c("&",     '"',      "'",      "<",    ">"),
+    c("&quot;", "&apos;", "&lt;", "&gt;", "&amp;"),
+    c('"',      "'",      "<",    ">",    "&"),
     vectorize_all = FALSE
   )
 }

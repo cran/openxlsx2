@@ -508,6 +508,9 @@ test_that("temp_dir works", {
 
   expect_true(dir.exists(out))
 
+  # a directory that cannot be created is an error, not an endless loop
+  expect_error(temp_dir("does_not_exist/temp_dir"), "Unable to create temporary directory")
+
 })
 
 test_that("relship", {
@@ -559,7 +562,7 @@ test_that("string formating", {
   expect_equal(exp, got)
 
   exp <- structure(
-    "<r><rPr><i/><strike/><rFont val=\"Arial\"/><charset/><outline/><vertAlign val=\"baseline\"/></rPr><t>test</t></r>",
+    "<r><rPr><i/><strike/><outline/><vertAlign val=\"baseline\"/><rFont val=\"Arial\"/><charset/></rPr><t>test</t></r>",
     class = c("character", "fmt_txt")
   )
   got <- fmt_txt(
@@ -653,7 +656,7 @@ test_that("protect against blank string in fmt_txt()", {
 
 test_that("fmt_txt() input validation works", {
 
-  exp <- "<r><rPr><b/><i/><u val=\"double\"/><strike/><sz val=\"12\"/><color rgb=\"FF0000FF\"/><rFont val=\"Times New Roman\"/><charset val=\"1\"/><outline/><vertAlign val=\"baseline\"/><family val=\"2\"/><shadow/><condense/><extend/></rPr><t>foo bar</t></r>"
+  exp <- "<r><rPr><b/><i/><strike/><condense/><extend/><outline/><shadow/><u val=\"double\"/><vertAlign val=\"baseline\"/><sz val=\"12\"/><color rgb=\"FF0000FF\"/><rFont val=\"Times New Roman\"/><family val=\"2\"/><charset val=\"1\"/></rPr><t>foo bar</t></r>"
   fmt_str <- fmt_txt(
     x = "foo bar",
     bold = TRUE,
@@ -963,4 +966,30 @@ test_that("assert_class() no longer slows down wb_dims()", {
   exp <- "A2:A1000001"
   got <- wb_dims(x = df, cols = "X1")
   expect_equal(got, exp)
+})
+
+test_that("dims_to_rowcol() rejects invalid dims", {
+
+  expect_error(dims_to_rowcol(NA), "character vector of cell ranges")
+  expect_error(dims_to_rowcol(NA_character_), "character vector of cell ranges")
+  expect_error(dims_to_rowcol(character()), "character vector of cell ranges")
+  expect_error(dims_to_rowcol(1), "character vector of cell ranges")
+
+})
+
+test_that("as_xml_attr() rejects unsupported types", {
+
+  zoom <- mean
+  expect_error(as_xml_attr(zoom), "`zoom` must be a number, a string or TRUE/FALSE, not of class 'function'")
+  expect_error(as_xml_attr(new.env()), "not of class 'environment'")
+  expect_error(as_xml_attr(list(1)), "not of class 'list'")
+  expect_equal(as_xml_attr(factor("a")), "a")
+
+  expect_equal(as_xml_attr(list()), character())
+  expect_equal(as_xml_attr(NULL), "")
+  expect_equal(as_xml_attr(c(TRUE, FALSE)), c("1", "0"))
+
+  wb <- wb_workbook()$add_worksheet()
+  expect_error(wb$set_sheetview(zoom_scale = mean), "`zoom_scale` must be a number")
+
 })

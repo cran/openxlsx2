@@ -37,6 +37,7 @@ Nulling
 OEM
 ONLYOFFICE
 OOXML
+OOXMLValidator
 ORCID
 OpenXML
 POSIXct
@@ -113,6 +114,7 @@ bottomLeft
 bottomRight
 bracePair
 bracketPair
+bugfixes
 builtins
 calcChain
 calculatedColumn

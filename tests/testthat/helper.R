@@ -148,7 +148,7 @@ testfile_path <- function(x, replace = FALSE) {
   if (!file.exists(fl) || replace) {
     url <- paste0("https://github.com/JanMarvin/openxlsx-data/raw/main/", x)
     tryCatch({
-      download.file(url, destfile = fl, quiet = TRUE, mode = "wb")
+      suppressWarnings(download.file(url, destfile = fl, quiet = TRUE, mode = "wb"))
     }, error = function(e) NULL)
   }
 
@@ -178,7 +178,7 @@ testsetup <- function() {
 
 #' @param host character; host to ping
 dns_lookup <- function(host = "captive.apple.com") {
-  con <- try(socketConnection(host, port = 80, open = "r+", timeout = 2), silent = TRUE)
+  con <- try(suppressWarnings(socketConnection(host, port = 80, open = "r+", timeout = 2)), silent = TRUE)
   if (inherits(con, "connection")) {
     on.exit(close(con))
     return(TRUE)
@@ -192,4 +192,8 @@ skip_online_checks <- function() {
   if (!dns_lookup()) {
     testthat::skip("Offline: DNS lookup failed")
   }
+}
+
+skip_if_big_endian <- function(format) {
+  testthat::skip_if(.Platform$endian == "big", paste0(format, ": skipping on big-endian system"))
 }

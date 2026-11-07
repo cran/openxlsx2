@@ -311,6 +311,7 @@ write_data2 <- function(
       data[fmls],
       function(val) {
         val <- replaceXMLEntities(val)
+        val <- strip_xml_control_chars(val)
         # replace localized separators ";" used e.g. in German formulas must be ","
         # otherwise the semicolon will interfere with the XML formulas
         val <- gsub('(;)(?=(?:[^"\']*(["\'])[^"\']*\\2)*[^"\']*$)', ',', val, perl = TRUE)
@@ -444,11 +445,6 @@ write_data2 <- function(
   sel <- which(dc == openxlsx2_celltype[["character"]] | dc == openxlsx2_celltype[["factor"]]) # character
   if (length(sel)) {
     data[sel][is.na(data[sel])] <- "_openxlsx_NA"
-
-    if (getOption("openxlsx2.force_utf8_encoding", default = FALSE)) {
-      from_enc <- getOption("openxlsx2.native_encoding")
-      data[sel] <- lapply(data[sel], stringi::stri_encode, from = from_enc, to = "UTF-8")
-    }
   }
 
   na_missing <- FALSE
@@ -755,7 +751,6 @@ write_data2 <- function(
 
     sel <- grepl("<si>", cc$v)
     v <- cc$v[sel]
-    Encoding(v) <- "UTF-8"
 
     wb$sharedStrings <- stringi::stri_unique(c(wb$sharedStrings, stringi::stri_unique(v)))
 
@@ -1016,6 +1011,18 @@ write_data_table <- function(
   nCol <- ncol(x)
   nRow <- nrow(x)
 
+  # spreadsheet software stores at most 32767 characters per cell
+  for (i in seq_len(nCol)) {
+    if (is.character(x[[i]]) && any(nchar(x[[i]], allowNA = TRUE) > 32767L, na.rm = TRUE)) {
+      warning(
+        "`x` contains strings with more than 32767 characters, the maximum ",
+        "length of a cell in spreadsheet software.",
+        call. = FALSE
+      )
+      break
+    }
+  }
+
   ### Beg: Only in data --------------------------------------------------------
   if (!data_table) {
 
@@ -1027,14 +1034,16 @@ write_data_table <- function(
       wb$worksheets[[sheet]]$autoFilter <- sprintf('<autoFilter ref="%s"/>', ref)
 
       l   <- int2col(unlist(coords[, 2]))
-      dfn <- sprintf("'%s'!%s", wb$get_sheet_names(escape = TRUE)[sheet], stringi::stri_join("$", l, "$", coords[, 1], collapse = ":"))
+      dfn <- sprintf("'%s'!%s", wb$sheet_names[sheet], stringi::stri_join("$", l, "$", coords[, 1], collapse = ":"))
 
-      dn  <- sprintf('<definedName name="_xlnm._FilterDatabase" localSheetId="%s" hidden="1">%s</definedName>', sheet - 1L, dfn)
+      lid <- match(sheet, wb$sheetOrder) - 1L
+      dn  <- sprintf('<definedName name="_xlnm._FilterDatabase" localSheetId="%s" hidden="1">%s</definedName>', lid, dfn)
 
-      if (!is.null(wbdn <- wb$get_named_regions())) {
+      if (length(wb$workbook$definedNames)) {
 
-        ind <- wbdn$name == "_xlnm._FilterDatabase" & wbdn$localSheetId == sheet - 1L
-        if (any(ind)) {
+        dn_attr <- rbindlist(xml_attr(wb$workbook$definedNames, "definedName"))
+        ind <- which(dn_attr$name == "_xlnm._FilterDatabase" & dn_attr$localSheetId == as.character(lid))
+        if (length(ind)) {
           wb$workbook$definedNames[ind] <- dn
         } else {
           wb$workbook$definedNames <- c(

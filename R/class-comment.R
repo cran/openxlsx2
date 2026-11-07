@@ -139,6 +139,14 @@ wb_comment <- function(
     style <- create_font()
   }
 
+  # one style per text element, a single style is used for all elements
+  if (!inherits(text, "fmt_txt") && length(style) != length(text)) {
+    if (length(style) != 1L) {
+      stop("`style` must be of length one or of the same length as `text`.", call. = FALSE)
+    }
+    style <- rep(style, length(text))
+  }
+
   # if text was created using fmt_txt()
   if (inherits(text, "fmt_txt")) {
     text  <- text
@@ -163,9 +171,10 @@ wb_comment <- function(
   # rPr font attributes are slightly different compared to the default
   df_font <- read_font(read_xml(style))
   df_font$name <- gsub("^<name", "^<rFont", df_font$name)
+  # the child order spreadsheet software expects (MS-OI29500, Part 1 18.4.7)
   sel <- c(
-    "name", "charset", "family", "b", "i", "strike", "outline", "shadow",
-    "condense", "extend", "color", "sz", "u", "vertAlign", "scheme"
+    "b", "i", "strike", "condense", "extend", "outline", "shadow", "u",
+    "vertAlign", "sz", "color", "name", "family", "charset", "scheme"
   )
   style <- write_font(df_font[sel])
 
@@ -493,13 +502,19 @@ do_remove_comment <- function(
     comb <- unlist(dims_to_dataframe(dims, fill = TRUE))
   }
 
-  toKeep <- !sapply(wb$comments[[comment_id]], "[[", "ref") %in% comb
+  refs <- sapply(wb$comments[[comment_id]], "[[", "ref")
+  toKeep <- !refs %in% comb
 
   wb$comments[[comment_id]] <- wb$comments[[comment_id]][toKeep]
 
-  # remove vml
+  # remove vml, a note per removed comment, dims can be a range
   vml_id <- wb$worksheets[[sheet]]$relships$vmlDrawing
-  wb$vml[[vml_id]] <- vml_rm_note(wb$vml[[vml_id]], dims = dims)
+  removed <- unlist(refs[!toKeep])
+  if (length(removed)) {
+    for (cell in removed) wb$vml[[vml_id]] <- vml_rm_note(wb$vml[[vml_id]], dims = cell)
+  } else {
+    wb$vml[[vml_id]] <- vml_rm_note(wb$vml[[vml_id]], dims = dims)
+  }
 
   # check if there are comments left on sheet
   if (length(wb$comments[[comment_id]]) == 0) {

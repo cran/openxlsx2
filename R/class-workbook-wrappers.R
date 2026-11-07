@@ -371,8 +371,7 @@ wb_add_data <- function(
 #'   add_data_table(
 #'     x = as.data.frame(USPersonalExpenditure),
 #'     row_names = TRUE,
-#'     total_row = c(text = "Total", "none", "sum", "sum", "sum", "SUM"),
-#'     stringsAsFactors = FALSE
+#'     total_row = c(text = "Total", "none", "sum", "sum", "sum", "SUM")
 #'   )
 #' @export
 wb_add_data_table <- function(
@@ -1266,14 +1265,20 @@ wb_add_worksheet <- function(
 #' @description
 #' Create a copy of a worksheet in the same `wbWorkbook` object.
 #'
+#' Data, styles, tables, comments, images and charts are cloned. Cloning
+#' sheets with pivot tables, slicers, timelines, named regions, chart
+#' extensions, form controls, embedded objects, threaded comments, query
+#' tables or rich values (e.g. pictures in cells) is experimental and throws a
+#' warning naming these elements. Check the output carefully.
+#'
 #' Cloning is possible only to a limited extent. References to sheet names in
 #' formulas, charts, pivot tables, etc. may not be updated. Some elements like
-#' named ranges and slicers cannot be cloned yet.
+#' slicers and timelines cannot be cloned yet.
 #'
 #' Cloning from another workbook is still an experimental feature and might not
-#' work reliably. Cloning data, media, charts and tables should work. Slicers
-#' and pivot tables as well as everything everything relying on dxfs styles
-#' (e.g. custom table styles and conditional formatting) is currently not
+#' work reliably. Cloning data, media, charts, tables and conditional
+#' formatting should work. Slicers, timelines, pivot tables, custom table
+#' styles and cell metadata (e.g. dynamic arrays) are currently not
 #' implemented.
 #' Formula references are not updated to reflect interactions between workbooks.
 #'
@@ -2666,11 +2671,11 @@ wb_set_grid_lines <- function(wb, sheet = current_sheet(), show = FALSE, print =
 #' wb$add_data(x = Formaldehyde)
 #'
 #' wb_get_order(wb)
-#' wb$get_sheet_na
+#' wb$get_sheet_names()
 #' wb$set_order(c(1, 3, 2)) # switch position of sheets 2 & 3
 #' wb$add_data(2, 'This is still the "mtcars" worksheet', start_col = 15)
 #' wb_get_order(wb)
-#' wb$get_sheet_names() ## ordering within workbook is not changed
+#' wb$get_sheet_names() ## sheet names are returned in the new order
 #' wb$set_order(3:1)
 #' @name wb_order
 wb_get_order <- function(wb) {
@@ -3594,6 +3599,9 @@ wb_add_chart_xml <- function(
 #'   within `dims`).
 #' @param hyperlinks Logical; if `TRUE`, removes hyperlinks from the specified
 #'   region.
+#' @param tables Logical; if `TRUE`, removes tables from the sheet and any
+#'   intersecting region. `FALSE` leaves the table unaltered, but removes the
+#'   data from the sheet which will cause spreadsheet software to complain.
 #'
 #' @return The [wbWorkbook] object, invisibly.
 #'
@@ -3610,7 +3618,8 @@ wb_clean_sheet <- function(
     characters   = TRUE,
     styles       = TRUE,
     merged_cells = TRUE,
-    hyperlinks   = TRUE
+    hyperlinks   = TRUE,
+    tables       = TRUE
 ) {
   assert_workbook(wb)
   wb$clone(deep = TRUE)$clean_sheet(
@@ -3620,7 +3629,8 @@ wb_clean_sheet <- function(
     characters   = characters,
     styles       = styles,
     merged_cells = merged_cells,
-    hyperlinks   = hyperlinks
+    hyperlinks   = hyperlinks,
+    tables       = tables
   )
 }
 
@@ -5205,6 +5215,7 @@ wb_set_sheetview <- function(
 #'
 #' Multiple sheets can be selected, but only a single one can be active (visible).
 #' The visible sheet, must not necessarily be a selected sheet.
+#' Sheets are returned in the order they appear in the workbook (see [wb_order]).
 #'
 #' @param wb a workbook
 #' @returns a data frame with tabSelected and names
@@ -5226,7 +5237,7 @@ wb_get_active_sheet <- function(wb) {
 }
 
 #' @rdname active_sheet-wb
-#' @param sheet a sheet name of the workbook
+#' @param sheet a sheet name or the position of the sheet in the workbook
 #' @export
 wb_set_active_sheet <- function(wb, sheet) {
   # active tab requires a c index

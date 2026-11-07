@@ -427,7 +427,7 @@ test_that("clone worksheet", {
   # clone pivot table and drawing -----------------------------------------
   fl <- testfile_path("loadExample.xlsx")
   wb <- wb_load(fl)
-  expect_silent(wb$clone_worksheet(4, "Clone 1"))
+  expect_warning(wb$clone_worksheet(4, "Clone 1"), "experimental")
 
   # sheets 4 & 5 both reference the same pivot table in different drawing
   # once the file is opened, both pivot tables behave independently
@@ -466,8 +466,13 @@ test_that("clone worksheet", {
   # clone slicer ----------------------------------------------------------
   fl <- testfile_path("loadExample.xlsx")
   wb <- wb_load(fl)
-  expect_warning(wb$clone_worksheet("IrisSample", "Clone1"),
-                 "Cloning slicers is not yet supported. It will not appear on the sheet.")
+  expect_warning(
+    expect_warning(
+      wb$clone_worksheet("IrisSample", "Clone1"),
+      "Cloning slicers is not yet supported. It will not appear on the sheet."
+    ),
+    "experimental"
+  )
   # wb$open()
 
 })
@@ -1706,4 +1711,212 @@ test_that("updating app.xml works", {
   expect_equal(wb$app$HeadingPairs, wb2$app$HeadingPairs)
   expect_equal(wb$app$TitlesOfParts, wb2$app$TitlesOfParts)
 
+})
+
+test_that("wb_data() reads a header of several rows", {
+  wb <- wb_workbook()$add_worksheet()
+  wb$add_data(
+    x = matrix(c("A", NA, "B", NA, "x", "y", "x", "y"), nrow = 2, byrow = TRUE),
+    col_names = FALSE,
+    dims = "B2"
+  )
+  wb$add_data(x = data.frame(1:2, 3:4, 5:6, 7:8), col_names = FALSE, dims = "B4")
+
+  default <- wb_data(wb, 1, dims = "B2:E5")
+  expect_null(attr(default, "header"))
+  expect_equal(nrow(attr(default, "dims")), nrow(default) + 1L)
+
+  dat <- wb_data(wb, 1, dims = "B2:E5", header_rows = 2)
+  expect_s3_class(dat, "wb_data")
+  expect_equal(names(dat), c("A x", "A y", "B x", "B y"))
+  expect_equal(unname(unlist(dat[1, ])), c(1, 3, 5, 7))
+  expect_equal(nrow(dat), 2L)
+  expect_equal(nrow(attr(dat, "dims")), 3L)
+  expect_equal(attr(dat, "dims")[1, 1], "B3")
+  expect_equal(attr(dat, "dims")[3, 1], "B5")
+  expect_equal(dim(attr(dat, "header_dims")), c(2L, 4L))
+  expect_equal(attr(dat, "header_dims")[, 1], c("B2", "B3"))
+  expect_equal(dim(attr(dat, "header")), c(2L, 4L))
+  expect_equal(attr(dat, "header")[, 3], c("B", "x"))
+  expect_equal(attr(dat, "header")[, 4], c("B", "y"))
+
+  sub <- dat[2, 3:4]
+  expect_equal(nrow(attr(sub, "dims")), 2L)
+  expect_equal(dim(attr(sub, "header")), c(2L, 2L))
+  expect_equal(dim(attr(sub, "header_dims")), c(2L, 2L))
+  expect_equal(names(sub), c("B x", "B y"))
+
+  expect_error(wb_data(wb, 1, dims = "B2:E5", header_rows = 0), "header_rows")
+  expect_error(wb_data(wb, 1, dims = "B2:E3", header_rows = 2), "more rows")
+  expect_error(wb_data(wb, 1, dims = "B2:E3;B5:E5", header_rows = 2), "single range")
+})
+
+test_that("wb_data() returns NULL for a worksheet without data", {
+  wb <- wb_workbook()$add_worksheet()
+
+  expect_message(got <- wb_data(wb, dims = "B2:C3"), "contains no data")
+  expect_null(got)
+
+  expect_message(got <- wb_data(wb, dims = "B2:C4", header_rows = 2), "contains no data")
+  expect_null(got)
+})
+
+test_that("wb_data() limits full column and full row dims to the used range", {
+  wb <- wb_workbook()$add_worksheet()$add_data(x = mtcars)
+
+  dat <- wb_data(wb, dims = "A:K")
+  expect_equal(dim(dat), c(33L, 11L))
+  expect_true(all(is.na(dat[33, ])))
+  expect_equal(dim(attr(dat, "dims")), c(34L, 11L))
+  expect_equal(attr(dat, "dims")[34, 11], "K34")
+  expect_equal(attr(dat, "dims_requested"), "A:K")
+
+  dat <- wb_data(wb, dims = "$B:$C")
+  expect_equal(dim(attr(dat, "dims")), c(34L, 2L))
+  expect_equal(attr(dat, "dims")[1, 1], "B1")
+
+  dat <- wb_data(wb, dims = "1:2")
+  expect_equal(dim(attr(dat, "dims")), c(2L, 12L))
+  expect_equal(attr(dat, "dims")[2, 12], "L2")
+  expect_equal(attr(dat, "dims_requested"), "1:2")
+
+  dat <- wb_data(wb, dims = "A1:K33")
+  expect_null(attr(dat, "dims_requested"))
+
+  dat <- wb_data(wb, dims = "1:2", used_range = FALSE)
+  expect_equal(dim(attr(dat, "dims")), c(2L, 16384L))
+  expect_null(attr(dat, "dims_requested"))
+
+  expect_error(wb_data(wb, dims = "A:K", used_range = NA), "used_range")
+
+  wb$add_pivot_table(wb_data(wb, dims = "A:K"), rows = "cyl", data = "mpg")
+  expect_match(wb$pivotDefinitions, '<worksheetSource ref="A:K" sheet="Sheet 1"/>', fixed = TRUE)
+  expect_match(wb$pivotDefinitions, 'recordCount="33"', fixed = TRUE)
+})
+
+test_that("wb_data() with several header rows is a valid single header object for others", {
+  skip_if_not_installed("mschart")
+
+  wb <- wb_workbook()$add_worksheet("S")
+  wb$add_data(x = "0-14", col_names = FALSE, dims = "B1")
+  wb$add_data(x = matrix(c("Region", "Male", "Female"), nrow = 1), col_names = FALSE, dims = "A2")
+  wb$add_data(x = data.frame(c("N", "S"), c(4, 6), c(5, 6)), col_names = FALSE, dims = "A3")
+  dat <- wb_data(wb, dims = "A1:C4", header_rows = 2)
+
+  ch <- mschart::ms_barchart(data = dat, x = "Region", y = "0-14 Male")
+  wb$add_mschart(dims = "E2:L18", graph = ch)
+  xml <- paste(wb$charts$chart, collapse = "")
+  expect_match(xml, "<c:f>S!$B$2:$B$2</c:f>", fixed = TRUE)
+  expect_match(xml, "<c:f>S!$A$3:$A$4</c:f>", fixed = TRUE)
+  expect_match(xml, "<c:f>S!$B$3:$B$4</c:f>", fixed = TRUE)
+
+  expect_error(wb$add_pivot_table(x = dat, rows = "Region", data = "0-14 Male"), "single header row")
+})
+
+test_that("invalid sheet arguments throw an error", {
+
+  wb <- wb_workbook()$add_worksheet()
+
+  expect_error(wb_add_data(wb, sheet = NA, x = 1), "whole number sheet index")
+  expect_error(wb_add_data(wb, sheet = 1.5, x = 1), "whole number sheet index")
+  expect_error(wb_add_data(wb, sheet = integer(), x = 1), "must not be empty")
+  expect_silent(wb_add_data(wb, sheet = 1, x = 1))
+
+})
+
+test_that("header and footer reject NaN", {
+
+  wb <- wb_workbook()$add_worksheet()
+  expect_error(wb$set_header_footer(header = NaN), "must have length 3")
+  expect_silent(wb$set_header_footer(header = NA))
+
+})
+
+test_that("remove_named_region() rejects NA names", {
+
+  wb <- wb_workbook()$add_worksheet()$add_named_region(dims = "A1", name = "nr")
+  expect_error(wb$remove_named_region(name = NA), "must be a character vector without NA")
+  expect_silent(wb$remove_named_region(name = "nr"))
+
+})
+
+test_that("table names must be non-empty strings", {
+
+  wb <- wb_workbook()$add_worksheet()
+  expect_error(wb$add_data_table(x = head(iris), table_name = ""), "single non-empty string")
+  expect_error(wb$add_data_table(x = head(iris), table_name = NA_character_), "single non-empty string")
+  expect_error(wb$add_data_table(x = head(iris), table_name = c("a", "b")), "single non-empty string")
+
+})
+
+test_that("markup in workbook properties is written as text", {
+
+  props <- list(
+    title = "a<b>&c", subject = "x & y", creator = "me & you", keywords = "<k>",
+    comments = "c&d \"q\"", category = "c<t", manager = "m&n", company = "<co>"
+  )
+  wb <- do.call(wb_workbook()$add_worksheet()$set_properties, props)
+
+  temp <- temp_xlsx()
+  on.exit(unlink(temp), add = TRUE)
+  wb$save(temp)
+
+  got <- wb_load(temp)$get_properties()
+  expect_equal(got[names(props)], unlist(props))
+
+  app <- read_xml(unzip(temp, "docProps/app.xml", exdir = temp_dir("props")), pointer = FALSE)
+  expect_equal(xml_value(app, "Properties", "Company"), "&lt;co&gt;")
+})
+
+test_that("wb_set_header_footer() works", {
+  wb <- wb_workbook()
+
+  # Add example data
+  wb$add_worksheet("S1")$add_data(x = 1:400)
+  wb$set_header_footer(
+    sheet = 1,
+    header = c("&[Date]", "ALL HEAD CENTER 2", "&[Page] / &[Pages]"),
+    footer = c("&[Path]&[File]", NA, "&[Tab]"),
+    first_header = c(NA, "Center Header of First Page", NA),
+    first_footer = c(NA, "Center Footer of First Page", NA)
+  )
+
+  exp <- list(
+    oddHeader = list("&amp;D", "ALL HEAD CENTER 2", "&amp;P / &amp;N"),
+    oddFooter = list("&amp;Z&amp;F", NULL, "&amp;A"),
+    evenHeader = list(),
+    evenFooter = list(),
+    firstHeader = list(NULL, "Center Header of First Page", NULL),
+    firstFooter = list(NULL, "Center Footer of First Page", NULL)
+  )
+  got <- wb$worksheets[[1]]$headerFooter
+  expect_equal(exp, got)
+
+})
+
+test_that("shapes of several drawings on a sheet get unique ids", {
+
+  sp <- function(id) {
+    sprintf(paste0(
+      "<xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr><xdr:cNvPr id=\"%s\" name=\"\"/><xdr:cNvSpPr/></xdr:nvSpPr>",
+      "<xdr:spPr><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></xdr:spPr></xdr:sp>"
+    ), id)
+  }
+  xml <- paste0(
+    "<xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\" ",
+    "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">",
+    "<xdr:absoluteAnchor><xdr:pos x=\"0\" y=\"0\"/><xdr:ext cx=\"914400\" cy=\"914400\"/>",
+    "<xdr:grpSp><xdr:nvGrpSpPr><xdr:cNvPr id=\"1\" name=\"\"/><xdr:cNvGrpSpPr/></xdr:nvGrpSpPr><xdr:grpSpPr/>",
+    sp(2), sp(3),
+    "</xdr:grpSp><xdr:clientData/></xdr:absoluteAnchor></xdr:wsDr>"
+  )
+
+  wb <- wb_workbook()$add_worksheet()$
+    add_drawing(xml = xml, dims = "A1")$
+    add_drawing(xml = xml, dims = "D1")$
+    add_drawing(xml = xml, dims = "G1")
+
+  ids <- regmatches(wb$drawings[[1]], gregexpr("(?<=cNvPr id=\")[0-9]+", wb$drawings[[1]], perl = TRUE))[[1]]
+  expect_length(ids, 9)
+  expect_false(anyDuplicated(ids) > 0)
 })

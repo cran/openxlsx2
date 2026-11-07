@@ -726,3 +726,44 @@ test_that("timestamps differ when use_modification_date is TRUE", {
 
   expect_false(file.mtime(tempFile1) == file.mtime(tempFile2))
 })
+
+test_that("long hyperlinks with digits work", {
+
+  pgs_small <- data.frame(
+    id = 245L,
+    plot_label = "test",
+    Protein.IDs = "A0A4P2L339;A0A8M6Z9J0",
+    stringsAsFactors = FALSE
+  )
+  my_links <- 'https://www.uniprot.org/uniprot/?query=(accession:A0A4P2L339)+OR+(accession:A0A8M6Z9J0)'
+
+  dims <- wb_dims(x = pgs_small, from_row = 1, cols = 2)
+
+  wb <- wb_workbook()$
+    add_worksheet()$
+    add_data_table(x = pgs_small)$
+    add_hyperlink(dims = dims, target = my_links)
+
+  tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
+  expect_silent(wb$save(tmp))
+
+  wb1 <- wb_load(tmp)
+  got <- xml_attr(wb1$worksheets_rels[[1]][2], "Relationship")[[1]][["Target"]]
+  expect_equal(got, my_links)
+
+})
+
+test_that("no relationship to a missing shared strings part is written", {
+  tmp <- temp_xlsx()
+  on.exit(unlink(tmp), add = TRUE)
+
+  wb <- wb_load(testfile_path("gh_issue_1419.xlsx"))
+  expect_equal(length(wb$sharedStrings), 0L)
+  wb$save(tmp)
+
+  files <- unzip(tmp, list = TRUE)$Name
+  expect_false("xl/sharedStrings.xml" %in% files)
+  rels <- readLines(unz(tmp, "xl/_rels/workbook.xml.rels"), warn = FALSE)
+  expect_false(any(grepl("sharedStrings", rels, fixed = TRUE)))
+})
